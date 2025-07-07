@@ -10,8 +10,8 @@ const redis = new Redis({
 interface Newsletter {
   id: string;
   subject: string;
-  body: string;
-  from: string;
+  content: string;
+  sender: string;
   date: string;
   isNew: boolean;
 }
