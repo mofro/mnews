@@ -10,8 +10,8 @@ const redis = new Redis({
 interface Newsletter {
   id: string;
   subject: string;
-  content: string;
-  sender: string;
+  content: string;    // ← Changed from "body"
+  sender: string;     // ← Changed from "from" 
   date: string;
   isNew: boolean;
 }
@@ -31,18 +31,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const newsletter: Newsletter = {
       id: Date.now().toString(),
       subject: subject || 'No Subject',
-      body: body || '',
-      from: from || 'Unknown Sender',
+      content: body || '',              // ← Changed "body" to "content"
+      sender: from || 'Unknown Sender', // ← Changed "from" to "sender"
       date: date || new Date().toISOString(),
       isNew: true,
     };
 
-    // Store in Redis
+    // Store in Redis with detailed logging
+    console.log('About to save newsletter:', newsletter);
+    
     // Use a Redis list to store newsletter IDs
-    await redis.lpush('newsletter_ids', newsletter.id);
+    console.log('Saving newsletter ID to list...');
+    const listResult = await redis.lpush('newsletter_ids', newsletter.id);
+    console.log('List push result:', listResult);
     
     // Store the full newsletter data
-    await redis.set(`newsletter:${newsletter.id}`, newsletter);
+    console.log('Saving newsletter data...');
+    const setResult = await redis.set(`newsletter:${newsletter.id}`, newsletter);
+    console.log('Set result:', setResult);
+
+    // Verify the data was saved
+    console.log('Verifying saved data...');
+    const savedData = await redis.get(`newsletter:${newsletter.id}`);
+    console.log('Retrieved data:', savedData);
 
     console.log('Newsletter saved to Redis:', newsletter.id);
 
