@@ -1,0 +1,9 @@
+[
+  {
+    "id": "example-1",
+    "sender": "TechCrunch Daily",
+    "subject": "Welcome to Nemo - Your Newsletter Aggregator!",
+    "date": "2025-07-07T10:00:00Z",
+    "content": "🐠 Welcome to Nemo!\n\nThis is an example newsletter to show you how the system works.\n\nOnce you start forwarding real newsletters, they'll appear here automatically.\n\nFeatures:\n- Search and filter newsletters\n- Mobile-friendly interface  \n- Expandable content view\n- Today's newsletters highlighted\n\nTo get started, forward your newsletters to the webhook endpoint and watch them populate here!\n\nHappy newsletter hunting! 🎣"
+  }
+]
