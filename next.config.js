@@ -1,14 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
-  trailingSlash: true,
+  // Remove output: 'export' to enable API routes on Vercel
   images: {
     unoptimized: true
   },
-  // Enable API routes for webhook
-  experimental: {
-    appDir: false // Use pages directory for now
-  }
+  // Clean config - no deprecated experimental options needed
 }
 
 module.exports = nextConfig
