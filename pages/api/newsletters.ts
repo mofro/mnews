@@ -1,70 +1,51 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
-import fs from 'fs'
-import path from 'path'
-import { isToday, parseISO } from 'date-fns'
-import type { NewsletterEmail, DashboardStats } from '../../lib/types'
+import { NextApiRequest, NextApiResponse } from 'next';
+import { Redis } from '@upstash/redis';
 
-export default function handler(
-  req: NextApiRequest,
-  res: NextApiResponse
-) {
+// Initialize Redis connection
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
+});
+
+interface Newsletter {
+  id: string;
+  subject: string;
+  body: string;
+  from: string;
+  date: string;
+  isNew: boolean;
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
-    return res.status(405).json({ message: 'Method not allowed' })
+    return res.status(405).json({ message: 'Method not allowed' });
   }
 
   try {
-    const newsletters = loadNewsletters()
-    const stats = calculateStats(newsletters)
+    // Get all newsletter IDs from Redis list
+    const newsletterIds = await redis.lrange('newsletter_ids', 0, -1) as string[];
     
-    res.status(200).json({
-      newsletters,
-      stats
-    })
-  } catch (error) {
-    console.error('Error loading newsletters:', error)
-    res.status(500).json({ 
-      newsletters: [], 
-      stats: {
-        totalNewsletters: 0,
-        todayCount: 0,
-        uniqueSenders: 0,
-        lastUpdated: new Date().toISOString()
+    console.log('Found newsletter IDs:', newsletterIds);
+
+    // Fetch all newsletters
+    const newsletters: Newsletter[] = [];
+    
+    for (const id of newsletterIds) {
+      const newsletter = await redis.get(`newsletter:${id}`) as Newsletter;
+      if (newsletter) {
+        newsletters.push(newsletter);
       }
-    })
-  }
-}
-
-function loadNewsletters(): NewsletterEmail[] {
-  const filePath = path.join(process.cwd(), 'data', 'newsletters.json')
-  
-  if (!fs.existsSync(filePath)) {
-    return []
-  }
-  
-  try {
-    const data = fs.readFileSync(filePath, 'utf8')
-    return JSON.parse(data)
-  } catch (error) {
-    console.error('Error parsing newsletters.json:', error)
-    return []
-  }
-}
-
-function calculateStats(newsletters: NewsletterEmail[]): DashboardStats {
-  const todayCount = newsletters.filter(newsletter => {
-    try {
-      return isToday(parseISO(newsletter.date))
-    } catch {
-      return false
     }
-  }).length
-  
-  const uniqueSenders = new Set(newsletters.map(n => n.sender)).size
-  
-  return {
-    totalNewsletters: newsletters.length,
-    todayCount,
-    uniqueSenders,
-    lastUpdated: new Date().toISOString()
+
+    // Sort by date (newest first)
+    newsletters.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    console.log(`Returning ${newsletters.length} newsletters`);
+
+    res.status(200).json(newsletters);
+
+  } catch (error) {
+    console.error('Error fetching newsletters:', error);
+    res.status(500).json({ message: 'Error fetching newsletters' });
   }
 }
