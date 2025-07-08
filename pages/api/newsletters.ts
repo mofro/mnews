@@ -2,9 +2,13 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { Redis } from '@upstash/redis';
 
 // Initialize Redis connection using existing KV variables
+if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+  throw new Error('Missing required environment variables: KV_REST_API_URL and KV_REST_API_TOKEN');
+}
+
 const redis = new Redis({
-  url: process.env.KV_REST_API_URL!,
-  token: process.env.KV_REST_API_TOKEN!,
+  url: process.env.KV_REST_API_URL,
+  token: process.env.KV_REST_API_TOKEN,
 });
 
 interface Newsletter {
