@@ -101,6 +101,11 @@ export default function Dashboard() {
 function NewsletterItem({ newsletter }: { newsletter: NewsletterEmail }) {
   const [expanded, setExpanded] = useState(false)
   
+  // In NewsletterItem component, before parseISO
+  console.log('Newsletter date:', newsletter.date);
+  console.log('Date type:', typeof newsletter.date);
+
+
   // Safe date parsing with fallback
   const parseDate = (dateString: string) => {
     try {
