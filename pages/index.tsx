@@ -105,15 +105,15 @@ function NewsletterItem({ newsletter }: { newsletter: NewsletterEmail }) {
   console.log('Newsletter date:', newsletter.date);
   console.log('Date type:', typeof newsletter.date);
 
-  if (process.env.NODE_ENV === 'development') {
+  // if (process.env.NODE_ENV === 'development') {
 
-    try {
-      const date = parseISO(newsletter.date);
-      console.log('Parsed date:', date);
-    } catch (error) {
-      console.error('Date parsing error:', error);
-    }
-  }
+  //   try {
+  //     const date = parseISO(newsletter.date);
+  //     console.log('Parsed date:', date);
+  //   } catch (error) {
+  //     console.error('Date parsing error:', error);
+  //   }
+  // }
 
   // Safe date parsing with fallback
   const parseDate = (dateString: string) => {
