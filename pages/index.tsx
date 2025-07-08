@@ -100,7 +100,24 @@ export default function Dashboard() {
 
 function NewsletterItem({ newsletter }: { newsletter: NewsletterEmail }) {
   const [expanded, setExpanded] = useState(false)
-  const date = parseISO(newsletter.date)
+  
+  // Safe date parsing with fallback
+  const parseDate = (dateString: string) => {
+    try {
+      const parsed = parseISO(dateString)
+      // Check if the parsed date is valid
+      if (isNaN(parsed.getTime())) {
+        console.warn('Invalid date string:', dateString)
+        return new Date() // fallback to current date
+      }
+      return parsed
+    } catch (error) {
+      console.warn('Error parsing date:', dateString, error)
+      return new Date() // fallback to current date
+    }
+  }
+  
+  const date = parseDate(newsletter.date)
   const isNew = isToday(date)
 
   return (

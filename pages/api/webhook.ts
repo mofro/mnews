@@ -31,13 +31,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     console.log('Newsletter received:', { subject, from, date });
 
+    // Normalize and validate date
+    const normalizeDate = (dateInput: any): string => {
+      if (!dateInput) {
+        return new Date().toISOString();
+      }
+      
+      try {
+        const parsedDate = new Date(dateInput);
+        if (isNaN(parsedDate.getTime())) {
+          console.warn('Invalid date received:', dateInput);
+          return new Date().toISOString();
+        }
+        return parsedDate.toISOString();
+      } catch (error) {
+        console.warn('Error parsing date:', dateInput, error);
+        return new Date().toISOString();
+      }
+    };
+
     // Create newsletter object
     const newsletter: Newsletter = {
       id: Date.now().toString(),
       subject: subject || 'No Subject',
       content: body || '',              // ← Changed "body" to "content"
       sender: from || 'Unknown Sender', // ← Changed "from" to "sender"
-      date: date || new Date().toISOString(),
+      date: normalizeDate(date),
       isNew: true,
     };
 
