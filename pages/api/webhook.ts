@@ -24,10 +24,10 @@ interface Newsletter {
 function htmlToText(html: string): string {
   if (!html) return '';
   
-  // Remove HTML tags
+  // Remove HTML tags (ES2017 compatible)
   let text = html
-    .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove style blocks
-    .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove scripts
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style blocks
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove scripts
     .replace(/<[^>]+>/g, ' ') // Remove all HTML tags
     .replace(/&nbsp;/g, ' ') // Replace non-breaking spaces
     .replace(/&amp;/g, '&') // Replace HTML entities
