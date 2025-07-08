@@ -7,18 +7,61 @@ if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
 }
 
 const redis = new Redis({
-  url: process.env.KV_REST_API_URL,
-  token: process.env.KV_REST_API_TOKEN,
+  url: process.env.KV_REST_API_URL!,
+  token: process.env.KV_REST_API_TOKEN!,
 });
 
 interface Newsletter {
   id: string;
   subject: string;
-  content: string;    // ← Changed from "body"
-  sender: string;     // ← Changed from "from" 
+  content: string;    
+  sender: string;     
   date: string;
   isNew: boolean;
 }
+
+// Simple HTML to text converter
+function htmlToText(html: string): string {
+  if (!html) return '';
+  
+  // Remove HTML tags
+  let text = html
+    .replace(/<style[^>]*>.*?<\/style>/gis, '') // Remove style blocks
+    .replace(/<script[^>]*>.*?<\/script>/gis, '') // Remove scripts
+    .replace(/<[^>]+>/g, ' ') // Remove all HTML tags
+    .replace(/&nbsp;/g, ' ') // Replace non-breaking spaces
+    .replace(/&amp;/g, '&') // Replace HTML entities
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\r\n/g, '\n') // Normalize line breaks
+    .replace(/\r/g, '\n')
+    .replace(/\n{3,}/g, '\n\n') // Collapse multiple line breaks
+    .replace(/[ \t]{2,}/g, ' ') // Collapse multiple spaces
+    .trim();
+  
+  return text;
+}
+
+// Normalize and validate date
+const normalizeDate = (dateInput: any): string => {
+  if (!dateInput) {
+    return new Date().toISOString();
+  }
+  
+  try {
+    const parsedDate = new Date(dateInput);
+    if (isNaN(parsedDate.getTime())) {
+      console.warn('Invalid date received:', dateInput);
+      return new Date().toISOString();
+    }
+    return parsedDate.toISOString();
+  } catch (error) {
+    console.warn('Error parsing date:', dateInput, error);
+    return new Date().toISOString();
+  }
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -31,31 +74,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     console.log('Newsletter received:', { subject, from, date });
 
-    // Normalize and validate date
-    const normalizeDate = (dateInput: any): string => {
-      if (!dateInput) {
-        return new Date().toISOString();
-      }
-      
-      try {
-        const parsedDate = new Date(dateInput);
-        if (isNaN(parsedDate.getTime())) {
-          console.warn('Invalid date received:', dateInput);
-          return new Date().toISOString();
-        }
-        return parsedDate.toISOString();
-      } catch (error) {
-        console.warn('Error parsing date:', dateInput, error);
-        return new Date().toISOString();
-      }
-    };
+    // Clean up the email content
+    const cleanContent = htmlToText(body || '');
+    console.log('Content cleaned, length:', cleanContent.length);
 
     // Create newsletter object
     const newsletter: Newsletter = {
       id: Date.now().toString(),
       subject: subject || 'No Subject',
-      content: body || '',              // ← Changed "body" to "content"
-      sender: from || 'Unknown Sender', // ← Changed "from" to "sender"
+      content: cleanContent,              
+      sender: from || 'Unknown Sender', 
       date: normalizeDate(date),
       isNew: true,
     };
