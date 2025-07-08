@@ -40,9 +40,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Sort by date (newest first)
     newsletters.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    console.log(`Returning ${newsletters.length} newsletters`);
+    // Calculate stats
+    const today = new Date().toISOString().split('T')[0];
+    const todayCount = newsletters.filter(n => n.date.startsWith(today)).length;
+    const uniqueSenders = new Set(newsletters.map(n => n.sender)).size;
 
-    res.status(200).json(newsletters);
+    const stats = {
+      totalNewsletters: newsletters.length,
+      todayCount,
+      uniqueSenders
+    };
+
+    console.log(`Returning ${newsletters.length} newsletters with stats`);
+
+    // Return in the format the frontend expects
+    res.status(200).json({
+      newsletters,
+      stats
+    });
 
   } catch (error) {
     console.error('Error fetching newsletters:', error);
