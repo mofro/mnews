@@ -127,7 +127,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // Store the full newsletter data
     console.log('Saving newsletter data...');
-    const setResult = await redis.set(`newsletter:${newsletter.id}`, newsletter);
+    const setResult = await redis.set(`newsletter:${newsletter.id}`, JSON.stringify(newsletter));
     console.log('Set result:', setResult);
 
     // Verify the data was saved
