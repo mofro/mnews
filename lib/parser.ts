@@ -31,7 +31,7 @@ export class NewsletterParser {
       };
       
       try {
-        let result = { html: rawHTML, metadata: { processingSteps: [] } };
+        let result = { html: rawHTML, metadata: { processingSteps: [] as string[] } };
         
         result = this.preprocess(result.html, result.metadata);
         result = this.extractStructure(result.html, result.metadata, config);
@@ -54,10 +54,10 @@ export class NewsletterParser {
         return {
           cleanHTML: this.basicCleanup(rawHTML),
           metadata: {
-            processingSteps: [],
+            processingSteps: [] as string[],
             processingVersion: '2.6.0-fallback',
             processedAt: new Date().toISOString(),
-            error: error.message,
+            error: error instanceof Error ? error.message : String(error),
             wordCount: this.estimateWordCount(rawHTML),
             compressionRatio: '0%'
           }
@@ -68,7 +68,7 @@ export class NewsletterParser {
     /**
      * Stage 1: Remove email cruft and noise
      */
-    static preprocess(html, metadata) {
+    static preprocess(html: string, metadata: { processingSteps: string[] }) {
       metadata.processingSteps.push('preprocess');
       
       let cleaned = html;
@@ -98,7 +98,7 @@ export class NewsletterParser {
     /**
      * Stage 2: Extract and preserve semantic structure
      */
-    static extractStructure(html, metadata, config) {
+    static extractStructure(html: string, metadata: { processingSteps: string[] }, config: any) {
       metadata.processingSteps.push('extract-structure');
       
       let structured = html;
@@ -136,7 +136,7 @@ export class NewsletterParser {
     /**
      * Stage 3: Clean up remaining HTML while preserving format
      */
-    static preserveFormat(html, metadata, config) {
+    static preserveFormat(html: string, metadata: { processingSteps: string[] }, config: any) {
       metadata.processingSteps.push('preserve-format');
       
       let formatted = html;
@@ -169,7 +169,7 @@ export class NewsletterParser {
     /**
      * Stage 4: Security cleanup
      */
-    static sanitize(html, metadata) {
+    static sanitize(html: string, metadata: { processingSteps: string[] }) {
       metadata.processingSteps.push('sanitize');
       
       let sanitized = html;
@@ -190,7 +190,7 @@ export class NewsletterParser {
     /**
      * Helper: Preserve list structure and hierarchy
      */
-    static preserveLists(html, maxNesting) {
+    static preserveLists(html: string, maxNesting: number) {
       // Convert unordered lists
       html = html.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (match, content) => {
         const cleanContent = this.cleanListContent(content);
@@ -215,7 +215,7 @@ export class NewsletterParser {
     /**
      * Helper: Clean content inside list items
      */
-    static cleanListContent(content) {
+    static cleanListContent(content: string) {
       return content
         .replace(/<li[^>]*>\s*<\/li>/gi, '') // Remove empty items
         .replace(/\s+/g, ' ')
@@ -225,7 +225,7 @@ export class NewsletterParser {
     /**
      * Helper: Clean inline content (remove styling but preserve text)
      */
-    static cleanInlineContent(content) {
+    static cleanInlineContent(content: string) {
       return content
         .replace(/<(?!\/?(strong|em|a)\b)[^>]+>/gi, ' ') // Keep only basic formatting
         .replace(/\s+/g, ' ')
@@ -235,7 +235,7 @@ export class NewsletterParser {
     /**
      * Helper: Sanitize URLs to prevent XSS
      */
-    static sanitizeUrl(url) {
+    static sanitizeUrl(url: string) {
       // Only allow safe protocols
       if (/^https?:\/\//.test(url) || /^mailto:/.test(url)) {
         return url;
@@ -246,7 +246,7 @@ export class NewsletterParser {
     /**
      * Helper: Estimate word count from HTML
      */
-    static estimateWordCount(html) {
+    static estimateWordCount(html: string) {
       const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
       return text ? text.split(' ').length : 0;
     }
@@ -254,7 +254,7 @@ export class NewsletterParser {
     /**
      * Fallback: Basic cleanup if main parser fails
      */
-    static basicCleanup(html) {
+    static basicCleanup(html: string) {
       return html
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
