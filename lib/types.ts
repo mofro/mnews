@@ -23,6 +23,9 @@ export interface Newsletter {
   content: string;         // Keep for existing dashboard compatibility
 }
 
+// BACKWARD COMPATIBILITY: Alias for existing dashboard
+export type NewsletterEmail = Newsletter;
+
 export interface Link {
   url: string;
   text: string;
@@ -38,4 +41,12 @@ export interface NewslettersResponse {
     needsProcessing?: number;      // NEW stats
     avgWordCount?: number;         // NEW stats
   };
+}
+
+// BACKWARD COMPATIBILITY: Dashboard stats interface
+export interface DashboardStats {
+  total: number;
+  withCleanContent?: number;
+  needsProcessing?: number;
+  avgWordCount?: number;
 }
