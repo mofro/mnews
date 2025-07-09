@@ -1,4 +1,4 @@
-// FILE: /pages/api/webhook.ts (MERGE with existing - preserves all customizations)
+
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Redis } from '@upstash/redis';
 
