@@ -1,4 +1,4 @@
-// FILE: /lib/storage.ts (CREATE NEW - Compatible with existing Redis structure)
+// FILE: /lib/storage.ts (CORRECTED VERSION - Copy this exactly)
 import { Redis } from '@upstash/redis';
 import { Newsletter } from './types';
 
@@ -34,10 +34,10 @@ export class NewsletterStorage {
             newsletter.rawContent = newsletter.content;
             newsletter.cleanContent = newsletter.content;
             newsletter.metadata = {
-              processingVersion: 'legacy-migrated',
+              ...(newsletter.metadata || {}),  // ✅ SPREAD FIRST
+              processingVersion: 'legacy-migrated',  // ✅ THEN OVERRIDE
               processedAt: new Date().toISOString(),
-              wordCount: newsletter.content.split(' ').length,
-              ...(newsletter.metadata || {})
+              wordCount: newsletter.content.split(' ').length
             };
             
             // Save migrated version back to Redis
@@ -76,10 +76,10 @@ export class NewsletterStorage {
         newsletter.rawContent = newsletter.content;
         newsletter.cleanContent = newsletter.content;
         newsletter.metadata = {
-          processingVersion: 'legacy-migrated',
+          ...(newsletter.metadata || {}),  // ✅ SPREAD FIRST
+          processingVersion: 'legacy-migrated',  // ✅ THEN OVERRIDE
           processedAt: new Date().toISOString(),
-          wordCount: newsletter.content.split(' ').length,
-          ...(newsletter.metadata || {})
+          wordCount: newsletter.content.split(' ').length
         };
         
         await redis.set(key, JSON.stringify(newsletter));
@@ -104,8 +104,8 @@ export class NewsletterStorage {
     newsletter.cleanContent = cleanContent;
     newsletter.content = cleanContent; // Update legacy field too
     newsletter.metadata = {
-      ...newsletter.metadata,
-      processedAt: new Date().toISOString()
+      ...newsletter.metadata,  // ✅ SPREAD FIRST
+      processedAt: new Date().toISOString()  // ✅ THEN OVERRIDE
     };
     
     const key = `${this.NEWSLETTER_PREFIX}${id}`;
