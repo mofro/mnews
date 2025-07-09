@@ -1,6 +1,7 @@
 
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Redis } from '@upstash/redis';
+import { NewsletterParser } from '../../lib/parser';
 
 // Initialize Redis connection using existing KV variables (your existing config)
 if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
@@ -91,9 +92,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // UPDATED: Handle both original content and cleaned content
     const originalContent = body || '';
-    const cleanContent = htmlToText(originalContent);
+    let cleanContent: string;
+    let processingVersion = '2.6.0-existing-logic';
+    
+    try {
+      // Try enhanced parser first
+      console.log('Attempting enhanced parsing...');
+      const parseResult = NewsletterParser.parseToCleanHTML(originalContent);
+      cleanContent = parseResult.cleanHTML;
+      processingVersion = parseResult.metadata.processingVersion;
+      console.log('Enhanced parser success:', {
+        originalLength: originalContent.length,
+        cleanLength: cleanContent.length,
+        compressionRatio: parseResult.metadata.compressionRatio
+      });
+    } catch (parseError) {
+      // Fall back to your existing working logic
+      console.warn('Enhanced parser failed, using existing htmlToText:', parseError);
+      cleanContent = htmlToText(originalContent);
+    }
+    
     console.log('Content cleaned, length:', cleanContent.length);
-
+    
     // UPDATED: Create newsletter object with additive content model
     const newsletter: Newsletter = {
       id: Date.now().toString(),              // Your existing ID generation
@@ -108,7 +128,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       // NEW: Processing metadata
       metadata: {
-        processingVersion: '2.6.0-existing-logic',
+        processingVersion: processingVersion,
         processedAt: new Date().toISOString(),
         wordCount: cleanContent.split(' ').length
       },
