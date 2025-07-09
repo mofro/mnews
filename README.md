@@ -2,7 +2,7 @@
 
 **Personal newsletter aggregation and digest system**
 
-Nemo helps you find your newsletters in the vast ocean of email by aggregating forwarded newsletters into a single, searchable dashboard.
+Nemo helps you find your newsletters in the vast ocean of email by aggregating forwarded newsletters into a single, searchable dashboard!
 
 ## Features
 
