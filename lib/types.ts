@@ -43,9 +43,15 @@ export interface NewslettersResponse {
   };
 }
 
-// BACKWARD COMPATIBILITY: Dashboard stats interface
+// BACKWARD COMPATIBILITY: Dashboard stats interface (match existing dashboard expectations)
 export interface DashboardStats {
-  total: number;
+  // Existing dashboard properties (your current dashboard expects these)
+  totalNewsletters: number;
+  todayCount: number;
+  uniqueSenders: number;
+  
+  // NEW stats (optional for backward compatibility)
+  total?: number;
   withCleanContent?: number;
   needsProcessing?: number;
   avgWordCount?: number;

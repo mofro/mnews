@@ -1,4 +1,4 @@
-// FILE: /lib/storage.ts (CORRECTED VERSION - Copy this exactly)
+// FILE: /lib/storage.ts (CREATE NEW - Compatible with existing Redis structure)
 import { Redis } from '@upstash/redis';
 import { Newsletter } from './types';
 
@@ -34,8 +34,8 @@ export class NewsletterStorage {
             newsletter.rawContent = newsletter.content;
             newsletter.cleanContent = newsletter.content;
             newsletter.metadata = {
-              ...(newsletter.metadata || {}),  // ✅ SPREAD FIRST
-              processingVersion: 'legacy-migrated',  // ✅ THEN OVERRIDE
+              ...(newsletter.metadata || {}),  // Spread existing metadata first
+              processingVersion: 'legacy-migrated',  // Then override specific fields
               processedAt: new Date().toISOString(),
               wordCount: newsletter.content.split(' ').length
             };
@@ -76,8 +76,8 @@ export class NewsletterStorage {
         newsletter.rawContent = newsletter.content;
         newsletter.cleanContent = newsletter.content;
         newsletter.metadata = {
-          ...(newsletter.metadata || {}),  // ✅ SPREAD FIRST
-          processingVersion: 'legacy-migrated',  // ✅ THEN OVERRIDE
+          ...(newsletter.metadata || {}),  // Spread existing metadata first
+          processingVersion: 'legacy-migrated',  // Then override specific fields
           processedAt: new Date().toISOString(),
           wordCount: newsletter.content.split(' ').length
         };
@@ -104,8 +104,8 @@ export class NewsletterStorage {
     newsletter.cleanContent = cleanContent;
     newsletter.content = cleanContent; // Update legacy field too
     newsletter.metadata = {
-      ...newsletter.metadata,  // ✅ SPREAD FIRST
-      processedAt: new Date().toISOString()  // ✅ THEN OVERRIDE
+      ...newsletter.metadata,  // Spread existing metadata first
+      processedAt: new Date().toISOString()  // Then override specific fields
     };
     
     const key = `${this.NEWSLETTER_PREFIX}${id}`;
