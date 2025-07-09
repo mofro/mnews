@@ -24,6 +24,7 @@ export class NewsletterStorage {
       try {
         const key = `${this.NEWSLETTER_PREFIX}${id}`;
         const data = await redis.get(key);
+        console.log(`Raw data for ${id}:`, data, typeof data); // adding for debug
         
         if (data) {
           const newsletter = JSON.parse(data as string) as Newsletter;
