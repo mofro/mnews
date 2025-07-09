@@ -2,7 +2,19 @@
 // NewsletterParser - Convert complex HTML newsletters to clean, readable HTML
 // Drop this file into your project - doesn't modify any existing code
 
-class NewsletterParser {
+export interface ParseResult {
+  cleanHTML: string;
+  metadata: {
+    processingSteps: string[];
+    processingVersion: string;
+    processedAt: string;
+    wordCount: number;
+    compressionRatio: string;
+    error?: string;
+  };
+}
+
+export class NewsletterParser {
   
     /**
      * Main entry point - convert raw newsletter HTML to clean HTML
@@ -10,7 +22,7 @@ class NewsletterParser {
      * @param {Object} options - Parsing configuration
      * @returns {Object} - { cleanHTML, metadata }
      */
-    static parseToCleanHTML(rawHTML, options = {}) {
+    static parseToCleanHTML(rawHTML: string, options: any = {}): ParseResult {
       const config = {
         preserveLinks: true,
         preserveImages: false,
@@ -254,9 +266,9 @@ class NewsletterParser {
   }
   
   // Export for Node.js
-  if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { NewsletterParser };
-  }
+  // if (typeof module !== 'undefined' && module.exports) {
+  //   module.exports = { NewsletterParser };
+  // }
   
   // Export for ES6 modules (if using import/export)
   // export { NewsletterParser };

@@ -1,7 +1,7 @@
 
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Redis } from '@upstash/redis';
-import { NewsletterParser } from '../../lib/parser';
+import { NewsletterParser, ParseResult } from '../../lib/parser';
 
 // Initialize Redis connection using existing KV variables (your existing config)
 if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
@@ -25,7 +25,7 @@ interface Newsletter {
   rawContent: string;      // Original email content
   cleanContent: string;    // Processed clean content
   
-  // NEW: Processing metadata
+  // NEW: Processing metadataconst
   metadata: {
     processingVersion: string;
     processedAt: string;
@@ -98,7 +98,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       // Try enhanced parser first
       console.log('Attempting enhanced parsing...');
-      const parseResult = NewsletterParser.parseToCleanHTML(originalContent);
+      const parseResult: ParseResult = NewsletterParser.parseToCleanHTML(originalContent);
       cleanContent = parseResult.cleanHTML;
       processingVersion = parseResult.metadata.processingVersion;
       console.log('Enhanced parser success:', {
