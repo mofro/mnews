@@ -54,6 +54,7 @@ export class NewsletterParser {
         return {
           cleanHTML: this.basicCleanup(rawHTML),
           metadata: {
+            processingSteps: [],
             processingVersion: '2.6.0-fallback',
             processedAt: new Date().toISOString(),
             error: error.message,
