@@ -27,7 +27,7 @@ export class NewsletterStorage {
         console.log(`Raw data for ${id}:`, data, typeof data); // adding for debug
         
         if (data) {
-          const newsletter = JSON.parse(data as string) as Newsletter;
+          const newsletter = (typeof data === 'string' ? JSON.parse(data) : data) as Newsletter;
           
           // AUTO-MIGRATION: Handle existing newsletters without new fields
           if (!newsletter.rawContent && newsletter.content) {
