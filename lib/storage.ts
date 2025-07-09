@@ -1,0 +1,114 @@
+// FILE: /lib/storage.ts (CREATE NEW - Compatible with existing Redis structure)
+import { Redis } from '@upstash/redis';
+import { Newsletter } from './types';
+
+// Use your existing environment variables
+const redis = new Redis({
+  url: process.env.KV_REST_API_URL!,
+  token: process.env.KV_REST_API_TOKEN!,
+});
+
+export class NewsletterStorage {
+  // Your existing Redis pattern: newsletter_ids list + newsletter:${id} keys
+  private static readonly NEWSLETTER_PREFIX = 'newsletter:';
+  private static readonly NEWSLETTER_IDS_KEY = 'newsletter_ids';  // Your existing key name
+  
+  static async getAllNewsletters(): Promise<Newsletter[]> {
+    // Use your existing Redis structure
+    const ids = await redis.lrange(this.NEWSLETTER_IDS_KEY, 0, -1);
+    if (!ids || ids.length === 0) return [];
+    
+    const newsletters: Newsletter[] = [];
+    
+    for (const id of ids) {
+      try {
+        const key = `${this.NEWSLETTER_PREFIX}${id}`;
+        const data = await redis.get(key);
+        
+        if (data) {
+          const newsletter = JSON.parse(data as string) as Newsletter;
+          
+          // AUTO-MIGRATION: Handle existing newsletters without new fields
+          if (!newsletter.rawContent && newsletter.content) {
+            console.log(`Auto-migrating newsletter ${id}`);
+            newsletter.rawContent = newsletter.content;
+            newsletter.cleanContent = newsletter.content;
+            newsletter.metadata = {
+              processingVersion: 'legacy-migrated',
+              processedAt: new Date().toISOString(),
+              wordCount: newsletter.content.split(' ').length,
+              ...(newsletter.metadata || {})
+            };
+            
+            // Save migrated version back to Redis
+            await redis.set(key, JSON.stringify(newsletter));
+          }
+          
+          // ENSURE BACKWARD COMPATIBILITY: Always have content field
+          if (!newsletter.content) {
+            newsletter.content = newsletter.cleanContent || newsletter.rawContent;
+          }
+          
+          newsletters.push(newsletter);
+        }
+      } catch (error) {
+        console.error(`Error loading newsletter ${id}:`, error);
+      }
+    }
+    
+    // Sort by date (newest first) - preserve your existing ordering
+    return newsletters.sort((a, b) => 
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    );
+  }
+  
+  static async getNewsletter(id: string): Promise<Newsletter | null> {
+    try {
+      const key = `${this.NEWSLETTER_PREFIX}${id}`;
+      const data = await redis.get(key);
+      
+      if (!data) return null;
+      
+      const newsletter = JSON.parse(data as string) as Newsletter;
+      
+      // Same auto-migration logic as getAllNewsletters
+      if (!newsletter.rawContent && newsletter.content) {
+        newsletter.rawContent = newsletter.content;
+        newsletter.cleanContent = newsletter.content;
+        newsletter.metadata = {
+          processingVersion: 'legacy-migrated',
+          processedAt: new Date().toISOString(),
+          wordCount: newsletter.content.split(' ').length,
+          ...(newsletter.metadata || {})
+        };
+        
+        await redis.set(key, JSON.stringify(newsletter));
+      }
+      
+      if (!newsletter.content) {
+        newsletter.content = newsletter.cleanContent || newsletter.rawContent;
+      }
+      
+      return newsletter;
+    } catch (error) {
+      console.error(`Error fetching newsletter ${id}:`, error);
+      return null;
+    }
+  }
+  
+  // NEW: Update clean content for existing newsletter
+  static async updateCleanContent(id: string, cleanContent: string): Promise<void> {
+    const newsletter = await this.getNewsletter(id);
+    if (!newsletter) throw new Error(`Newsletter ${id} not found`);
+    
+    newsletter.cleanContent = cleanContent;
+    newsletter.content = cleanContent; // Update legacy field too
+    newsletter.metadata = {
+      ...newsletter.metadata,
+      processedAt: new Date().toISOString()
+    };
+    
+    const key = `${this.NEWSLETTER_PREFIX}${id}`;
+    await redis.set(key, JSON.stringify(newsletter));
+  }
+}

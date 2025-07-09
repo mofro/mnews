@@ -1,7 +1,8 @@
+// FILE: /pages/api/webhook.ts (MERGE with existing - preserves all customizations)
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Redis } from '@upstash/redis';
 
-// Initialize Redis connection using existing KV variables
+// Initialize Redis connection using existing KV variables (your existing config)
 if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
   throw new Error('Missing required environment variables: KV_REST_API_URL and KV_REST_API_TOKEN');
 }
@@ -11,16 +12,30 @@ const redis = new Redis({
   token: process.env.KV_REST_API_TOKEN!,
 });
 
+// UPDATED: Newsletter interface with additive content model
 interface Newsletter {
   id: string;
   subject: string;
-  content: string;    
   sender: string;     
   date: string;
   isNew: boolean;
+  
+  // NEW: Additive content model
+  rawContent: string;      // Original email content
+  cleanContent: string;    // Processed clean content
+  
+  // NEW: Processing metadata
+  metadata: {
+    processingVersion: string;
+    processedAt: string;
+    wordCount?: number;
+  };
+  
+  // LEGACY: Backward compatibility
+  content: string;         // Keep for existing dashboard
 }
 
-// Simple HTML to text converter
+// Your existing HTML to text converter (preserved exactly)
 function htmlToText(html: string): string {
   if (!html) return '';
   
@@ -44,7 +59,7 @@ function htmlToText(html: string): string {
   return text;
 }
 
-// Normalize and validate date
+// Your existing date normalization (preserved exactly)
 const normalizeDate = (dateInput: any): string => {
   if (!dateInput) {
     return new Date().toISOString();
@@ -69,29 +84,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    // Extract newsletter data from request
+    // Extract newsletter data from request (your existing field names)
     const { subject, body, from, date } = req.body;
     
     console.log('Newsletter received:', { subject, from, date });
 
-    // Clean up the email content
-    const cleanContent = htmlToText(body || '');
+    // UPDATED: Handle both original content and cleaned content
+    const originalContent = body || '';
+    const cleanContent = htmlToText(originalContent);
     console.log('Content cleaned, length:', cleanContent.length);
 
-    // Create newsletter object
+    // UPDATED: Create newsletter object with additive content model
     const newsletter: Newsletter = {
-      id: Date.now().toString(),
+      id: Date.now().toString(),              // Your existing ID generation
       subject: subject || 'No Subject',
-      content: cleanContent,              
       sender: from || 'Unknown Sender', 
       date: normalizeDate(date),
-      isNew: true,
+      isNew: true,                            // Your existing field
+      
+      // NEW: Additive content model
+      rawContent: originalContent,            // Preserve original
+      cleanContent: cleanContent,             // Processed version
+      
+      // NEW: Processing metadata
+      metadata: {
+        processingVersion: '2.6.0-existing-logic',
+        processedAt: new Date().toISOString(),
+        wordCount: cleanContent.split(' ').length
+      },
+      
+      // LEGACY: Backward compatibility
+      content: cleanContent,                  // Keep for existing dashboard
     };
 
-    // Store in Redis with detailed logging
+    // Your existing Redis storage pattern (preserved exactly)
     console.log('About to save newsletter:', newsletter);
     
-    // Use a Redis list to store newsletter IDs
+    // Use your existing Redis list pattern
     console.log('Saving newsletter ID to list...');
     const listResult = await redis.lpush('newsletter_ids', newsletter.id);
     console.log('List push result:', listResult);
@@ -108,6 +137,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log('Newsletter saved to Redis:', newsletter.id);
 
+    // Your existing response format (preserved)
     res.status(200).json({ 
       message: 'Newsletter received and saved',
       id: newsletter.id 
