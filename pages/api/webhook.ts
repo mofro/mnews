@@ -60,23 +60,12 @@ function htmlToText(html: string): string {
   return text;
 }
 
-// Your existing date normalization (preserved exactly)
+// Using the centralized date service instead of local implementation
+import { parseDateToISOString } from '../../utils/dateService';
+
+// Wrapper to maintain backward compatibility
 const normalizeDate = (dateInput: any): string => {
-  if (!dateInput) {
-    return new Date().toISOString();
-  }
-  
-  try {
-    const parsedDate = new Date(dateInput);
-    if (isNaN(parsedDate.getTime())) {
-      console.warn('Invalid date received:', dateInput);
-      return new Date().toISOString();
-    }
-    return parsedDate.toISOString();
-  } catch (error) {
-    console.warn('Error parsing date:', dateInput, error);
-    return new Date().toISOString();
-  }
+  return parseDateToISOString(dateInput) || new Date().toISOString();
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

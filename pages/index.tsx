@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { format, isToday, parseISO } from 'date-fns'
+import { format } from 'date-fns'
+import { parseDate, formatDateSafely } from '../utils/dateService'
 import type { NewsletterEmail, DashboardStats } from '../lib/types'
 
 export default function Dashboard() {
@@ -115,31 +116,26 @@ function NewsletterItem({ newsletter }: { newsletter: NewsletterEmail }) {
   //   }
   // }
 
-  // Safe date parsing with fallback
-  const parseDate = (dateString: string) => {
-    try {
-      const parsed = parseISO(dateString)
-      // Check if the parsed date is valid
-      if (isNaN(parsed.getTime())) {
-        console.warn('Invalid date string:', dateString)
-        return new Date() // fallback to current date
-      }
-      return parsed
-    } catch (error) {
-      console.warn('Error parsing date:', dateString, error)
-      return new Date() // fallback to current date
-    }
-  }
+  // Using the centralized date service instead of local implementation
   
-  const date = parseDate(newsletter.date)
-  const isNew = isToday(date)
+  // Get the parsed date and check if it's today
+  const date = parseDate(newsletter.date);
+  
+  // Determine if the newsletter is from today
+  let isNew = false;
+  if (date) {
+    const today = new Date();
+    isNew = date.getDate() === today.getDate() && 
+            date.getMonth() === today.getMonth() && 
+            date.getFullYear() === today.getFullYear();
+  }
 
   return (
     <div className={`newsletter-item ${isNew ? 'new' : ''}`}>
       <div className="newsletter-header" onClick={() => setExpanded(!expanded)}>
         <div className="newsletter-meta">
           <span className="sender">{newsletter.sender}</span>
-          <span className="date">{format(date, 'MMM d, h:mm a')}</span>
+          <span className="date">{formatDateSafely(newsletter.date, (d) => format(d, 'MMM d, h:mm a'), 'Unknown date')}</span>
           {isNew && <span className="new-badge">NEW</span>}
         </div>
         <h3 className="subject">{newsletter.subject}</h3>

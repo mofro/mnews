@@ -1,6 +1,7 @@
 // FILE: /lib/storage.ts (CREATE NEW - Compatible with existing Redis structure)
 import { Redis } from '@upstash/redis';
 import { Newsletter } from './types';
+import { parseDate } from '../utils/dateService';
 
 // Use your existing environment variables
 const redis = new Redis({
@@ -58,9 +59,19 @@ export class NewsletterStorage {
     }
     
     // Sort by date (newest first) - preserve your existing ordering
-    return newsletters.sort((a, b) => 
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    );
+    // Using the date service for safer parsing
+    
+    return newsletters.sort((a, b) => {
+      const dateA = parseDate(a.date);
+      const dateB = parseDate(b.date);
+      
+      // If either date is invalid, use fallback logic
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1; // Invalid dates sort to the end
+      if (!dateB) return -1;
+      
+      return dateB.getTime() - dateA.getTime();
+    });
   }
   
   static async getNewsletter(id: string): Promise<Newsletter | null> {

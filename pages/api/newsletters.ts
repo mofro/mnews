@@ -2,7 +2,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { NewsletterStorage } from '../../lib/storage';
 import type { DashboardStats } from '../../lib/types';
-import { isToday, parseISO } from 'date-fns';
+import { isDateToday, parseDate } from '../../utils/dateService';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     // Calculate stats in the format your existing dashboard expects
     const today = new Date();
-    const todayNewsletters = newsletters.filter(n => isToday(parseISO(n.date)));
+    const todayNewsletters = newsletters.filter(n => isDateToday(n.date));
     const uniqueSenders = new Set(newsletters.map(n => n.sender)).size;
     
     const stats: DashboardStats = {
