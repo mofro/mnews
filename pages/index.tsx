@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
+import DOMPurify from 'dompurify'
 import { parseDate, formatDateSafely } from '../utils/dateService'
 import type { NewsletterEmail, DashboardStats } from '../lib/types'
 
@@ -145,7 +146,22 @@ function NewsletterItem({ newsletter }: { newsletter: NewsletterEmail }) {
       {expanded && (
         <div 
           className="newsletter-content-html"
-          dangerouslySetInnerHTML={{ __html: newsletter.content }} 
+          dangerouslySetInnerHTML={{ 
+            __html: DOMPurify.sanitize(newsletter.content, {
+              ALLOWED_TAGS: [
+                'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+                'p', 'br', 'strong', 'em', 'b', 'i',
+                'ul', 'ol', 'li', 'a', 'img',
+                'blockquote', 'div', 'span'
+              ],
+              ALLOWED_ATTR: [
+                'href', 'src', 'alt', 'title', 'target'
+              ],
+              ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
+              FORBID_TAGS: ['script', 'object', 'embed', 'form', 'input', 'iframe'],
+              FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style']
+            })
+          }} 
         />
       )}
     </div>
