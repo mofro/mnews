@@ -33,7 +33,7 @@ export class NewsletterParser {
       try {
         let result = { html: rawHTML, metadata: { processingSteps: [] as string[] } };
         
-        result = this.preprocess(result.html, result.metadata);
+        result = this.preprocess(result.html, result.metadata, config);
         result = this.extractStructure(result.html, result.metadata, config);
         result = this.preserveFormat(result.html, result.metadata, config);
         result = this.sanitize(result.html, result.metadata);
@@ -68,7 +68,7 @@ export class NewsletterParser {
     /**
      * Stage 1: Remove email cruft and noise
      */
-    static preprocess(html: string, metadata: { processingSteps: string[] }): { html: string, metadata: { processingSteps: string[] } } {
+    static preprocess(html: string, metadata: { processingSteps: string[] }, config: any): { html: string, metadata: { processingSteps: string[] } } {
       metadata.processingSteps.push('preprocess');
       
       let cleaned = html;
@@ -78,8 +78,8 @@ export class NewsletterParser {
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
         // Remove script blocks  
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        // Remove tracking pixels and tiny images
-        .replace(/<img[^>]*(?:width|height)="1"[^>]*>/gi, '')
+        // ENHANCED: Smart image filtering replaces blanket removal of tracking pixels
+        .replace(/(<img[^>]*>)/gi, (match) => this.filterImages(match, config.preserveImages))
         // Remove those invisible character sequences from email templates
         .replace(/͏[\s\u00A0\u00AD]*­͏[\s\u00A0\u00AD]*/g, ' ')
         // Remove email table wrapper cruft but keep content
@@ -187,6 +187,70 @@ export class NewsletterParser {
       return { html: sanitized, metadata };
     }
     
+    /**
+     * Enhanced image filtering - preserve real images, remove tracking pixels
+     */
+    static filterImages(html: string, preserveImages: boolean): string {
+      if (!preserveImages) {
+        // Remove all images if not preserving
+        return html.replace(/<img[^>]*>/gi, '');
+      }
+      
+      // Enhanced tracking pixel detection
+      return html.replace(/<img([^>]*)>/gi, (match, attributes) => {
+        const attrs = attributes.toLowerCase();
+        
+        // 1. Explicit display:none style
+        if (/style[^=]*=["'][^"']*display\s*:\s*none/i.test(attrs)) {
+          return '';
+        }
+        // 2. Visibility:hidden style
+        if (/style[^=]*=["'][^"']*visibility\s*:\s*hidden/i.test(attrs)) {
+          return '';
+        }
+        // 3. 1x1 pixel dimensions
+        if ((/width\s*=\s*["']?1["']?/i.test(attrs) && /height\s*=\s*["']?1["']?/i.test(attrs)) ||
+            (/style[^=]*=["'][^"']*width\s*:\s*1px/i.test(attrs) && /style[^=]*=["'][^"']*height\s*:\s*1px/i.test(attrs))) {
+          return '';
+        }
+        // 4. Zero dimensions
+        if ((/width\s*=\s*["']?0["']?/i.test(attrs) && /height\s*=\s*["']?0["']?/i.test(attrs)) ||
+            (/style[^=]*=["'][^"']*width\s*:\s*0px/i.test(attrs) && /style[^=]*=["'][^"']*height\s*:\s*0px/i.test(attrs))) {
+          return '';
+        }
+        // 5. Common tracking domains/paths
+        const trackingPatterns = [
+          /src[^=]*=["'][^"']*\/track/i,
+          /src[^=]*=["'][^"']*\/pixel/i,
+          /src[^=]*=["'][^"']*\/analytics/i,
+          /src[^=]*=["'][^"']*\/open/i,
+          /src[^=]*=["'][^"']*\/impression/i,
+          /src[^=]*=["'][^"']*\.gif\?/i,
+          /src[^=]*=["'][^"']*mailer.*\/[^"']*$/i,
+        ];
+        for (const pattern of trackingPatterns) {
+          if (pattern.test(attrs)) {
+            return '';
+          }
+        }
+        // 6. Empty alt & tracking query params
+        if (/alt\s*=\s*["']?\s*["']?/i.test(attrs) && /src[^=]*=["'][^"']*\?[^"']*$/i.test(attrs)) {
+          return '';
+        }
+        // Preserve real images – clean styles & handlers
+        return match
+          .replace(/style\s*=\s*["']([^"']*)\bvisibility\s*:\s*hidden\b([^"']*)["']/gi, (m, before, after) => {
+            const cleanStyle = (before + after).replace(/;\s*;/g, ';').replace(/^;|;$/g, '').trim();
+            return cleanStyle ? `style="${cleanStyle}"` : '';
+          })
+          .replace(/style\s*=\s*["']([^"']*)\bdisplay\s*:\s*none\b([^"']*)["']/gi, (m, before, after) => {
+            const cleanStyle = (before + after).replace(/;\s*;/g, ';').replace(/^;|;$/g, '').trim();
+            return cleanStyle ? `style="${cleanStyle}"` : '';
+          })
+          .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, '');
+      });
+    }
+
     /**
      * Helper: Preserve list structure and hierarchy
      */
