@@ -147,9 +147,10 @@ function NewsletterItem({ newsletter }: { newsletter: NewsletterEmail }) {
       </div>
       
       {expanded && (
-        <div className="newsletter-content">
-          <pre>{newsletter.content}</pre>
-        </div>
+        <div 
+          className="newsletter-content-html"
+          dangerouslySetInnerHTML={{ __html: newsletter.content }} 
+        />
       )}
     </div>
   )
