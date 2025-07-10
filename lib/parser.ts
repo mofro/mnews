@@ -68,7 +68,7 @@ export class NewsletterParser {
     /**
      * Stage 1: Remove email cruft and noise
      */
-    static preprocess(html: string, metadata: { processingSteps: string[] }) {
+    static preprocess(html: string, metadata: { processingSteps: string[] }): { html: string, metadata: { processingSteps: string[] } } {
       metadata.processingSteps.push('preprocess');
       
       let cleaned = html;
@@ -98,7 +98,7 @@ export class NewsletterParser {
     /**
      * Stage 2: Extract and preserve semantic structure
      */
-    static extractStructure(html: string, metadata: { processingSteps: string[] }, config: any) {
+    static extractStructure(html: string, metadata: { processingSteps: string[] }, config: any): { html: string, metadata: { processingSteps: string[] } } {
       metadata.processingSteps.push('extract-structure');
       
       let structured = html;
@@ -136,7 +136,7 @@ export class NewsletterParser {
     /**
      * Stage 3: Clean up remaining HTML while preserving format
      */
-    static preserveFormat(html: string, metadata: { processingSteps: string[] }, config: any) {
+    static preserveFormat(html: string, metadata: { processingSteps: string[] }, config: any): { html: string, metadata: { processingSteps: string[] } } {
       metadata.processingSteps.push('preserve-format');
       
       let formatted = html;
@@ -169,7 +169,7 @@ export class NewsletterParser {
     /**
      * Stage 4: Security cleanup
      */
-    static sanitize(html: string, metadata: { processingSteps: string[] }) {
+    static sanitize(html: string, metadata: { processingSteps: string[] }): { html: string, metadata: { processingSteps: string[] } } {
       metadata.processingSteps.push('sanitize');
       
       let sanitized = html;
