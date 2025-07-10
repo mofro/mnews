@@ -87,7 +87,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       // Try enhanced parser first
       console.log('Attempting enhanced parsing...');
-      const parseResult: ParseResult = NewsletterParser.parseToCleanHTML(originalContent);
+      const parseResult: ParseResult = NewsletterParser.parseToCleanHTML(originalContent, {
+        preserveImages: true,
+        preserveLinks: true
+      });
       cleanContent = parseResult.cleanHTML;
       processingVersion = parseResult.metadata.processingVersion;
       console.log('Enhanced parser success:', {

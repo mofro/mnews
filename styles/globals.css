@@ -286,3 +286,32 @@ body {
 .newsletter-content-html > *:last-child {
   margin-bottom: 0;
 }
+
+/* Enhanced image handling for newsletters */
+.newsletter-content-html img {
+  max-width: 100%;
+  height: auto;
+  margin: 15px 0;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  transition: transform 0.2s;
+}
+
+.newsletter-content-html img:hover {
+  transform: scale(1.02);
+}
+
+/* Handle newsletter logos/headers */
+.newsletter-content-html img[width="1"],
+.newsletter-content-html img[height="1"] {
+  display: none; /* Hide tracking pixels */
+}
+
+/* Newsletter logos/brand images */
+.newsletter-content-html img[alt*="logo" i],
+.newsletter-content-html img[src*="logo" i] {
+  max-height: 60px;
+  width: auto;
+  margin: 10px 0;
+  box-shadow: none;
+}
