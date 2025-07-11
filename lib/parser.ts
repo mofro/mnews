@@ -22,6 +22,7 @@ export class NewsletterParser {
      * @param {Object} options - Parsing configuration
      * @returns {Object} - { cleanHTML, metadata }
      */
+    
     static parseToCleanHTML(rawHTML: string, options: any = {}): ParseResult {
       const config = {
         preserveLinks: true,
@@ -42,7 +43,7 @@ export class NewsletterParser {
           cleanHTML: result.html,
           metadata: {
             ...result.metadata,
-            processingVersion: '2.6.0-structure-preservation',
+            processingVersion: '2.6.1-enhanced-artifact-cleanup',  // UPDATED VERSION
             processedAt: new Date().toISOString(),
             wordCount: this.estimateWordCount(result.html),
             compressionRatio: ((rawHTML.length - result.html.length) / rawHTML.length * 100).toFixed(1) + '%'
@@ -202,14 +203,23 @@ export class NewsletterParser {
       
       // ENHANCED BUT SAFE: Clean up table-related artifacts
       formatted = formatted
-        // Remove specific patterns that create v&gt;, d&gt;, etc artifacts
+        // EXISTING: Remove specific patterns that create v&gt;, d&gt;, etc artifacts
         .replace(/\s*[vdrye]&gt;\s*/gi, ' ')  // Remove letter + &gt; patterns
         .replace(/\s*"&gt;\s*/gi, ' ')        // Remove "&gt; patterns  
         .replace(/\s*n&gt;\s*/gi, ' ')        // Remove n&gt; patterns
         .replace(/\s*&gt;\s*/gi, ' ')         // Remove standalone &gt;
         
+        // NEW: Also catch the non-entity versions (raw > characters)
+        .replace(/\s*[vdryen]>\s*/gi, ' ')     // Remove letter + > patterns (raw characters)
+        .replace(/\s*">\s*/g, ' ')             // Remove "> patterns (raw characters)
+        .replace(/\s*br>\s*/gi, ' ')           // Remove br> artifacts (not <br> tags)
+        
+        // NEW: Remove invisible character sequences (very safe)
+        .replace(/͏[\s\u00A0\u00AD]*­͏[\s\u00A0\u00AD]*/g, ' ')
+        
         // But be conservative - only remove if they're clearly artifacts
-        .replace(/(?:^|\s)[vdrye]&gt;(?=\s|$)/gi, ' ')  // Only remove if isolated
+        .replace(/(?:^|\s)[vdryen]&gt;(?=\s|$)/gi, ' ')  // Only remove if isolated
+        .replace(/(?:^|\s)[vdryen]>(?=\s|$)/gi, ' ')     // Only remove if isolated (raw >)
         
         // Standard whitespace cleanup
         .replace(/\n{3,}/g, '\n\n')  // Collapse multiple line breaks
@@ -218,6 +228,21 @@ export class NewsletterParser {
         .trim();
       
       return { html: formatted, metadata };
+    }
+    
+    static parseToCleanHTML(rawHTML: string, options: any = {}): ParseResult {
+      // ... existing code ...
+      
+      return {
+        cleanHTML: result.html,
+        metadata: {
+          ...result.metadata,
+          processingVersion: '2.6.1-enhanced-artifact-cleanup',  // UPDATED VERSION
+          processedAt: new Date().toISOString(),
+          wordCount: this.estimateWordCount(result.html),
+          compressionRatio: ((rawHTML.length - result.html.length) / rawHTML.length * 100).toFixed(1) + '%'
+        }
+      };
     }
     /**
      * Stage 4: Security cleanup
@@ -420,10 +445,3 @@ export class NewsletterParser {
     }
   }
   
-  // Export for Node.js
-  // if (typeof module !== 'undefined' && module.exports) {
-  //   module.exports = { NewsletterParser };
-  // }
-  
-  // Export for ES6 modules (if using import/export)
-  // export { NewsletterParser };
