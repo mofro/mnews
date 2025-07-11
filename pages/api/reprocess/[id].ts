@@ -2,7 +2,7 @@
 // Reprocess a specific newsletter with current parser version
 
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getNewsletter, updateNewsletter } from '../../../lib/storage';
+import { NewsletterStorage } from '../../../lib/storage';
 import { NewsletterParser } from '../../../lib/parser';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -13,7 +13,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const { id } = req.query;
-    const { forceReprocess = false } = req.body;
 
     if (!id || typeof id !== 'string') {
       return res.status(400).json({ error: 'Newsletter ID required' });
@@ -22,7 +21,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`Reprocessing newsletter ${id}...`);
 
     // Get the existing newsletter
-    const existingNewsletter = await getNewsletter(id);
+    const existingNewsletter = await NewsletterStorage.getNewsletter(id);
     if (!existingNewsletter) {
       return res.status(404).json({ error: 'Newsletter not found' });
     }
@@ -70,21 +69,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Create updated newsletter object
-    const updatedNewsletter = {
-      ...existingNewsletter,
-      cleanContent: newCleanContent,
-      content: newCleanContent, // Dashboard compatibility
-      metadata: {
-        ...existingNewsletter.metadata,
-        ...processingMetadata,
-        reprocessedAt: new Date().toISOString(),
-        reprocessedFrom: existingNewsletter.metadata?.processingVersion || 'unknown'
-      }
-    };
-
-    // Save the updated newsletter
-    await updateNewsletter(id, updatedNewsletter);
+    // Save the updated newsletter using the available method
+    await NewsletterStorage.updateCleanContent(id, newCleanContent);
 
     console.log('Newsletter reprocessed successfully');
 
@@ -92,10 +78,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(200).json({
       success: true,
       newsletter: {
-        id: updatedNewsletter.id,
-        subject: updatedNewsletter.subject,
-        sender: updatedNewsletter.sender,
-        date: updatedNewsletter.date
+        id: existingNewsletter.id,
+        subject: existingNewsletter.subject,
+        sender: existingNewsletter.sender,
+        date: existingNewsletter.date
       },
       processing: {
         originalVersion: existingNewsletter.metadata?.processingVersion || 'unknown',
@@ -103,7 +89,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         originalLength: existingNewsletter.cleanContent?.length || 0,
         newLength: newCleanContent.length,
         processingSteps: processingMetadata.processingSteps,
-        reprocessedAt: updatedNewsletter.metadata.reprocessedAt
+        reprocessedAt: new Date().toISOString()
       },
       comparison: {
         lengthChange: newCleanContent.length - (existingNewsletter.cleanContent?.length || 0),
@@ -119,4 +105,3 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
-

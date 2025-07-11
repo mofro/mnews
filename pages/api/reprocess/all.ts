@@ -2,7 +2,7 @@
 // Reprocess ALL newsletters (use with caution!)
 
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getAllNewsletters, updateNewsletter } from '../../../lib/storage';
+import { NewsletterStorage } from '../../../lib/storage';
 import { NewsletterParser } from '../../../lib/parser';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -23,7 +23,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('Starting bulk reprocessing...');
 
     // Get all newsletters
-    const newsletters = await getAllNewsletters();
+    const newsletters = await NewsletterStorage.getAllNewsletters();
     console.log(`Found ${newsletters.length} newsletters`);
 
     // Filter to only those with rawContent and limit count
@@ -53,19 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           preserveLinks: true
         });
 
-        const updatedNewsletter = {
-          ...newsletter,
-          cleanContent: parseResult.cleanHTML,
-          content: parseResult.cleanHTML,
-          metadata: {
-            ...newsletter.metadata,
-            ...parseResult.metadata,
-            reprocessedAt: new Date().toISOString(),
-            reprocessedFrom: newsletter.metadata?.processingVersion || 'unknown'
-          }
-        };
-
-        await updateNewsletter(newsletter.id, updatedNewsletter);
+        await NewsletterStorage.updateCleanContent(newsletter.id, parseResult.cleanHTML);
 
         results.push({
           id: newsletter.id,
