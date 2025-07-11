@@ -66,7 +66,7 @@ export class NewsletterParser {
     }
     
     /**
-     * Stage 1: Remove email cruft and noise
+     * Enhanced Stage 1: Safer email table processing
      */
     static preprocess(html: string, metadata: { processingSteps: string[] }, config: any): { html: string, metadata: { processingSteps: string[] } } {
       metadata.processingSteps.push('preprocess');
@@ -82,19 +82,59 @@ export class NewsletterParser {
         .replace(/(<img[^>]*>)/gi, (match) => this.filterImages(match, config.preserveImages))
         // Remove those invisible character sequences from email templates
         .replace(/͏[\s\u00A0\u00AD]*­͏[\s\u00A0\u00AD]*/g, ' ')
-        // Remove email table wrapper cruft but keep content
-        .replace(/<table[^>]*role="presentation"[^>]*>[\s\S]*?<\/table>/gi, (match) => {
-          return match.replace(/<\/?(?:table|tbody|tr|td)[^>]*>/gi, ' ');
+        
+        // ENHANCED BUT SAFE: Better email table handling
+        // Strategy: Handle specific problematic patterns without being too aggressive
+        
+        // 1. Handle Substack-style nested tables with presentation role
+        .replace(/<table[^>]*role\s*=\s*["']presentation["'][^>]*>[\s\S]*?<\/table>/gi, (match) => {
+          // First, try to extract meaningful content from table cells
+          let content = match
+            // Extract content from table cells, preserve paragraphs/headings inside
+            .replace(/<td[^>]*>([\s\S]*?)<\/td>/gi, (cellMatch, cellContent) => {
+              // If cell contains semantic elements, preserve structure
+              if (/<(?:h[1-6]|p|ul|ol|li|a|strong|em|img)\b[^>]*>/i.test(cellContent)) {
+                return cellContent + ' ';
+              } else {
+                // Otherwise just extract text with spacing
+                return cellContent.replace(/<[^>]+>/g, ' ') + ' ';
+              }
+            })
+            // Remove remaining table structure
+            .replace(/<\/?(?:table|tbody|tr|thead|tfoot|th)[^>]*>/gi, ' ')
+            // Clean up excessive whitespace
+            .replace(/\s{2,}/g, ' ');
+          
+          return content;
         })
-        // Clean up email-specific divs
-        .replace(/<div[^>]*class="[^"]*(?:email|preview|header|footer)[^"]*"[^>]*>/gi, '<div>')
+        
+        // 2. Handle simpler tables (non-presentation role) more conservatively
+        .replace(/<table(?![^>]*role\s*=\s*["']presentation["'])[^>]*>[\s\S]*?<\/table>/gi, (match) => {
+          // For non-presentation tables, just remove table tags but preserve all content
+          return match.replace(/<\/?(?:table|tbody|tr|thead|tfoot)[^>]*>/gi, ' ')
+                      .replace(/<t[hd][^>]*>/gi, ' ')
+                      .replace(/<\/t[hd]>/gi, ' ');
+        })
+        
+        // 3. Clean up specific problematic patterns that create artifacts
+        // Remove empty table cells that might become artifacts
+        .replace(/<t[dh][^>]*>\s*<\/t[dh]>/gi, ' ')
+        // Remove table rows that only contain whitespace/empty cells
+        .replace(/<tr[^>]*>[\s\u00A0]*<\/tr>/gi, ' ')
+        
+        // 4. Handle email wrapper divs more carefully
+        .replace(/<div[^>]*class="[^"]*(?:email|newsletter|wrapper|container)[^"]*"[^>]*>/gi, '<div>')
+        
+        // 5. Clean up email-specific styling divs but preserve content
+        .replace(/<div[^>]*style="[^"]*(?:margin|padding|width):[^"]*"[^>]*>([\s\S]*?)<\/div>/gi, '$1')
+        
         // Normalize line breaks
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '\n');
       
       return { html: cleaned, metadata };
     }
-    
+
     /**
      * Stage 2: Extract and preserve semantic structure
      */
@@ -133,21 +173,18 @@ export class NewsletterParser {
       return { html: structured, metadata };
     }
     
-    /**
-     * Stage 3: Clean up remaining HTML while preserving format
-     */
+    // ADDITIONAL SAFETY: Enhanced artifact cleanup in preserveFormat
     static preserveFormat(html: string, metadata: { processingSteps: string[] }, config: any): { html: string, metadata: { processingSteps: string[] } } {
       metadata.processingSteps.push('preserve-format');
       
       let formatted = html;
       
-      // Remove all HTML tags except the ones we want to keep
-      // FIXED: smarter tag removal preserving attributes on allowed tags
+      // Remove unwanted HTML tags while preserving attributes on allowed tags
       formatted = formatted.replace(/<(?!\/?)(?!(?:h[1-6]|p|ul|ol|li|a|strong|em|br|img)\b)[^>]*>/gi, ' ');
       // Remove any stray malformed tags
       formatted = formatted.replace(/<(?![\/]?(?:h[1-6]|p|ul|ol|li|a|strong|em|br|img))[^>]*(?!>)/gi, ' ');
       
-      // Clean up HTML entities
+      // ENHANCED: More comprehensive HTML entity cleanup
       formatted = formatted
         .replace(/&nbsp;/g, ' ')
         .replace(/&amp;/g, '&')
@@ -157,10 +194,24 @@ export class NewsletterParser {
         .replace(/&#39;/g, "'")
         .replace(/&rsquo;/g, "'")
         .replace(/&ldquo;/g, '"')
-        .replace(/&rdquo;/g, '"');
+        .replace(/&rdquo;/g, '"')
+        // Additional common email entities
+        .replace(/&ndash;/g, '–')
+        .replace(/&mdash;/g, '—')
+        .replace(/&hellip;/g, '…');
       
-      // Normalize whitespace
+      // ENHANCED BUT SAFE: Clean up table-related artifacts
       formatted = formatted
+        // Remove specific patterns that create v&gt;, d&gt;, etc artifacts
+        .replace(/\s*[vdrye]&gt;\s*/gi, ' ')  // Remove letter + &gt; patterns
+        .replace(/\s*"&gt;\s*/gi, ' ')        // Remove "&gt; patterns  
+        .replace(/\s*n&gt;\s*/gi, ' ')        // Remove n&gt; patterns
+        .replace(/\s*&gt;\s*/gi, ' ')         // Remove standalone &gt;
+        
+        // But be conservative - only remove if they're clearly artifacts
+        .replace(/(?:^|\s)[vdrye]&gt;(?=\s|$)/gi, ' ')  // Only remove if isolated
+        
+        // Standard whitespace cleanup
         .replace(/\n{3,}/g, '\n\n')  // Collapse multiple line breaks
         .replace(/[ \t]{2,}/g, ' ')  // Collapse multiple spaces
         .replace(/>\s+</g, '><')     // Remove space between tags
@@ -168,7 +219,6 @@ export class NewsletterParser {
       
       return { html: formatted, metadata };
     }
-    
     /**
      * Stage 4: Security cleanup
      */
@@ -330,6 +380,43 @@ export class NewsletterParser {
         .replace(/&amp;/g, '&')
         .replace(/\s+/g, ' ')
         .trim();
+    }
+
+    // SAFETY VALVE: Add detection for newsletter platform
+    static detectNewsletterPlatform(html: string): string {
+      const patterns = {
+        'substack': /substackcdn\.com|substack\.com/i,
+        'mailchimp': /mailchimp\.com|mc\.us/i,
+        'convertkit': /convertkit\.com|ck\.page/i,
+        'ghost': /ghost\.org|ghost\.io/i,
+        'buttondown': /buttondown\.email/i,
+        'beehiiv': /beehiiv\.com/i,
+        'revue': /revue\.co|getrevue\.co/i
+      };
+      
+      for (const [platform, pattern] of Object.entries(patterns)) {
+        if (pattern.test(html)) {
+          return platform;
+        }
+      }
+      
+      return 'unknown';
+    }
+
+    // DEFENSIVE PROCESSING: Apply platform-specific tweaks if needed
+    static applyPlatformSpecificProcessing(html: string, platform: string): string {
+      switch (platform) {
+        case 'substack':
+          // Substack-specific cleanup for those weird table artifacts
+          return html.replace(/\s*[vdrye]\s*&gt;\s*/gi, ' ');
+        
+        case 'mailchimp':
+          // Mailchimp often has heavy div nesting
+          return html.replace(/<div[^>]*style="[^"]*text-align[^"]*"[^>]*>/gi, '<div>');
+        
+        default:
+          return html;
+      }
     }
   }
   
