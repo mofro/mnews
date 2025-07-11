@@ -230,20 +230,6 @@ export class NewsletterParser {
       return { html: formatted, metadata };
     }
     
-    static parseToCleanHTML(rawHTML: string, options: any = {}): ParseResult {
-      // ... existing code ...
-      
-      return {
-        cleanHTML: result.html,
-        metadata: {
-          ...result.metadata,
-          processingVersion: '2.6.1-enhanced-artifact-cleanup',  // UPDATED VERSION
-          processedAt: new Date().toISOString(),
-          wordCount: this.estimateWordCount(result.html),
-          compressionRatio: ((rawHTML.length - result.html.length) / rawHTML.length * 100).toFixed(1) + '%'
-        }
-      };
-    }
     /**
      * Stage 4: Security cleanup
      */
