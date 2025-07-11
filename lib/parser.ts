@@ -291,7 +291,7 @@ export class NewsletterParser {
      */
     static cleanInlineContent(content: string) {
       return content
-        .replace(/<(?!\/?(strong|em|a)\b)[^>]+>/gi, ' ') // Keep only basic formatting
+        .replace(/<(?!\/?)(?!(?:h[1-6]|p|ul|ol|li|a|strong|em|br|img)\b)[^>]*>/gi, ' ') // Remove all tags except the ones we want to keep
         .replace(/\s+/g, ' ')
         .trim();
     }
