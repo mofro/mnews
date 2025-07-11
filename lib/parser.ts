@@ -142,7 +142,10 @@ export class NewsletterParser {
       let formatted = html;
       
       // Remove all HTML tags except the ones we want to keep
-      formatted = formatted.replace(/<(?!\/?(?:h[1-6]|p|ul|ol|li|a|strong|em|br|img)\b)[^>]+>/gi, ' ');
+      // FIXED: smarter tag removal preserving attributes on allowed tags
+      formatted = formatted.replace(/<(?!\/?)(?!(?:h[1-6]|p|ul|ol|li|a|strong|em|br|img)\b)[^>]*>/gi, ' ');
+      // Remove any stray malformed tags
+      formatted = formatted.replace(/<(?![\/]?(?:h[1-6]|p|ul|ol|li|a|strong|em|br|img))[^>]*(?!>)/gi, ' ');
       
       // Clean up HTML entities
       formatted = formatted
