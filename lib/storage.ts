@@ -81,7 +81,8 @@ export class NewsletterStorage {
       
       if (!data) return null;
       
-      const newsletter = JSON.parse(data as string) as Newsletter;
+      // FIX: Handle both string and object responses like getAllNewsletters does
+      const newsletter = (typeof data === 'string' ? JSON.parse(data) : data) as Newsletter;
       
       // Same auto-migration logic as getAllNewsletters
       if (!newsletter.rawContent && newsletter.content) {
@@ -106,8 +107,7 @@ export class NewsletterStorage {
       console.error(`Error fetching newsletter ${id}:`, error);
       return null;
     }
-  }
-  
+  }  
   // NEW: Update clean content for existing newsletter
   static async updateCleanContent(id: string, cleanContent: string): Promise<void> {
     const newsletter = await this.getNewsletter(id);
