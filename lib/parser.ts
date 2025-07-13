@@ -49,8 +49,13 @@ export class IncrementalNewsletterParser {
     let currentContent = rawHTML;
     
     try {
-      // Step 1: Basic HTML to text (your original working version)
-      currentContent = this.step1_BasicHtmlToText(currentContent, steps);
+      // Footnote links (OPTIONAL) – run before any stripping so we can inspect <a> tags
+      if (config.enableFootnoteLinks) {
+        currentContent = integrateFootnoteLinks(currentContent, steps, config);
+      } else {
+        // Step 1: Basic HTML to text (original)
+        currentContent = this.step1_BasicHtmlToText(currentContent, steps);
+      }
       
       // Step 2: Clean whitespace and entities (safe improvements)
       currentContent = this.step2_CleanWhitespace(currentContent, steps);
@@ -60,12 +65,7 @@ export class IncrementalNewsletterParser {
         currentContent = this.step3_RecoverStructure(currentContent, steps);
       }
       
-      // Step 4: Footnote links (OPTIONAL)
-      if (config.enableFootnoteLinks) {
-        currentContent = integrateFootnoteLinks(currentContent, steps, config);
-      }
-      
-      // Step 5: Link preservation (OPTIONAL - disabled by default)
+      // Step 4: Link preservation (OPTIONAL - disabled by default)
       if (config.enableLinkPreservation) {
         currentContent = this.step4_PreserveLinks(currentContent, steps);
       }
