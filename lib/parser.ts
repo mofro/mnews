@@ -190,27 +190,39 @@ export class IncrementalNewsletterParser {
     }
   }
   
-  /**
-   * Step 3: EXPERIMENTAL - Try to recover basic structure (h1, h2, p)
-   * This step is OPTIONAL and disabled by default until tested
-   */
+/**
+ * Step 3: ENHANCED - Try to recover basic structure (h1, h2, p)
+ * This step is OPTIONAL and disabled by default until tested
+ * 
+ * IMPROVEMENTS FROM TESTING:
+ * - Numbered headings: 3+ chars (was 10+), no max limit (was 50)
+ * - All-caps headings: include punctuation (&:!?,-), max 35 chars
+ * - Paragraph wrapping: exclude bullet points (•-*), 50+ chars
+ */
   private static step3_RecoverStructure(content: string, steps: ProcessingStep[]): string {
     const input = content;
     
     try {
-      // VERY conservative structure recovery
-      let structured = content
-        // Look for numbered headings in text
-        .replace(/\n\s*(\d+\.\s+[^\n]{10,50})\n/g, '\n<h3>$1</h3>\n')
-        
-        // Look for all-caps headings
-        .replace(/\n\s*([A-Z][A-Z\s]{10,50}[A-Z])\s*\n/g, '\n<h3>$1</h3>\n')
-        
-        // Wrap paragraphs (very basic)
-        .replace(/\n\s*([^\n<>]{50,})\n/g, '\n<p>$1</p>\n');
+      let structured = content;
+      
+      // ENHANCED: Numbered headings - flexible length, no arbitrary max
+      // Matches: "1. AI NEWS", "2. BREAKING: Fed Announces Rate Cut", etc.
+      structured = structured
+        .replace(/\n\s*(\d+\.\s+[^\n]{3,})\s*\n/g, '\n<h3>$1</h3>\n');
+      
+      // ENHANCED: All-caps headings - include common punctuation, reasonable max
+      // Matches: "MARKET ANALYSIS", "ANALYSIS & OPINION", "QUICK READS:", etc.
+      structured = structured
+        .replace(/\n\s*([A-Z][A-Z\s&:!?,-]{8,35}[A-Z])\s*\n/g, '\n<h3>$1</h3>\n');
+      
+      // ENHANCED: Paragraph wrapping - avoid bullet points and lists
+      // Matches: long text paragraphs (50+ chars)
+      // Avoids: "• Apple releases...", "- Another item...", "* List item..."
+      structured = structured
+        .replace(/\n\s*([^•\-\*\n<>]{50,})\s*\n/g, '\n<p>$1</p>\n');
       
       steps.push({
-        stepName: 'recover-structure',
+        stepName: 'recover-structure-enhanced',
         input: input.substring(0, 200) + '...',
         output: structured.substring(0, 200) + '...',
         success: true
@@ -220,11 +232,11 @@ export class IncrementalNewsletterParser {
       
     } catch (error) {
       steps.push({
-        stepName: 'recover-structure',
+        stepName: 'recover-structure-enhanced',
         input: input.substring(0, 200) + '...',
         output: content,
         success: false,
-        error: error instanceof Error ? error.message : 'Step 3 failed'
+        error: error instanceof Error ? error.message : 'Enhanced Step 3 failed'
       });
       
       return content; // Return input unchanged on failure
