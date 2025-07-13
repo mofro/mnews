@@ -1,6 +1,8 @@
 // FILE: /lib/incremental-parser.ts
 // Incremental Newsletter Parser - One step at a time, with fallbacks
 
+import { integrateFootnoteLinks } from './footnoteLinks';
+
 export interface ProcessingStep {
   stepName: string;
   input: string;
@@ -38,6 +40,7 @@ export class IncrementalNewsletterParser {
     const config = {
       enableImagePreservation: false,
       enableLinkPreservation: false,
+      enableFootnoteLinks: false,
       enableStructureRecovery: false, // Start disabled until we test
       ...options
     };
@@ -57,7 +60,12 @@ export class IncrementalNewsletterParser {
         currentContent = this.step3_RecoverStructure(currentContent, steps);
       }
       
-      // Step 4: Link preservation (OPTIONAL - disabled by default)
+      // Step 4: Footnote links (OPTIONAL)
+      if (config.enableFootnoteLinks) {
+        currentContent = integrateFootnoteLinks(currentContent, steps, config);
+      }
+      
+      // Step 5: Link preservation (OPTIONAL - disabled by default)
       if (config.enableLinkPreservation) {
         currentContent = this.step4_PreserveLinks(currentContent, steps);
       }
