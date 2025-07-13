@@ -36,6 +36,8 @@ export class NewsletterParser {
         
         result = this.preprocess(result.html, result.metadata, config);
         result = this.extractStructure(result.html, result.metadata, config);
+        // Stage 2.5: layout artifacts cleanup
+        result = this.cleanLayoutArtifacts(result.html, result.metadata);
         result = this.preserveFormat(result.html, result.metadata, config);
         result = this.sanitize(result.html, result.metadata);
         
@@ -43,7 +45,7 @@ export class NewsletterParser {
           cleanHTML: result.html,
           metadata: {
             ...result.metadata,
-            processingVersion: '2.6.1-enhanced-artifact-cleanup',  // UPDATED VERSION
+            processingVersion: '2.6.1-artifact-cleanup',  // UPDATED VERSION
             processedAt: new Date().toISOString(),
             wordCount: this.estimateWordCount(result.html),
             compressionRatio: ((rawHTML.length - result.html.length) / rawHTML.length * 100).toFixed(1) + '%'
@@ -56,7 +58,7 @@ export class NewsletterParser {
           cleanHTML: this.basicCleanup(rawHTML),
           metadata: {
             processingSteps: [] as string[],
-            processingVersion: '2.6.0-fallback',
+            processingVersion: '2.6.1-fallback',
             processedAt: new Date().toISOString(),
             error: error instanceof Error ? error.message : String(error),
             wordCount: this.estimateWordCount(rawHTML),
@@ -182,8 +184,8 @@ export class NewsletterParser {
       
       // Remove unwanted HTML tags while preserving attributes on allowed tags
       formatted = formatted.replace(/<(?!\/?)(?!(?:h[1-6]|p|ul|ol|li|a|strong|em|br|img)\b)[^>]*>/gi, ' ');
-      // Remove any stray malformed tags
-      formatted = formatted.replace(/<(?![\/]?(?:h[1-6]|p|ul|ol|li|a|strong|em|br|img))[^>]*(?!>)/gi, ' ');
+      // Remove any stray malformed tags (safer version)
+      formatted = formatted.replace(/<(?!\/?)(?!(?:h[1-6]|p|ul|ol|li|a|strong|em|br|img)\b)[^>]*>/gi, ' ');
       
       // ENHANCED: More comprehensive HTML entity cleanup
       formatted = formatted
@@ -230,6 +232,101 @@ export class NewsletterParser {
       return { html: formatted, metadata };
     }
     
+    /**
+     */// Stage 2.5: Clean up email layout artifacts - MODERATE RISK APPROACH
+  static cleanLayoutArtifacts(html: string, metadata: { processingSteps: string[] }): { html: string, metadata: { processingSteps: string[] } } {
+    metadata.processingSteps.push('clean-layout-artifacts');
+    let cleaned = html;
+    cleaned = cleaned
+      .replace(/\s*[vdryen]>\s*/gi, ' ')
+      .replace(/\s*">\s*/g, ' ')
+      .replace(/\s*br>\s*/gi, ' ')
+      .replace(/\s*&gt;\s*/g, ' ')
+      .replace(/͏[\s\u00A0\u00AD]*­͏[\s\u00A0\u00AD]*/g, ' ')
+      .replace(/\s{2,}/g, ' ')
+      .replace(/\n\s*\n/g, '\n')
+      .trim();
+    return { html: cleaned, metadata };
+  }
+
+  /**
+   * Helper: Clean inline content (remove styling but preserve text)
+     */
+    static cleanInlineContent(content: string) {
+      return content
+        .replace(/<(?!\/?)(?!(?:h[1-6]|p|ul|ol|li|a|strong|em|br|img)\b)[^>]*>/gi, ' ') // Remove all tags except the ones we want to keep
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    
+    /**
+     * Helper: Clean content inside list items
+     */
+    static cleanListContent(content: string) {
+      return content
+        .replace(/<li[^>]*>\s*<\/li>/gi, '') // Remove empty items
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+    
+    /**
+     * Helper: Preserve list structure and hierarchy
+     */
+    static preserveLists(html: string, maxNesting: number) {
+      // Convert unordered lists
+      html = html.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (match, content) => {
+        const cleanContent = this.cleanListContent(content);
+        return `<ul>${cleanContent}</ul>`;
+      });
+      
+      // Convert ordered lists  
+      html = html.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (match, content) => {
+        const cleanContent = this.cleanListContent(content);
+        return `<ol>${cleanContent}</ol>`;
+      });
+      
+      // Convert list items
+      html = html.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (match, content) => {
+        const cleanContent = this.cleanInlineContent(content);
+        return cleanContent.trim() ? `<li>${cleanContent}</li>` : '';
+      });
+      
+      return html;
+    }
+    
+    /**
+     * Helper: Sanitize URLs to prevent XSS
+     */
+    static sanitizeUrl(url: string) {
+      // Only allow safe protocols
+      if (/^https?:\/\//.test(url) || /^mailto:/.test(url)) {
+        return url;
+      }
+      return null; // Remove suspicious URLs
+    }
+    
+    /**
+     * Helper: Estimate word count from HTML
+     */
+    static estimateWordCount(html: string) {
+      const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      return text ? text.split(' ').length : 0;
+    }
+    
+    /**
+     * Fallback: Basic cleanup if main parser fails
+     */
+    static basicCleanup(html: string) {
+      return html
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
     /**
      * Stage 4: Security cleanup
      */
@@ -315,85 +412,7 @@ export class NewsletterParser {
       });
     }
 
-    /**
-     * Helper: Preserve list structure and hierarchy
-     */
-    static preserveLists(html: string, maxNesting: number) {
-      // Convert unordered lists
-      html = html.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (match, content) => {
-        const cleanContent = this.cleanListContent(content);
-        return `<ul>${cleanContent}</ul>`;
-      });
-      
-      // Convert ordered lists  
-      html = html.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (match, content) => {
-        const cleanContent = this.cleanListContent(content);
-        return `<ol>${cleanContent}</ol>`;
-      });
-      
-      // Convert list items
-      html = html.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (match, content) => {
-        const cleanContent = this.cleanInlineContent(content);
-        return cleanContent.trim() ? `<li>${cleanContent}</li>` : '';
-      });
-      
-      return html;
-    }
-    
-    /**
-     * Helper: Clean content inside list items
-     */
-    static cleanListContent(content: string) {
-      return content
-        .replace(/<li[^>]*>\s*<\/li>/gi, '') // Remove empty items
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-    
-    /**
-     * Helper: Clean inline content (remove styling but preserve text)
-     */
-    static cleanInlineContent(content: string) {
-      return content
-        .replace(/<(?!\/?)(?!(?:h[1-6]|p|ul|ol|li|a|strong|em|br|img)\b)[^>]*>/gi, ' ') // Remove all tags except the ones we want to keep
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-    
-    /**
-     * Helper: Sanitize URLs to prevent XSS
-     */
-    static sanitizeUrl(url: string) {
-      // Only allow safe protocols
-      if (/^https?:\/\//.test(url) || /^mailto:/.test(url)) {
-        return url;
-      }
-      return null; // Remove suspicious URLs
-    }
-    
-    /**
-     * Helper: Estimate word count from HTML
-     */
-    static estimateWordCount(html: string) {
-      const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-      return text ? text.split(' ').length : 0;
-    }
-    
-    /**
-     * Fallback: Basic cleanup if main parser fails
-     */
-    static basicCleanup(html: string) {
-      return html
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/\s+/g, ' ')
-        .trim();
-    }
-
-    // SAFETY VALVE: Add detection for newsletter platform
+     // SAFETY VALVE: Add detection for newsletter platform
     static detectNewsletterPlatform(html: string): string {
       const patterns = {
         'substack': /substackcdn\.com|substack\.com/i,
