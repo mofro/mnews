@@ -1,5 +1,5 @@
 // FILE: pages/api/reprocess/all.ts  
-// Reprocess ALL newsletters (use with caution!)
+// ENHANCED: Reprocess ALL newsletters with incremental parser options
 
 import { NextApiRequest, NextApiResponse } from 'next';
 import { NewsletterStorage } from '../../../lib/storage';
@@ -11,7 +11,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const { confirmReprocessAll = false, maxCount = 10 } = req.body;
+    const { 
+      confirmReprocessAll = false, 
+      maxCount = 10,
+      options = {} // NEW: Accept parser options for bulk processing
+    } = req.body;
 
     if (!confirmReprocessAll) {
       return res.status(400).json({ 
@@ -20,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    console.log('Starting bulk reprocessing...');
+    console.log('Starting bulk reprocessing with options:', options);
 
     // Get all newsletters
     const newsletters = await NewsletterStorage.getAllNewsletters();
@@ -38,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    console.log(`Reprocessing ${processableNewsletters.length} newsletters...`);
+    console.log(`Reprocessing ${processableNewsletters.length} newsletters with enhanced parser...`);
 
     const results = [];
     let successCount = 0;
@@ -48,31 +52,59 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         console.log(`Processing newsletter ${newsletter.id}: ${newsletter.subject}`);
 
+        // ENHANCED: Use the same parser options for all newsletters
         const parseResult = NewsletterParser.parseToCleanHTML(newsletter.rawContent, {
-          preserveImages: true,
-          preserveLinks: true
+          preserveImages: options.preserveImages ?? true,
+          preserveLinks: options.preserveLinks ?? true,
+          // NEW: Pass through incremental parser options
+          enableImagePreservation: options.enableImagePreservation ?? false,
+          enableLinkPreservation: options.enableLinkPreservation ?? true,
+          enableStructureRecovery: options.enableStructureRecovery ?? false, // KEY: Step 3!
+          ...options // Pass through any additional options
         });
 
-        await NewsletterStorage.updateCleanContent(newsletter.id, parseResult.finalOutput);
+        const newCleanContent = parseResult.cleanHTML || parseResult.finalOutput;
+        await NewsletterStorage.updateCleanContent(newsletter.id, newCleanContent);
 
         results.push({
-          id: newsletter.id,
+          newsletterId: newsletter.id,
           subject: newsletter.subject,
           success: true,
-          originalVersion: newsletter.metadata?.processingVersion || 'unknown',
-          newVersion: parseResult.metadata.processingVersion
+          result: {
+            success: true,
+            reprocessedNewsletter: {
+              id: newsletter.id,
+              subject: newsletter.subject,
+              cleanContent: newCleanContent,
+              metadata: {
+                ...parseResult.metadata,
+                originalLength: newsletter.rawContent.length,
+                newLength: newCleanContent.length
+              }
+            },
+            processingInfo: {
+              originalVersion: newsletter.metadata?.processingVersion || 'unknown',
+              newVersion: parseResult.metadata.processingVersion,
+              optionsUsed: options,
+              stepsExecuted: parseResult.metadata.processingSteps,
+              compressionRatio: parseResult.metadata.compressionRatio
+            }
+          }
         });
 
         successCount++;
-        console.log(`✅ Success: ${newsletter.id}`);
+        console.log(`✅ Success: ${newsletter.id} (${parseResult.metadata.compressionRatio} compression)`);
 
       } catch (error) {
         console.error(`❌ Error processing ${newsletter.id}:`, error);
         results.push({
-          id: newsletter.id,
+          newsletterId: newsletter.id,
           subject: newsletter.subject,
           success: false,
-          error: error instanceof Error ? error.message : String(error)
+          result: {
+            success: false,
+            error: error instanceof Error ? error.message : String(error)
+          }
         });
         errorCount++;
       }
@@ -80,12 +112,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     console.log(`Bulk reprocessing complete: ${successCount} success, ${errorCount} errors`);
 
+    // ENHANCED: Provide detailed summary statistics
+    const successfulResults = results.filter(r => r.success);
+    const compressionRatios = successfulResults
+      .map(r => parseFloat(r.result.processingInfo?.compressionRatio?.replace('%', '') || '0'))
+      .filter(ratio => !isNaN(ratio));
+    
+    const avgCompression = compressionRatios.length > 0 
+      ? (compressionRatios.reduce((a, b) => a + b, 0) / compressionRatios.length).toFixed(1) + '%'
+      : '0%';
+
+    const structureRecoveryEnabled = options.enableStructureRecovery;
+    const structureRecoveryCount = successfulResults
+      .filter(r => r.result.processingInfo?.stepsExecuted?.includes('recover-structure-enhanced'))
+      .length;
+
     res.status(200).json({
       success: true,
       summary: {
         totalProcessed: processableNewsletters.length,
         successCount,
-        errorCount
+        errorCount,
+        // NEW: Enhanced statistics
+        averageCompression: avgCompression,
+        structureRecoveryEnabled,
+        structureRecoveryApplied: structureRecoveryCount,
+        optionsUsed: options
       },
       results
     });
