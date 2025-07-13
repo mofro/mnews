@@ -3,7 +3,7 @@
 
 import { NextApiRequest, NextApiResponse } from 'next';
 import { NewsletterStorage } from '../../../lib/storage';
-import { IncrementalNewsletterParser } from '../../../lib/parser'; // CHANGED: Use incremental parser
+import { IncrementalNewsletterParser, ParseResult, ProcessingStep } from '../../../lib/parser'; // CHANGED: Use incremental parser & types
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -42,7 +42,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // NEW: Reprocess with INCREMENTAL parser and options
-    let parseResult: any;
+    let parseResult: ParseResult;
 
     try {
       console.log('Starting incremental parsing with options:', options);
@@ -59,7 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         originalLength: existingNewsletter.rawContent.length,
         cleanLength: parseResult.finalOutput.length,
         compressionRatio: parseResult.metadata.compressionRatio,
-        processingSteps: parseResult.steps.map(s => s.stepName),
+        processingSteps: parseResult.steps.map((s: ProcessingStep) => s.stepName),
         processingVersion: parseResult.metadata.processingVersion
       });
       
@@ -83,4 +83,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    // Get the updated newsletter to
+    // All done – respond to client with summary
+    res.status(200).json({
+      success: true,
+      newsletterId: id,
+      processingVersion: parseResult.metadata.processingVersion,
+      cleanLength: parseResult.finalOutput.length,
+      compressionRatio: parseResult.metadata.compressionRatio,
+      stepsExecuted: parseResult.steps.map((s: ProcessingStep) => s.stepName)
+    });
+
+  } catch (error) {
+    console.error('Reprocessing error:', error);
+    res.status(500).json({ 
+      error: 'Internal server error during reprocessing',
+      details: error instanceof Error ? error.message : String(error)
+    });
+  }
+}

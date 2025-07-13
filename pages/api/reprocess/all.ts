@@ -115,7 +115,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // ENHANCED: Provide detailed summary statistics
     const successfulResults = results.filter(r => r.success);
     const compressionRatios = successfulResults
-      .map(r => parseFloat(r.result.processingInfo?.compressionRatio?.replace('%', '') || '0'))
+      .map((r: any) => parseFloat(r.result.processingInfo?.compressionRatio?.replace('%', '') || '0'))
       .filter(ratio => !isNaN(ratio));
     
     const avgCompression = compressionRatios.length > 0 
@@ -124,7 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const structureRecoveryEnabled = options.enableStructureRecovery;
     const structureRecoveryCount = successfulResults
-      .filter(r => r.result.processingInfo?.stepsExecuted?.includes('recover-structure-enhanced'))
+      .filter((r: any) => r.result.processingInfo?.stepsExecuted?.includes('recover-structure-enhanced'))
       .length;
 
     res.status(200).json({
