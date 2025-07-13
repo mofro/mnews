@@ -148,14 +148,27 @@ export class IncrementalNewsletterParser {
   }
   
   /**
-   * Step 2: Clean up whitespace and common entities (safe improvements)
+   * Step 2: ENHANCED - Clean whitespace and entities + INVISIBLE CHARACTER REMOVAL
+   * This step is SAFE and should always run
    */
   private static step2_CleanWhitespace(content: string, steps: ProcessingStep[]): string {
     const input = content;
     
     try {
       let cleaned = content
-        // Additional entities
+        // CRITICAL: Remove the massive invisible character sequences
+        // Pattern: ͏ ­͏ ­͏ ­͏ ­͏ ­ (repeated hundreds of times)
+        .replace(/͏[\s\u00A0\u00AD­]*­͏[\s\u00A0\u00AD­]*/g, ' ')
+        .replace(/[\u00AD\u200B\u200C\u200D\uFEFF]+/g, '') // Additional invisible chars
+        .replace(/͏+/g, '') // Remove any remaining invisible separators
+        
+        // Clean up HTML entities (existing logic)
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
         .replace(/&rsquo;/g, "'")
         .replace(/&ldquo;/g, '"')
         .replace(/&rdquo;/g, '"')
@@ -163,13 +176,13 @@ export class IncrementalNewsletterParser {
         .replace(/&mdash;/g, '—')
         .replace(/&hellip;/g, '…')
         
-        // Clean up excessive whitespace
-        .replace(/\s{3,}/g, ' ')
+        // Normalize whitespace (existing logic)
+        .replace(/\s+/g, ' ')
         .replace(/\n\s*\n\s*\n/g, '\n\n')
         .trim();
       
       steps.push({
-        stepName: 'clean-whitespace',
+        stepName: 'clean-whitespace-enhanced',
         input: input.substring(0, 200) + '...',
         output: cleaned.substring(0, 200) + '...',
         success: true
@@ -179,26 +192,22 @@ export class IncrementalNewsletterParser {
       
     } catch (error) {
       steps.push({
-        stepName: 'clean-whitespace',
+        stepName: 'clean-whitespace-enhanced',
         input: input.substring(0, 200) + '...',
         output: content,
         success: false,
-        error: error instanceof Error ? error.message : 'Step 2 failed'
+        error: error instanceof Error ? error.message : 'Enhanced Step 2 failed'
       });
       
-      return content; // Return input unchanged on failure
+      return content;
     }
   }
-  
-/**
- * Step 3: ENHANCED - Try to recover basic structure (h1, h2, p)
- * This step is OPTIONAL and disabled by default until tested
- * 
- * IMPROVEMENTS FROM TESTING:
- * - Numbered headings: 3+ chars (was 10+), no max limit (was 50)
- * - All-caps headings: include punctuation (&:!?,-), max 35 chars
- * - Paragraph wrapping: exclude bullet points (•-*), 50+ chars
- */
+
+    
+  /**
+   * Step 3: ENHANCED - Structure recovery with improved pattern matching
+   * This step is OPTIONAL and disabled by default until tested
+   */
   private static step3_RecoverStructure(content: string, steps: ProcessingStep[]): string {
     const input = content;
     
@@ -239,10 +248,10 @@ export class IncrementalNewsletterParser {
         error: error instanceof Error ? error.message : 'Enhanced Step 3 failed'
       });
       
-      return content; // Return input unchanged on failure
+      return content;
     }
   }
-  
+    
   /**
    * Step 4: EXPERIMENTAL - Preserve some links
    * This step is OPTIONAL 
