@@ -52,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         preserveLinks: true
       });
       
-      newCleanContent = parseResult.cleanHTML;
+      newCleanContent = parseResult.finalOutput;
       processingMetadata = parseResult.metadata;
       
       console.log('Enhanced parser success:', {

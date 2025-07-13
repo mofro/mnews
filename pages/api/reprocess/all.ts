@@ -53,7 +53,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           preserveLinks: true
         });
 
-        await NewsletterStorage.updateCleanContent(newsletter.id, parseResult.cleanHTML);
+        await NewsletterStorage.updateCleanContent(newsletter.id, parseResult.finalOutput);
 
         results.push({
           id: newsletter.id,

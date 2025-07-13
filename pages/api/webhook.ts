@@ -91,7 +91,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         preserveImages: true,
         preserveLinks: true
       });
-      cleanContent = parseResult.cleanHTML;
+      cleanContent = parseResult.finalOutput;
       processingVersion = parseResult.metadata.processingVersion;
       console.log('Enhanced parser success:', {
         originalLength: originalContent.length,

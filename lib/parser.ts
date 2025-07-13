@@ -10,13 +10,22 @@ export interface ProcessingStep {
 }
 
 export interface ParseResult {
+  /** Legacy clean HTML output. Present when produced via parseToCleanHTML wrapper. */
+  cleanHTML?: string;
+  /** Primary output of new incremental pipeline */
   finalOutput: string;
+  /** Detailed steps executed during processing */
   steps: ProcessingStep[];
+  /** Additional metadata */
   metadata: {
     processingVersion: string;
     processedAt: string;
     wordCount: number;
     compressionRatio: string;
+    /** Legacy array of step names for backwards compatibility */
+    processingSteps?: string[];
+    /** Error message when parser falls back */
+    error?: string;
   };
 }
 
@@ -312,3 +321,25 @@ export const TestableSteps = {
     return IncrementalNewsletterParser['step3_RecoverStructure'](content, steps);
   }
 };
+
+// -----------------------------------------------------------------------------
+// Legacy compatibility layer – maintains original NewsletterParser API
+// -----------------------------------------------------------------------------
+export class NewsletterParser {
+  /**
+   * Original entry-point retained so existing code continues to compile.
+   * Internally delegates the heavy lifting to IncrementalNewsletterParser.
+   */
+  static parseToCleanHTML(rawHTML: string, options: any = {}): ParseResult {
+    const result = IncrementalNewsletterParser.parseNewsletter(rawHTML, options);
+
+    return {
+      ...result,
+      cleanHTML: result.finalOutput,
+      metadata: {
+        ...result.metadata,
+        processingSteps: result.steps.map((s) => s.stepName)
+      }
+    } as ParseResult;
+  }
+}
