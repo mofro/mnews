@@ -66,81 +66,225 @@ export class NewsletterParser {
   }
 
   /**
-   * Stage 1: Preprocess and normalize HTML structure
+   * Stage 1: Preprocessing - Remove noise and normalize structure
    */
-  private static preprocess(html: string, metadata: { processingSteps: string[] }, config: any) {
+  private static preprocess(html: string, metadata: { processingSteps: string[] }, config: any): { html: string, metadata: { processingSteps: string[] } } {
     metadata.processingSteps.push('preprocess');
     
-    // Remove style and script blocks
-    html = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-    html = html.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+    let cleaned = html;
     
-    // Remove common tracking and layout tables
-    html = html.replace(/<table[^>]*class[^>]*spacer[^>]*>[\s\S]*?<\/table>/gi, '');
-    html = html.replace(/<table[^>]*width\s*=\s*["']?100%["']?[^>]*>[\s\S]*?<\/table>/gi, function(match) {
-      if (match.length < 200 && !/\w{10,}/.test(match.replace(/<[^>]*>/g, ''))) {
-        return '';
-      }
-      return match;
-    });
+    // 1. Remove script and style blocks entirely
+    cleaned = cleaned
+      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
     
-    return { html, metadata };
+    // 2. Filter images based on configuration
+    cleaned = this.filterImages(cleaned, config.preserveImages);
+    
+    // 3. Remove presentation tables and email layout containers
+    cleaned = cleaned
+      // Remove presentation tables (role="presentation" or obvious layout tables)
+      .replace(/<table[^>]*role\s*=\s*["']presentation["'][^>]*>[\s\S]*?<\/table>/gi, ' ')
+      
+      // Remove tables that are clearly for spacing/layout (very conservative)
+      .replace(/<table[^>]*class="[^"]*(?:spacer|layout|container|wrapper)[^"]*"[^>]*>[\s\S]*?<\/table>/gi, ' ')
+      
+      // Handle simpler tables (non-presentation role) more conservatively
+      .replace(/<table(?![^>]*role\s*=\s*["']presentation["'])[^>]*>[\s\S]*?<\/table>/gi, (match) => {
+        // For non-presentation tables, just remove table tags but preserve all content
+        return match.replace(/<\/?(?:table|tbody|tr|thead|tfoot)[^>]*>/gi, ' ')
+                    .replace(/<t[hd][^>]*>/gi, ' ')
+                    .replace(/<\/t[hd]>/gi, ' ');
+      })
+      
+      // Clean up specific problematic patterns that create artifacts
+      .replace(/<t[dh][^>]*>\s*<\/t[dh]>/gi, ' ')
+      .replace(/<tr[^>]*>[\s\u00A0]*<\/tr>/gi, ' ')
+      
+      // Handle email wrapper divs more carefully
+      .replace(/<div[^>]*class="[^"]*(?:email|newsletter|wrapper|container)[^"]*"[^>]*>/gi, '<div>')
+      
+      // Clean up email-specific styling divs but preserve content
+      .replace(/<div[^>]*style="[^"]*(?:margin|padding|width):[^"]*"[^>]*>([\s\S]*?)<\/div>/gi, '$1')
+      
+      // Normalize line breaks
+      .replace(/\r\n/g, '\n')
+      .replace(/\r/g, '\n');
+    
+    return { html: cleaned, metadata };
   }
 
   /**
-   * Stage 2: Extract meaningful content structure
+   * Stage 2: Extract and preserve semantic structure
    */
-  private static extractStructure(html: string, metadata: { processingSteps: string[] }, config: any) {
+  private static extractStructure(html: string, metadata: { processingSteps: string[] }, config: any): { html: string, metadata: { processingSteps: string[] } } {
     metadata.processingSteps.push('extract-structure');
     
-    // Convert common newsletter structures to semantic HTML
-    html = html.replace(/<td[^>]*class[^>]*header[^>]*>([\s\S]*?)<\/td>/gi, '<h2>$1</h2>');
-    html = html.replace(/<td[^>]*class[^>]*title[^>]*>([\s\S]*?)<\/td>/gi, '<h3>$1</h3>');
+    let structured = html;
     
-    // Extract list-like content from tables
-    html = html.replace(/<tr[^>]*>([\s\S]*?)<\/tr>/gi, function(match, content) {
-      const cells = content.match(/<td[^>]*>([\s\S]*?)<\/td>/gi);
-      if (cells && cells.length === 1) {
-        return '<li>' + cells[0].replace(/<\/?td[^>]*>/gi, '') + '</li>';
-      }
-      return match;
-    });
+    // Convert headers - preserve hierarchy, remove styling
+    structured = structured
+      .replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h[1-6]>/gi, (match, level, content) => {
+        const cleanContent = this.cleanInlineContent(content);
+        return `<h${level}>${cleanContent}</h${level}>`;
+      });
     
-    return { html, metadata };
+    // Convert paragraphs - remove inline styles but preserve structure
+    structured = structured
+      .replace(/<p[^>]*>([\s\S]*?)<\/p>/gi, (match, content) => {
+        const cleanContent = this.cleanInlineContent(content);
+        return cleanContent.trim() ? `<p>${cleanContent}</p>` : '';
+      });
+    
+    // Convert lists - preserve nesting and list types
+    structured = this.preserveLists(structured, config.maxListNesting);
+    
+    // Convert links if requested
+    if (config.preserveLinks) {
+      structured = structured
+        .replace(/<a[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (match, url, text) => {
+          const cleanText = this.cleanInlineContent(text);
+          const cleanUrl = this.sanitizeUrl(url);
+          return cleanUrl ? `<a href="${cleanUrl}">${cleanText}</a>` : cleanText;
+        });
+    }
+    
+    return { html: structured, metadata };
   }
 
   /**
-   * Stage 2.5: Clean layout artifacts (NEW)
+   * Stage 2.5: Clean up email layout artifacts - MODERATE RISK APPROACH
    */
-  private static cleanLayoutArtifacts(html: string, metadata: { processingSteps: string[] }) {
+  private static cleanLayoutArtifacts(html: string, metadata: { processingSteps: string[] }): { html: string, metadata: { processingSteps: string[] } } {
     metadata.processingSteps.push('clean-layout-artifacts');
     
-    // Remove tracking images
-    html = html.replace(/<img[^>]*>/gi, function(match) {
-      const attrs = match.toLowerCase();
+    let cleaned = html;
+    
+    // MODERATE RISK: Remove patterns that are very likely artifacts
+    cleaned = cleaned
+      // Remove the specific artifact patterns we've seen consistently
+      .replace(/\s*[vdryen]>\s*/gi, ' ')              // The main culprits - RAW > characters
+      .replace(/\s*">\s*/g, ' ')                      // Quote-greater patterns
+      .replace(/\s*br>\s*/gi, ' ')                    // br> artifacts (not <br> tags)
+      
+      // Clean up HTML entities that are clearly artifacts  
+      .replace(/\s*&gt;\s*/g, ' ')                    // &gt; patterns (existing logic)
+      
+      // Remove the invisible character sequences (very safe)
+      .replace(/͏[\s\u00A0\u00AD]*­͏[\s\u00A0\u00AD]*/g, ' ')
+      
+      // Clean up excessive whitespace from removals
+      .replace(/\s{2,}/g, ' ')
+      .replace(/\n\s*\n/g, '\n')
+      .trim();
+    
+    return { html: cleaned, metadata };
+  }
+
+  /**
+   * Stage 3: Preserve formatting while removing unwanted elements
+   */
+  private static preserveFormat(html: string, metadata: { processingSteps: string[] }, config: any): { html: string, metadata: { processingSteps: string[] } } {
+    metadata.processingSteps.push('preserve-format');
+    
+    let formatted = html;
+    
+    // Remove unwanted HTML tags while preserving attributes on allowed tags
+    formatted = formatted.replace(/<(?!\/?)(?!(?:h[1-6]|p|ul|ol|li|a|strong|em|br|img)\b)[^>]*>/gi, ' ');
+    
+    // ENHANCED: More comprehensive HTML entity cleanup
+    formatted = formatted
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&rsquo;/g, "'")
+      .replace(/&ldquo;/g, '"')
+      .replace(/&rdquo;/g, '"')
+      // Additional common email entities
+      .replace(/&ndash;/g, '–')
+      .replace(/&mdash;/g, '—')
+      .replace(/&hellip;/g, '…');
+    
+    // ENHANCED BUT SAFE: Clean up table-related artifacts
+    formatted = formatted
+      // EXISTING: Remove specific patterns that create v&gt;, d&gt;, etc artifacts
+      .replace(/\s*[vdrye]&gt;\s*/gi, ' ')  // Remove letter + &gt; patterns
+      .replace(/\s*"&gt;\s*/gi, ' ')        // Remove "&gt; patterns  
+      .replace(/\s*n&gt;\s*/gi, ' ')        // Remove n&gt; patterns
+      .replace(/\s*&gt;\s*/gi, ' ')         // Remove standalone &gt;
+      
+      // NEW: Also catch the non-entity versions (raw > characters)
+      .replace(/\s*[vdryen]>\s*/gi, ' ')     // Remove letter + > patterns (raw characters)
+      .replace(/\s*">\s*/g, ' ')             // Remove "> patterns (raw characters)
+      .replace(/\s*br>\s*/gi, ' ')           // Remove br> artifacts (not <br> tags)
+      
+      // Clean up remaining whitespace
+      .replace(/\s+/g, ' ')
+      .replace(/\n\s*\n/g, '\n')
+      .trim();
+    
+    return { html: formatted, metadata };
+  }
+
+  /**
+   * Stage 4: Final sanitization and security cleanup
+   */
+  private static sanitize(html: string, metadata: { processingSteps: string[] }): { html: string, metadata: { processingSteps: string[] } } {
+    metadata.processingSteps.push('sanitize');
+    
+    let sanitized = html;
+    
+    // Remove dangerous URLs
+    sanitized = sanitized.replace(/href="javascript:[^"]*"/gi, 'href="#"');
+    sanitized = sanitized.replace(/href="data:[^"]*"/gi, 'href="#"');
+    
+    // Remove any remaining event handlers
+    sanitized = sanitized.replace(/\son\w+="[^"]*"/gi, '');
+    
+    // Clean up empty elements
+    sanitized = sanitized.replace(/<p>\s*<\/p>/gi, '');
+    sanitized = sanitized.replace(/<h[1-6]>\s*<\/h[1-6]>/gi, '');
+    sanitized = sanitized.replace(/<li>\s*<\/li>/gi, '');
+    
+    // Final cleanup
+    sanitized = sanitized.replace(/\s+/g, ' ').trim();
+    
+    return { html: sanitized, metadata };
+  }
+
+  /**
+   * Enhanced image filtering - preserve real images, remove tracking pixels
+   */
+  private static filterImages(html: string, preserveImages: boolean): string {
+    if (!preserveImages) {
+      return html.replace(/<img[^>]*>/gi, '');
+    }
+    
+    // Enhanced tracking pixel detection
+    return html.replace(/<img([^>]*)>/gi, (match, attributes) => {
+      const attrs = attributes.toLowerCase();
       
       // 1. Explicit display:none style
       if (/style[^=]*=["'][^"']*display\s*:\s*none/i.test(attrs)) {
         return '';
       }
-      
       // 2. Visibility:hidden style
       if (/style[^=]*=["'][^"']*visibility\s*:\s*hidden/i.test(attrs)) {
         return '';
       }
-      
       // 3. 1x1 pixel dimensions
       if ((/width\s*=\s*["']?1["']?/i.test(attrs) && /height\s*=\s*["']?1["']?/i.test(attrs)) ||
           (/style[^=]*=["'][^"']*width\s*:\s*1px/i.test(attrs) && /style[^=]*=["'][^"']*height\s*:\s*1px/i.test(attrs))) {
         return '';
       }
-      
       // 4. Zero dimensions
       if ((/width\s*=\s*["']?0["']?/i.test(attrs) && /height\s*=\s*["']?0["']?/i.test(attrs)) ||
           (/style[^=]*=["'][^"']*width\s*:\s*0px/i.test(attrs) && /style[^=]*=["'][^"']*height\s*:\s*0px/i.test(attrs))) {
         return '';
       }
-      
       // 5. Common tracking domains/paths
       const trackingPatterns = [
         /src[^=]*=["'][^"']*\/track/i,
@@ -166,84 +310,83 @@ export class NewsletterParser {
       // Keep the image if it passes all checks
       return match;
     });
-    
-    // Remove empty table structures
-    html = html.replace(/<table[^>]*>\s*<\/table>/gi, '');
-    html = html.replace(/<tr[^>]*>\s*<\/tr>/gi, '');
-    html = html.replace(/<td[^>]*>\s*<\/td>/gi, '');
-    
-    return { html, metadata };
   }
 
   /**
-   * Stage 3: Preserve formatting and structure
+   * Helper: Preserve list structures with proper nesting
    */
-  private static preserveFormat(html: string, metadata: { processingSteps: string[] }, config: any) {
-    metadata.processingSteps.push('preserve-format');
-    
-    // Clean up nested tables but preserve content
-    html = html.replace(/<table[^>]*>([\s\S]*?)<\/table>/gi, function(match, content) {
-      // If table has meaningful content, preserve it
-      const textContent = content.replace(/<[^>]*>/g, ' ').trim();
-      if (textContent.length > 50) {
-        return '<div class="content-block">' + content + '</div>';
-      }
-      return content;
+  private static preserveLists(html: string, maxNesting: number): string {
+    // Convert unordered lists
+    html = html.replace(/<ul[^>]*>([\s\S]*?)<\/ul>/gi, (match, content) => {
+      const cleanContent = this.cleanListContent(content);
+      return `<ul>${cleanContent}</ul>`;
     });
     
-    // Convert remaining table cells to paragraphs
-    html = html.replace(/<td[^>]*>([\s\S]*?)<\/td>/gi, '<p>$1</p>');
-    html = html.replace(/<th[^>]*>([\s\S]*?)<\/th>/gi, '<h4>$1</h4>');
+    // Convert ordered lists
+    html = html.replace(/<ol[^>]*>([\s\S]*?)<\/ol>/gi, (match, content) => {
+      const cleanContent = this.cleanListContent(content);
+      return `<ol>${cleanContent}</ol>`;
+    });
     
-    return { html, metadata };
+    // Convert list items
+    html = html.replace(/<li[^>]*>([\s\S]*?)<\/li>/gi, (match, content) => {
+      const cleanContent = this.cleanInlineContent(content);
+      return cleanContent.trim() ? `<li>${cleanContent}</li>` : '';
+    });
+    
+    return html;
   }
 
   /**
-   * Stage 4: Final sanitization and cleanup
+   * Helper: Clean content within list elements
    */
-  private static sanitize(html: string, metadata: { processingSteps: string[] }) {
-    metadata.processingSteps.push('sanitize');
-    
-    // Remove remaining table tags
-    html = html.replace(/<\/?table[^>]*>/gi, '');
-    html = html.replace(/<\/?tr[^>]*>/gi, '');
-    html = html.replace(/<\/?tbody[^>]*>/gi, '');
-    html = html.replace(/<\/?thead[^>]*>/gi, '');
-    
-    // Clean up whitespace and empty elements
-    html = html.replace(/\s+/g, ' ');
-    html = html.replace(/<p>\s*<\/p>/gi, '');
-    html = html.replace(/<div>\s*<\/div>/gi, '');
-    html = html.replace(/<h[1-6]>\s*<\/h[1-6]>/gi, '');
-    
-    // Final HTML entity cleanup
-    html = html.replace(/&nbsp;/g, ' ');
-    html = html.replace(/&amp;/g, '&');
-    html = html.replace(/&lt;/g, '<');
-    html = html.replace(/&gt;/g, '>');
-    html = html.replace(/&quot;/g, '"');
-    html = html.replace(/&#39;/g, "'");
-    
-    return { html, metadata };
+  private static cleanListContent(content: string): string {
+    return content
+      .replace(/<(?!\/?)(?!(?:li|ul|ol)\b)[^>]*>/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
   /**
-   * Fallback: Basic cleanup for error cases
+   * Helper: Clean inline content while preserving basic formatting
+   */
+  private static cleanInlineContent(content: string): string {
+    return content
+      .replace(/<(?!\/?)(?!(?:strong|em|b|i|u)\b)[^>]*>/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /**
+   * Helper: Sanitize URLs to prevent XSS
+   */
+  private static sanitizeUrl(url: string): string | null {
+    // Only allow safe protocols
+    if (/^https?:\/\//.test(url) || /^mailto:/.test(url)) {
+      return url;
+    }
+    return null; // Remove suspicious URLs
+  }
+
+  /**
+   * Helper: Estimate word count from HTML
+   */
+  private static estimateWordCount(html: string): number {
+    const text = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    return text ? text.split(' ').length : 0;
+  }
+
+  /**
+   * Fallback: Basic cleanup if main parser fails
    */
   private static basicCleanup(html: string): string {
     return html
       .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
       .replace(/<[^>]+>/g, ' ')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
       .replace(/\s+/g, ' ')
       .trim();
-  }
-
-  /**
-   * Utility: Estimate word count
-   */
-  private static estimateWordCount(html: string): number {
-    const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-    return text ? text.split(' ').length : 0;
   }
 }
