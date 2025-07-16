@@ -256,7 +256,7 @@ body {
 
 .newsletter-content-html p {
   margin: 10px 0;
-  text-align: left;
+  text-align: justify;
 }
 
 .newsletter-content-html ul,
