@@ -89,10 +89,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // First clean the content of tracking/ads
       const cleanedResult = cleanNewsletterContent(originalContent);
       
-      // Process with the parser
+      // Process with the parser, enabling HTML preservation
       const parseResult = NewsletterParser.parseToCleanHTML(cleanedResult.cleanedContent, {
         enableImages: true,
         enableLinks: true,
+        enableStructureRecovery: true,  // Enable structure recovery
+        enableLinkPreservation: true,   // Preserve links
+        enableImagePreservation: true,  // Preserve images
+        enableContentCleaning: false    // Skip the cleaning step since we already did it
       });
 
       cleanContent = parseResult.finalOutput;
@@ -109,9 +113,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         compressionRatio: parseResult.metadata.compressionRatio
       });
     } catch (parseError) {
-      // Fall back to your existing working logic
-      console.warn('Enhanced parser failed, using existing htmlToText:', parseError);
-      cleanContent = htmlToText(originalContent);
+      console.error('Parser failed, using original HTML:', parseError);
+      cleanContent = originalContent;  // Fall back to original HTML if parsing fails
     }
     
     console.log('Content cleaned, length:', cleanContent.length);
