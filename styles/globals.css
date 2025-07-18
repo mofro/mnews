@@ -84,12 +84,18 @@ body {
 }
 
 /* Medium screens: two-column newspaper style */
-@media (min-width: 600px) {
+@media (min-width: 600px) and (max-width: 899px) {
   .newsletters {
-    column-count: 2;
-    column-gap: 24px;
-    /* reset flex so column layout works */
-    display: block;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  .newsletters > .newsletter-item {
+    break-inside: initial;
+    grid-column: span 1;
+  }
+  .newsletters > .newsletter-item:nth-child(1) {
+    grid-column: 1 / span 2;
   }
 }
 
@@ -102,6 +108,7 @@ body {
   }
   .newsletters > .newsletter-item {
     break-inside: initial; /* not relevant in grid */
+    grid-column: span 2; /* default: half-width row under hero */
   }
   /* Hero card */
   .newsletters > .newsletter-item:nth-child(1) {
