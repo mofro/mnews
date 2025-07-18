@@ -77,9 +77,33 @@ body {
 }
 
 .newsletters {
+  /* default mobile: single column flex */
   display: flex;
   flex-direction: column;
   gap: 15px;
+}
+
+/* Medium screens: two-column newspaper style */
+@media (min-width: 600px) {
+  .newsletters {
+    column-count: 2;
+    column-gap: 24px;
+    /* reset flex so column layout works */
+    display: block;
+  }
+}
+
+/* Large screens: three columns */
+@media (min-width: 900px) {
+  .newsletters {
+    column-count: 3;
+  }
+}
+
+/* Keep each item intact within columns */
+.newsletter-item {
+  break-inside: avoid-column;
+  margin-bottom: 15px;
 }
 
 .newsletter-item {
