@@ -126,9 +126,8 @@ body {
   padding: 20px;
   cursor: pointer;
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 15px;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .newsletter-meta {
@@ -156,10 +155,24 @@ body {
 
 .subject {
   flex: 1;
-  font-size: 1.1em;
   font-weight: 600;
   color: #2c3e50;
-  margin: 5px 0;
+  margin: 0;
+  line-height: 1.3;
+  /* mobile default */
+  font-size: 1.2em;
+}
+
+@media (min-width: 600px) {
+  .subject {
+    font-size: 1.1em;
+  }
+}
+
+@media (min-width: 900px) {
+  .subject {
+    font-size: 0.95em;
+  }
 }
 
 .expand-icon {
