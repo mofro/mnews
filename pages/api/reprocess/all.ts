@@ -52,15 +52,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         console.log(`Processing newsletter ${newsletter.id}: ${newsletter.subject}`);
 
-        // ENHANCED: Use the same parser options for all newsletters
+        // ENHANCED: Use the same parser options as the single-item endpoint
         const parseResult = NewsletterParser.parseToCleanHTML(newsletter.rawContent, {
-          preserveImages: options.preserveImages ?? true,
-          preserveLinks: options.preserveLinks ?? true,
-          // NEW: Pass through incremental parser options
-          enableImagePreservation: options.enableImagePreservation ?? false,
-          enableLinkPreservation: options.enableLinkPreservation ?? true,
-          enableStructureRecovery: options.enableStructureRecovery ?? false, // KEY: Step 3!
-          ...options // Pass through any additional options
+          // Skip the HTML-to-text conversion to preserve HTML structure
+          skipHtmlToText: true,
+          // Preserve all content structure
+          enableImages: true,
+          enableLinks: true,
+          enableStructureRecovery: true,
+          enableLinkPreservation: true,
+          enableImagePreservation: true,
+          // Skip cleaning since it was done in cleanNewsletterContent
+          enableContentCleaning: false,
+          // Allow common HTML tags and attributes
+          ALLOWED_TAGS: '*',
+          ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'class', 'style'],
+          ALLOW_DATA_ATTR: true,
+          // Merge with any additional options passed in
+          ...options
         });
 
         const newCleanContent = parseResult.cleanHTML || parseResult.finalOutput;
