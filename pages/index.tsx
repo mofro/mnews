@@ -91,8 +91,8 @@ export default function Dashboard() {
               : "No newsletters match your filters."}
           </div>
         ) : (
-          filteredNewsletters.map(newsletter => (
-            <NewsletterItem key={newsletter.id} newsletter={newsletter} />
+          filteredNewsletters.map((newsletter, idx) => (
+            <NewsletterItem key={newsletter.id} newsletter={newsletter} index={idx} />
           ))
         )}
       </div>
@@ -100,7 +100,7 @@ export default function Dashboard() {
   )
 }
 
-function NewsletterItem({ newsletter }: { newsletter: NewsletterEmail }) {
+function NewsletterItem({ newsletter, index }: { newsletter: NewsletterEmail, index: number }) {
   const [expanded, setExpanded] = useState(false)
   const itemRef = useRef<HTMLDivElement>(null)
 
@@ -139,6 +139,13 @@ function NewsletterItem({ newsletter }: { newsletter: NewsletterEmail }) {
             date.getFullYear() === today.getFullYear();
   }
 
+  // Generate preview text for first two items when collapsed
+  const preview = !expanded && index < 3 ? (() => {
+    const plain = newsletter.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+    const words = plain.split(' ').slice(0, 40).join(' ')
+    return words + (plain.split(' ').length > 40 ? '…' : '')
+  })() : null;
+
   return (
     <div ref={itemRef} className={`newsletter-item ${isNew ? 'new' : ''}`}>
       <div className="newsletter-header" onClick={() => setExpanded(!expanded)}>
@@ -151,6 +158,9 @@ function NewsletterItem({ newsletter }: { newsletter: NewsletterEmail }) {
         <div className="expand-icon">{expanded ? '📖' : '📄'}</div>
       </div>
       
+      {!expanded && preview && (
+        <p className="preview">{preview}</p>
+      )}
       {expanded && (
         <div 
           className="newsletter-content-html"

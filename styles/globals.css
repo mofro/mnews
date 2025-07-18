@@ -217,6 +217,13 @@ body {
   background: #f8f9fa;
 }
 
+.preview {
+  font-size: 0.95em;
+  color: #555;
+  padding: 0 20px 15px;
+  line-height: 1.4;
+}
+
 .newsletter-content pre {
   white-space: pre-wrap;
   word-wrap: break-word;
