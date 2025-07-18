@@ -123,7 +123,8 @@ body {
 }
 
 .newsletter-header {
-  padding: 20px;
+  position: relative;
+  padding: 20px 50px 20px 20px; /* leave room for icon */
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -176,13 +177,15 @@ body {
 }
 
 .expand-icon {
-  font-size: 1.2em;
+  position: absolute;
+  top: 22px;
+  right: 20px;
+  font-size: 1.3em;
   opacity: 0.6;
-  transition: transform 0.2s;
 }
 
 .newsletter-item .newsletter-header:hover .expand-icon {
-  transform: scale(1.1);
+  opacity: 0.8;
 }
 
 .newsletter-content {
