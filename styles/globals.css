@@ -97,20 +97,22 @@ body {
 @media (min-width: 900px) {
   .newsletters {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: repeat(6, 1fr);
     gap: 24px;
-    column-count: unset;
   }
   .newsletters > .newsletter-item {
     break-inside: initial; /* not relevant in grid */
   }
-  /* First card spans first two columns */
+  /* Hero card */
   .newsletters > .newsletter-item:nth-child(1) {
-    grid-column: 1 / span 2;
+    grid-column: 1 / span 6;
   }
-  /* Second card in third column */
+  /* Second and third cards occupy half width each */
   .newsletters > .newsletter-item:nth-child(2) {
-    grid-column: 3;
+    grid-column: 1 / span 3;
+  }
+  .newsletters > .newsletter-item:nth-child(3) {
+    grid-column: 4 / span 3;
   }
 }
 
