@@ -3,7 +3,8 @@
 
 import { NextApiRequest, NextApiResponse } from 'next';
 import { NewsletterStorage } from '../../../lib/storage';
-import { IncrementalNewsletterParser, ParseResult, ProcessingStep } from '../../../lib/parser'; // CHANGED: Use incremental parser & types
+import { IncrementalNewsletterParser, ParseResult, ProcessingStep } from '../../../lib/parser';
+import { cleanNewsletterContent } from '../../../lib/cleaners/contentCleaner';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -41,17 +42,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       currentProcessingVersion: existingNewsletter.metadata?.processingVersion || 'unknown'
     });
 
-    // NEW: Reprocess with INCREMENTAL parser and options
-    let parseResult: ParseResult;
+    // Clean the content first
+    console.log('Running content cleaner...');
+    const cleaningResult = cleanNewsletterContent(existingNewsletter.rawContent);
+    
+    // Log cleaning results
+    console.log(`Content cleaner removed ${cleaningResult.removedItems.length} types of elements:`);
+    cleaningResult.removedItems.forEach(item => {
+      console.log(`- ${item.description}: ${item.matches} matches`);
+    });
 
+    // Process with incremental parser
+    let parseResult: ParseResult;
     try {
       console.log('Starting incremental parsing with options:', options);
       
-      // CHANGED: Use IncrementalNewsletterParser instead of NewsletterParser
-      parseResult = IncrementalNewsletterParser.parseNewsletter(existingNewsletter.rawContent, {
+      // Use cleaned content for parsing
+      parseResult = IncrementalNewsletterParser.parseNewsletter(cleaningResult.cleanedContent, {
         enableImagePreservation: options.enableImagePreservation || false,
         enableLinkPreservation: options.enableLinkPreservation || true,
-        enableStructureRecovery: options.enableStructureRecovery || false, // NEW: Step 3!
+        enableStructureRecovery: options.enableStructureRecovery || false,
         ...options
       });
       

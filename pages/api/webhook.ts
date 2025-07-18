@@ -2,6 +2,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Redis } from '@upstash/redis';
 import { NewsletterParser, ParseResult } from '../../lib/parser';
+import { cleanNewsletterContent } from '../../lib/cleaners/contentCleaner';
 
 // Initialize Redis connection using existing KV variables (your existing config)
 if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
@@ -85,13 +86,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let processingVersion = '2.6.0-existing-logic';
     
     try {
-      // Try enhanced parser first
-      console.log('Attempting enhanced parsing...');
-      const parseResult: ParseResult = NewsletterParser.parseToCleanHTML(originalContent, {
-        preserveImages: true,
-        preserveLinks: true
+      // First clean the content of tracking/ads
+      const cleanedResult = cleanNewsletterContent(originalContent);
+      
+      // Process with the parser
+      const parseResult = NewsletterParser.parseToCleanHTML(cleanedResult.cleanedContent, {
+        enableImages: true,
+        enableLinks: true,
       });
+
       cleanContent = parseResult.finalOutput;
+      
+      // Log what was removed for debugging
+      console.log(`Cleaning removed ${cleanedResult.removedItems.length} types of elements:`);
+      cleanedResult.removedItems.forEach(item => {
+        console.log(`- ${item.description}: ${item.matches} matches`);
+      });
       processingVersion = parseResult.metadata.processingVersion;
       console.log('Enhanced parser success:', {
         originalLength: originalContent.length,
