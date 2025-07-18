@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { format } from 'date-fns'
 import DOMPurify from 'dompurify'
 import { parseDate, formatDateSafely } from '../utils/dateService'
@@ -102,6 +102,14 @@ export default function Dashboard() {
 
 function NewsletterItem({ newsletter }: { newsletter: NewsletterEmail }) {
   const [expanded, setExpanded] = useState(false)
+  const itemRef = useRef<HTMLDivElement>(null)
+
+  // Scroll into view on mobile when expanded
+  useEffect(() => {
+    if (expanded && itemRef.current && window.innerWidth <= 768) {
+      itemRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  }, [expanded])
   
   // In NewsletterItem component, before parseISO
   console.log('Newsletter date:', newsletter.date);
@@ -132,7 +140,7 @@ function NewsletterItem({ newsletter }: { newsletter: NewsletterEmail }) {
   }
 
   return (
-    <div className={`newsletter-item ${isNew ? 'new' : ''}`}>
+    <div ref={itemRef} className={`newsletter-item ${isNew ? 'new' : ''}`}>
       <div className="newsletter-header" onClick={() => setExpanded(!expanded)}>
         <div className="newsletter-meta">
           <span className="sender">{newsletter.sender}</span>
