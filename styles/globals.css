@@ -96,7 +96,21 @@ body {
 /* Large screens: three columns */
 @media (min-width: 900px) {
   .newsletters {
-    column-count: 3;
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    gap: 24px;
+    column-count: unset;
+  }
+  .newsletters > .newsletter-item {
+    break-inside: initial; /* not relevant in grid */
+  }
+  /* First card spans first two columns */
+  .newsletters > .newsletter-item:nth-child(1) {
+    grid-column: 1 / span 2;
+  }
+  /* Second card in third column */
+  .newsletters > .newsletter-item:nth-child(2) {
+    grid-column: 3;
   }
 }
 
