@@ -89,14 +89,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // First clean the content of tracking/ads
       const cleanedResult = cleanNewsletterContent(originalContent);
       
-      // Process with the parser, enabling HTML preservation
+      // Process with the parser, preserving HTML structure
       const parseResult = NewsletterParser.parseToCleanHTML(cleanedResult.cleanedContent, {
+        // Skip the HTML-to-text conversion entirely
+        skipHtmlToText: true,
+        // Preserve all content structure
         enableImages: true,
         enableLinks: true,
-        enableStructureRecovery: true,  // Enable structure recovery
-        enableLinkPreservation: true,   // Preserve links
-        enableImagePreservation: true,  // Preserve images
-        enableContentCleaning: false    // Skip the cleaning step since we already did it
+        enableStructureRecovery: true,
+        enableLinkPreservation: true,
+        enableImagePreservation: true,
+        enableContentCleaning: false,
+        // Ensure we don't strip any HTML tags
+        ALLOWED_TAGS: '*',
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'class', 'style'],
+        ALLOW_DATA_ATTR: true
       });
 
       cleanContent = parseResult.finalOutput;

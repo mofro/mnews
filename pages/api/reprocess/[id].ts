@@ -3,7 +3,12 @@
 
 import { NextApiRequest, NextApiResponse } from 'next';
 import { NewsletterStorage } from '../../../lib/storage';
-import { IncrementalNewsletterParser, ParseResult, ProcessingStep } from '../../../lib/parser';
+import { 
+  IncrementalNewsletterParser, 
+  NewsletterParser,
+  ParseResult, 
+  ProcessingStep 
+} from '../../../lib/parser';
 import { cleanNewsletterContent } from '../../../lib/cleaners/contentCleaner';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -57,12 +62,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       console.log('Starting incremental parsing with options:', options);
       
-      // Use cleaned content for parsing
+// Process with the new parser, preserving HTML structure
       parseResult = IncrementalNewsletterParser.parseNewsletter(cleaningResult.cleanedContent, {
-        enableImagePreservation: options.enableImagePreservation || false,
-        enableLinkPreservation: options.enableLinkPreservation || true,
-        enableStructureRecovery: options.enableStructureRecovery || false,
-        ...options
+        // Skip the HTML-to-text conversion entirely
+        skipHtmlToText: true,
+        // Preserve all content structure
+        enableImages: true,
+        enableLinks: true,
+        enableStructureRecovery: true,
+        enableLinkPreservation: true,
+        enableImagePreservation: true,
+        enableContentCleaning: false,
+        // Ensure we don't strip any HTML tags
+        ALLOWED_TAGS: '*',
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'class', 'style'],
+        ALLOW_DATA_ATTR: true,
+        ...options // Allow overrides if needed
       });
       
       console.log('Incremental parser success:', {

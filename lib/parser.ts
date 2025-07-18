@@ -42,6 +42,7 @@ export class IncrementalNewsletterParser {
       enableLinkPreservation: false,
       enableFootnoteLinks: false,
       enableStructureRecovery: false, // Start disabled until we test
+      skipHtmlToText: false, // New option to skip HTML-to-text conversion
       ...options
     };
     
@@ -49,12 +50,21 @@ export class IncrementalNewsletterParser {
     let currentContent = rawHTML;
     
     try {
-      // Footnote links (OPTIONAL) – run before any stripping so we can inspect <a> tags
-      if (config.enableFootnoteLinks) {
-        currentContent = integrateFootnoteLinks(currentContent, steps, config);
+      // Only run HTML-to-text conversion if not explicitly skipped
+      if (!config.skipHtmlToText) {
+        if (config.enableFootnoteLinks) {
+          currentContent = integrateFootnoteLinks(currentContent, steps, config);
+        } else {
+          // Step 1: Basic HTML to text (original)
+          currentContent = this.step1_BasicHtmlToText(currentContent, steps);
+        }
       } else {
-        // Step 1: Basic HTML to text (original)
-        currentContent = this.step1_BasicHtmlToText(currentContent, steps);
+        steps.push({
+          stepName: 'skip-html-to-text',
+          input: 'HTML content',
+          output: 'Skipped HTML-to-text conversion',
+          success: true
+        });
       }
       
       // Step 2: Clean whitespace and entities (safe improvements)
