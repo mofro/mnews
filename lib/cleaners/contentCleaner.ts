@@ -35,11 +35,47 @@ const CLEANING_RULES: CleaningRule[] = [
     enabled: true
   },
   
+  // Remove Word/XML namespaces and processing instructions
+  {
+    id: 'remove-xml-namespaces',
+    description: 'Remove XML namespaces and processing instructions',
+    pattern: /<\?xml[^>]*\?>|<!\[if[^\]]*\]>|<!\[endif\]>/gi,
+    replacement: '',
+    enabled: true
+  },
+  
+  // Remove Microsoft Office specific elements and attributes
+  {
+    id: 'remove-ms-office-elements',
+    description: 'Remove Microsoft Office specific elements',
+    pattern: /<\/?(?:o:[a-z]+|w:[a-z]+|v:[a-z]+|m:[a-z]+|\w+:\w+)[^>]*>/gi,
+    replacement: '',
+    enabled: true
+  },
+  
+  // Remove Word document specific elements
+  {
+    id: 'remove-word-document-elements',
+    description: 'Remove Word document specific elements',
+    pattern: /<\/?w:WordDocument[^>]*>|<\/?o:WordDocument[^>]*>|<\/?v:background[^>]*>|<\/?v:shapetype[^>]*>|<\/?v:shape[^>]*>/gi,
+    replacement: '',
+    enabled: true
+  },
+  
+  // Remove conditional comments and other MS Office specific comments
+  {
+    id: 'remove-ms-conditional-comments',
+    description: 'Remove Microsoft conditional comments',
+    pattern: /<!--\s*\[if[^>]*>.*?<\!\[endif\]-->/gis,
+    replacement: '',
+    enabled: true
+  },
+  
   // Remove email client specific elements
   {
     id: 'remove-email-client-elements',
     description: 'Remove email client specific elements',
-    pattern: /<\/?(?:o:p|o:office|meta|link|script|iframe|noscript|object|embed|applet|frame|frameset)[^>]*>/gi,
+    pattern: /<\/?(?:o:p|o:office|meta|link|script|iframe|noscript|object|embed|applet|frame|frameset|\w+:\w+)[^>]*>/gi,
     replacement: '',
     enabled: true
   },
@@ -177,18 +213,24 @@ export function cleanNewsletterContent(html: string): CleaningResult {
   
   // Final cleanup
   cleaned = cleaned
+    // Remove any XML/HTML comments except conditional IE comments (handled by other rules)
+    .replace(/<!--(?!\s*\[if)[\s\S]*?-->/g, '')
     // Remove any inline event handlers
     .replace(/\s+on\w+=["'][^"']*["']/gi, '')
     // Remove any script tags that might have been missed
     .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    // Remove XML namespaces from remaining elements
+    .replace(/<\/?([a-z]+):/gi, '<$1')
     // Remove empty attributes
     .replace(/\s+[a-z-]+=["']\s*["']/gi, '')
     // Clean up any leftover whitespace
     .replace(/\s+/g, ' ')
-    .replace(/\s*<\/(p|div|span)>/g, '</$1>') // Remove spaces before closing tags
+    .replace(/\s*<\/(p|div|span|a|strong|em|h[1-6])>/g, '</$1>') // Remove spaces before closing tags
     .replace(/(<[^>]+>)\s+/g, '$1') // Remove spaces after opening tags
     .replace(/\s+(<\/[^>]+>)/g, '$1') // Remove spaces before closing tags
     .replace(/>\s+</g, '><') // Remove spaces between tags
+    // Remove any remaining XML/Word specific attributes
+    .replace(/\s+(?:xmlns|w:|o:|v:|m:)[^=\s>]+(?:=["'][^"']*["'])?/gi, '')
     .trim();
   
   return {
