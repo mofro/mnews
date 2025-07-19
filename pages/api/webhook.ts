@@ -86,34 +86,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let processingVersion = '2.6.0-existing-logic';
     
     try {
-      // First clean the content of tracking/ads
+      // First clean the content of tracking/ads and style information
       const cleanedResult = cleanNewsletterContent(originalContent);
       
-      // Process with the parser, preserving HTML structure
+      // Process with the parser, preserving HTML structure but letting our cleaner handle the content
       const parseResult = NewsletterParser.parseToCleanHTML(cleanedResult.cleanedContent, {
-        // Skip the HTML-to-text conversion entirely
+        // Skip the HTML-to-text conversion to preserve HTML structure
         skipHtmlToText: true,
-        // Preserve all content structure
+        // Disable parser's built-in cleaning since we're handling it ourselves
+        enableContentCleaning: false,
+        // Preserve structure and media
         enableImages: true,
         enableLinks: true,
         enableStructureRecovery: true,
-        enableLinkPreservation: true,
-        enableImagePreservation: true,
-        enableContentCleaning: false,
-        // Ensure we don't strip any HTML tags
-        ALLOWED_TAGS: '*',
-        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'class', 'style'],
-        ALLOW_DATA_ATTR: true
+        // Allow basic HTML but prevent scripts and other dangerous elements
+        ALLOWED_TAGS: ['p', 'div', 'span', 'a', 'img', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target'],
+        ALLOW_DATA_ATTR: false
       });
 
-      cleanContent = parseResult.finalOutput;
+      // Clean the parsed output again to catch anything the parser might have introduced
+      const finalClean = cleanNewsletterContent(parseResult.finalOutput);
+      cleanContent = finalClean.cleanedContent;
       
       // Log what was removed for debugging
-      console.log(`Cleaning removed ${cleanedResult.removedItems.length} types of elements:`);
-      cleanedResult.removedItems.forEach(item => {
+      const totalRemoved = [...cleanedResult.removedItems, ...finalClean.removedItems];
+      console.log(`Cleaning removed ${totalRemoved.length} types of elements:`);
+      totalRemoved.forEach(item => {
         console.log(`- ${item.description}: ${item.matches} matches`);
       });
-      processingVersion = parseResult.metadata.processingVersion;
+      processingVersion = `2.7.0-enhanced-cleaning-${parseResult.metadata.processingVersion}`;
       console.log('Enhanced parser success:', {
         originalLength: originalContent.length,
         cleanLength: cleanContent.length,

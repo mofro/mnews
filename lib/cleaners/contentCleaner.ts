@@ -8,6 +8,33 @@ interface CleaningRule {
 
 // Common patterns for tracking elements, ads, and promotional content
 const CLEANING_RULES: CleaningRule[] = [
+  // Remove entire style blocks first
+  {
+    id: 'remove-style-blocks',
+    description: 'Remove all style blocks',
+    pattern: /<style[^>]*>[\s\S]*?<\/style>/gi,
+    replacement: '',
+    enabled: true
+  },
+  
+  // Remove inline styles
+  {
+    id: 'remove-inline-styles',
+    description: 'Remove all inline styles',
+    pattern: /\s+style=["'][^"']*["']/gi,
+    replacement: '',
+    enabled: true
+  },
+  
+  // Remove common CSS classes that contain style information
+  {
+    id: 'remove-style-classes',
+    description: 'Remove style-related classes',
+    pattern: /\s+class=["'][^"']*\b(?:mso|Mso|style|font|color|size|align|margin|padding|border|width|height|bgcolor|background|text-|font-|line-|letter-|word-|whitespace-|break-|list-|table-|border-|rounded-|shadow-|opacity-|overflow-|position-|top-|right-|bottom-|left-|z-|float-|clear-|object-|gap-|space-|divide-|ring-|ring-offset-)\S*\b[^"']*["']/gi,
+    replacement: '',
+    enabled: true
+  },
+  
   // Substack app links and social media icons
   {
     id: 'remove-substack-app-links',
@@ -26,11 +53,11 @@ const CLEANING_RULES: CleaningRule[] = [
     enabled: true
   },
   
-  // Inline styles (moved up to catch them before other rules)
+  // Remove empty style and class attributes
   {
-    id: 'remove-inline-styles',
-    description: 'Remove inline styles',
-    pattern: /\s+style=["'][^"']*["']/gi,
+    id: 'remove-empty-attrs',
+    description: 'Remove empty style and class attributes',
+    pattern: /\s+(?:style|class)=["']\s*["']/gi,
     replacement: '',
     enabled: true
   },
@@ -123,6 +150,24 @@ export function cleanNewsletterContent(html: string): CleaningResult {
     previousLength = cleaned.length;
     cleaned = cleaned.replace(/<([a-z]+)[^>]*>\s*<\/\1>/gi, '');
   } while (cleaned.length < previousLength);
+  
+  // Final cleanup: Remove any remaining CSS rules or style attributes
+  cleaned = cleaned
+    // Remove any remaining style attributes that might have been missed
+    .replace(/\s+style=["'][^"']*["']/gi, '')
+    // Remove any inline event handlers
+    .replace(/\s+on\w+=["'][^"']*["']/gi, '')
+    // Remove any data-* attributes that might contain styling
+    .replace(/\s+data-[\w-]+(?:=["'].*?["'])?/gi, '')
+    // Remove any remaining class attributes
+    .replace(/\s+class=["'][^"']*["']/gi, '')
+    // Remove any remaining empty attributes
+    .replace(/\s+[\w-]+=(?:""|'')/gi, '')
+    // Remove any remaining CSS rules
+    .replace(/[a-z\-]+\s*:\s*[^;\{\}]+(;|(?=\s*[\{\}]|$))/gi, '')
+    // Clean up any leftover whitespace
+    .replace(/\s+/g, ' ')
+    .trim();
   
   return {
     cleanedContent: cleaned,
