@@ -4,6 +4,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { NewsletterStorage } from '../../../lib/storage';
 import { NewsletterParser } from '../../../lib/parser';
+import { cleanNewsletterContent } from '../../../lib/cleaners/contentCleaner';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -52,8 +53,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         console.log(`Processing newsletter ${newsletter.id}: ${newsletter.subject}`);
 
-        // ENHANCED: Use the same parser options as the single-item endpoint
-        const parseResult = NewsletterParser.parseToCleanHTML(newsletter.rawContent, {
+        // Clean the content first
+        const cleanedResult = cleanNewsletterContent(newsletter.rawContent);
+        
+        // Process with the parser, preserving HTML structure
+        const parseResult = NewsletterParser.parseToCleanHTML(cleanedResult.cleanedContent, {
           // Skip the HTML-to-text conversion to preserve HTML structure
           skipHtmlToText: true,
           // Preserve all content structure

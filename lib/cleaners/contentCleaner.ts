@@ -8,6 +8,33 @@ interface CleaningRule {
 
 // Common patterns for tracking elements, ads, and promotional content
 const CLEANING_RULES: CleaningRule[] = [
+  // Substack app links and social media icons
+  {
+    id: 'remove-substack-app-links',
+    description: 'Remove Substack app links and social media icons',
+    pattern: /<a[^>]*\b(href=["']https?:\/\/substack\.com\/app-link\/[^"']*["']|class=["'][^"']*\b(?:app-link|share-icon|like-button|comment-button|share-button)\b[^"']*["'])[^>]*>.*?<\/a>/gis,
+    replacement: '',
+    enabled: true
+  },
+  
+  // Substack read-in-app buttons
+  {
+    id: 'remove-read-in-app',
+    description: 'Remove READ IN APP buttons',
+    pattern: /<a[^>]*\bclass=["'][^"']*\bread-in-app\b[^>]*>.*?<\/a>/gis,
+    replacement: '',
+    enabled: true
+  },
+  
+  // Inline styles (moved up to catch them before other rules)
+  {
+    id: 'remove-inline-styles',
+    description: 'Remove inline styles',
+    pattern: /\s+style=["'][^"']*["']/gi,
+    replacement: '',
+    enabled: true
+  },
+  
   // Tracking pixels (1x1, transparent, or tiny images)
   {
     id: 'remove-tracking-pixels',
