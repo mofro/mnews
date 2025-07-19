@@ -141,17 +141,9 @@ function NewsletterItem({ newsletter, index }: { newsletter: NewsletterEmail, in
 
   // Generate preview text for first two items when collapsed
   const preview = !expanded && index < 3 ? (() => {
-    // Use cleanContent if available, fall back to content
-    const content = newsletter.cleanContent || newsletter.content;
-    // Remove all HTML tags and CSS styles
-    const plain = content
-      .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style blocks
-      .replace(/<[^>]*>/g, ' ') // Remove all HTML tags
-      .replace(/\s*\{[^}]*\}/g, '') // Remove CSS rules
-      .replace(/\s+/g, ' ') // Collapse whitespace
-      .trim();
-    const words = plain.split(' ').slice(0, 40).join(' ');
-    return words + (plain.split(' ').length > 40 ? '…' : '');
+    const plain = newsletter.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+    const words = plain.split(' ').slice(0, 40).join(' ')
+    return words + (plain.split(' ').length > 40 ? '…' : '')
   })() : null;
 
   return (
