@@ -112,6 +112,12 @@ function NewsletterItem({ newsletter, index }: { newsletter: NewsletterEmail, in
   const [expanded, setExpanded] = useState(false)
   const itemRef = useRef<HTMLDivElement>(null)
 
+  // Debug log for Redis index
+  useEffect(() => {
+    console.log('Newsletter metadata:', newsletter.metadata)
+    console.log('Redis index:', newsletter.metadata?.redisIndex)
+  }, [newsletter])
+
   // Scroll into view on mobile when expanded
   useEffect(() => {
     if (expanded && itemRef.current && window.innerWidth <= 768) {
