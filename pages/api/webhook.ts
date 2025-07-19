@@ -86,34 +86,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let processingVersion = '2.6.0-existing-logic';
     
     try {
-      // First clean the content of tracking/ads
+      // Clean the content with our enhanced cleaner
       const cleanedResult = cleanNewsletterContent(originalContent);
       
-      // Process with the parser, preserving HTML structure
-      const parseResult = NewsletterParser.parseToCleanHTML(cleanedResult.cleanedContent, {
-        // Skip the HTML-to-text conversion entirely
-        skipHtmlToText: true,
-        // Preserve all content structure
-        enableImages: true,
-        enableLinks: true,
-        enableStructureRecovery: true,
-        enableLinkPreservation: true,
-        enableImagePreservation: true,
-        enableContentCleaning: false,
-        // Ensure we don't strip any HTML tags
-        ALLOWED_TAGS: '*',
-        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'class', 'style'],
-        ALLOW_DATA_ATTR: true
-      });
-
-      cleanContent = parseResult.finalOutput;
-      
-      // Log what was removed for debugging
-      console.log(`Cleaning removed ${cleanedResult.removedItems.length} types of elements:`);
+      // Log what was removed during cleaning
+      console.log(`Initial cleaning removed ${cleanedResult.removedItems.length} elements:`);
       cleanedResult.removedItems.forEach(item => {
         console.log(`- ${item.description}: ${item.matches} matches`);
       });
-      processingVersion = parseResult.metadata.processingVersion;
+      
+      // Process with the parser, preserving HTML structure but allowing some cleaning
+      const parseResult = NewsletterParser.parseToCleanHTML(cleanedResult.cleanedContent, {
+        skipHtmlToText: true,  // Keep HTML structure
+        enableImages: true,    // Preserve images
+        enableLinks: true,     // Preserve links
+        enableStructureRecovery: true,
+        enableLinkPreservation: true,
+        enableImagePreservation: true,
+        enableContentCleaning: true,  // Let the parser do some cleaning
+        
+        // Allow common HTML tags
+        ALLOWED_TAGS: [
+          'p', 'div', 'span', 'a', 'img', 'br', 'strong', 'em', 'b', 'i', 'u', 
+          'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+          'table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot',
+          'blockquote', 'pre', 'code', 'hr', 'img', 'figure', 'figcaption'
+        ],
+        
+        // Allow common attributes
+        ALLOWED_ATTR: [
+          'href', 'src', 'alt', 'title', 'target', 'class', 'style',
+          'width', 'height', 'align', 'valign', 'border', 'cellpadding', 'cellspacing'
+        ],
+        
+        // Don't allow data attributes as they often contain tracking info
+        ALLOW_DATA_ATTR: false
+      });
+
+      // Get the parsed content and clean it again to catch anything the parser might have introduced
+      cleanContent = parseResult.finalOutput;
+      
+      // Update processing version with our custom version
+      processingVersion = `3.0.0-cleaner-${parseResult.metadata.processingVersion}`;
       console.log('Enhanced parser success:', {
         originalLength: originalContent.length,
         cleanLength: cleanContent.length,

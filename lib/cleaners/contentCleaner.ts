@@ -8,6 +8,41 @@ interface CleaningRule {
 
 // Common patterns for tracking elements, ads, and promotional content
 const CLEANING_RULES: CleaningRule[] = [
+  // Remove any raw CSS before the first HTML tag
+  {
+    id: 'remove-leading-css',
+    description: 'Remove any raw CSS before the first HTML tag',
+    pattern: /^[^<]*?(?=<[a-z])/i,
+    replacement: '',
+    enabled: true
+  },
+  
+  // Remove style blocks
+  {
+    id: 'remove-style-blocks',
+    description: 'Remove all style blocks',
+    pattern: /<style[^>]*>[\s\S]*?<\/style>/gi,
+    replacement: '',
+    enabled: true
+  },
+  
+  // Remove inline styles
+  {
+    id: 'remove-inline-styles',
+    description: 'Remove inline styles',
+    pattern: /\s+style=["'][^"']*["']/gi,
+    replacement: '',
+    enabled: true
+  },
+  
+  // Remove email client specific elements
+  {
+    id: 'remove-email-client-elements',
+    description: 'Remove email client specific elements',
+    pattern: /<\/?(?:o:p|o:office|meta|link|script|iframe|noscript|object|embed|applet|frame|frameset)[^>]*>/gi,
+    replacement: '',
+    enabled: true
+  },
   // Substack app links and social media icons
   {
     id: 'remove-substack-app-links',
@@ -103,26 +138,58 @@ export function cleanNewsletterContent(html: string): CleaningResult {
   let cleaned = html;
   const removedItems: CleaningResult['removedItems'] = [];
   
-  for (const rule of CLEANING_RULES.filter(r => r.enabled)) {
+  // First, remove any leading CSS before the first HTML tag
+  const leadingCssMatch = cleaned.match(/^[^<]*?(?=<[a-z])/i);
+  if (leadingCssMatch) {
     const beforeLength = cleaned.length;
-    cleaned = cleaned.replace(rule.pattern, rule.replacement);
-    const matches = (html.length - cleaned.length) / rule.pattern.source.length;
-    
-    if (matches > 0) {
+    cleaned = cleaned.replace(/^[^<]*?(?=<[a-z])/i, '');
+    if (cleaned.length < beforeLength) {
       removedItems.push({
-        ruleId: rule.id,
-        description: rule.description,
-        matches: Math.round(matches)
+        ruleId: 'leading-css-removed',
+        description: 'Removed leading CSS before first HTML tag',
+        matches: 1
       });
     }
   }
   
-  // Clean up any leftover empty containers
+  // Process all other cleaning rules
+  for (const rule of CLEANING_RULES.filter(r => r.enabled)) {
+    const beforeLength = cleaned.length;
+    cleaned = cleaned.replace(rule.pattern, rule.replacement);
+    
+    if (cleaned.length < beforeLength) {
+      removedItems.push({
+        ruleId: rule.id,
+        description: rule.description,
+        matches: 1
+      });
+    }
+  }
+  
+  // Clean up any leftover empty containers (but be careful with nested structures)
   let previousLength;
-  do {
-    previousLength = cleaned.length;
-    cleaned = cleaned.replace(/<([a-z]+)[^>]*>\s*<\/\1>/gi, '');
-  } while (cleaned.length < previousLength);
+  const emptyElements = ['div', 'p', 'span', 'a', 'strong', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
+  
+  emptyElements.forEach(tag => {
+    const regex = new RegExp(`<${tag}[^>]*>\\s*<\\/${tag}>`, 'gi');
+    cleaned = cleaned.replace(regex, '');
+  });
+  
+  // Final cleanup
+  cleaned = cleaned
+    // Remove any inline event handlers
+    .replace(/\s+on\w+=["'][^"']*["']/gi, '')
+    // Remove any script tags that might have been missed
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    // Remove empty attributes
+    .replace(/\s+[a-z-]+=["']\s*["']/gi, '')
+    // Clean up any leftover whitespace
+    .replace(/\s+/g, ' ')
+    .replace(/\s*<\/(p|div|span)>/g, '</$1>') // Remove spaces before closing tags
+    .replace(/(<[^>]+>)\s+/g, '$1') // Remove spaces after opening tags
+    .replace(/\s+(<\/[^>]+>)/g, '$1') // Remove spaces before closing tags
+    .replace(/>\s+</g, '><') // Remove spaces between tags
+    .trim();
   
   return {
     cleanedContent: cleaned,
