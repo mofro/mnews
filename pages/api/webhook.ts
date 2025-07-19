@@ -86,46 +86,34 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let processingVersion = '2.6.0-existing-logic';
     
     try {
-      console.log('=== Starting content processing ===');
-      console.log('Original content length:', originalContent.length);
-      
-      // First, clean only the most problematic elements (tracking, ads, etc.)
+      // First clean the content of tracking/ads
       const cleanedResult = cleanNewsletterContent(originalContent);
-      console.log('After initial cleaning - length:', cleanedResult.cleanedContent.length);
       
-      // Process with the parser, using its built-in cleaning but preserving HTML structure
+      // Process with the parser, preserving HTML structure
       const parseResult = NewsletterParser.parseToCleanHTML(cleanedResult.cleanedContent, {
-        skipHtmlToText: true,     // Preserve HTML structure
-        enableContentCleaning: true, // Use parser's built-in cleaning
-        enableImages: true,       // Preserve images
-        enableLinks: true,        // Preserve links
-        enableStructureRecovery: true, // Recover structure from malformed HTML
-        
-        // Be more permissive with tags and attributes
-        ALLOWED_TAGS: [
-          'p', 'div', 'span', 'a', 'img', 'br', 'strong', 'em', 
-          'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-          'table', 'tr', 'td', 'th', 'thead', 'tbody', 'tfoot',
-          'b', 'i', 'u', 's', 'blockquote', 'pre', 'code', 'hr'
-        ],
-        ALLOWED_ATTR: [
-          'href', 'src', 'alt', 'title', 'target',
-          'width', 'height', 'align', 'valign',
-          'border', 'cellpadding', 'cellspacing'
-        ],
-        ALLOW_DATA_ATTR: false
+        // Skip the HTML-to-text conversion entirely
+        skipHtmlToText: true,
+        // Preserve all content structure
+        enableImages: true,
+        enableLinks: true,
+        enableStructureRecovery: true,
+        enableLinkPreservation: true,
+        enableImagePreservation: true,
+        enableContentCleaning: false,
+        // Ensure we don't strip any HTML tags
+        ALLOWED_TAGS: '*',
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'class', 'style'],
+        ALLOW_DATA_ATTR: true
       });
 
       cleanContent = parseResult.finalOutput;
-      console.log('After parsing - length:', cleanContent.length);
       
-      // Log what was removed in the initial cleaning
-      console.log('Initial cleaning removed:');
+      // Log what was removed for debugging
+      console.log(`Cleaning removed ${cleanedResult.removedItems.length} types of elements:`);
       cleanedResult.removedItems.forEach(item => {
         console.log(`- ${item.description}: ${item.matches} matches`);
       });
-      
-      processingVersion = `2.8.0-simplified-cleaning-${parseResult.metadata.processingVersion}`;
+      processingVersion = parseResult.metadata.processingVersion;
       console.log('Enhanced parser success:', {
         originalLength: originalContent.length,
         cleanLength: cleanContent.length,
