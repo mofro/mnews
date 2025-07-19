@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { format } from 'date-fns'
 import DOMPurify from 'dompurify'
 import { parseDate, formatDateSafely } from '../utils/dateService'
+import { ThemeToggle } from '../components/ThemeToggle'
 import type { NewsletterEmail, DashboardStats } from '../lib/types'
 
 export default function Dashboard() {
@@ -51,15 +52,22 @@ export default function Dashboard() {
   return (
     <div className="container">
       <header className="header">
-        <h1>🐠 Nemo</h1>
-        <p>Finding your newsletters in the vast ocean of email</p>
-        {stats && (
-          <div className="stats">
-            <span>{stats.totalNewsletters} total</span>
-            <span>{stats.todayCount} today</span>
-            <span>{stats.uniqueSenders} sources</span>
+        <div className="header-content">
+          <div className="header-titles">
+            <h1>🐠 Nemo</h1>
+            <p>Finding your newsletters in the vast ocean of email</p>
+            {stats && (
+              <div className="stats">
+                <span>{stats.totalNewsletters} total</span>
+                <span>{stats.todayCount} today</span>
+                <span>{stats.uniqueSenders} sources</span>
+              </div>
+            )}
           </div>
-        )}
+          <div className="header-actions">
+            <ThemeToggle />
+          </div>
+        </div>
       </header>
 
       <div className="filters">
