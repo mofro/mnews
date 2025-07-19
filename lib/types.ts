@@ -17,6 +17,7 @@ export interface Newsletter {
     sections?: string[];
     links?: Link[];
     wordCount?: number;
+    redisIndex?: string;
   };
   
   // LEGACY: Backward compatibility (will be deprecated)

@@ -190,6 +190,11 @@ function NewsletterItem({ newsletter, index }: { newsletter: NewsletterEmail, in
           }} 
         />
       )}
+      {newsletter.metadata?.redisIndex && (
+        <div className="redis-index">
+          <span>ID: {newsletter.metadata.redisIndex}</span>
+        </div>
+      )}
     </div>
   )
 }

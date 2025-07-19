@@ -198,11 +198,19 @@ body {
 }
 
 .newsletter-item {
-  background: white;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  margin-bottom: 20px;
   overflow: hidden;
-  transition: box-shadow 0.2s;
+  transition: all 0.3s ease;
+}
+
+.dark .newsletter-item {
+  background: var(--surface-color);
+  border-color: var(--border-color);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .newsletter-item:hover {
@@ -406,10 +414,89 @@ body {
   line-height: 1.7;
   color: var(--text-color);
   margin: 0 1.5rem 1.5rem;
+  padding: 1rem;
   font-size: 1rem;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  background-color: var(--bg-color);
+  background-color: var(--surface-color);
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.dark .newsletter-content-html {
+  background-color: var(--surface-color);
+  border-color: var(--border-color);
+}
+
+/* Redis Index Styles */
+.redis-index {
+  padding: 0.5rem 1.5rem;
+  margin: 0;
+  font-size: 0.7rem;
+  font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
+  color: var(--text-color);
+  opacity: 0.7;
+  text-align: right;
+  border-top: 1px solid var(--border-color);
+  background-color: rgba(0, 0, 0, 0.02);
+  transition: all 0.3s ease;
+}
+
+.dark .redis-index {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-top-color: var(--border-color);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.redis-index span {
+  display: inline-block;
+  padding: 0.2rem 0.5rem;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-radius: 4px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
+  font-size: 0.7rem;
+}
+
+.dark .redis-index span {
+  background-color: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.newsletter-content-html a:hover {
+  color: var(--accent-color);
+  opacity: 1;
+  border-bottom-width: 2px;
+  text-decoration: none;
+}
+
+.dark .newsletter-content-html a {
+  color: var(--accent-color);
+  border-bottom-color: var(--accent-color);
+  opacity: 0.9;
+}
+
+.dark .newsletter-content-html a:hover {
+  color: var(--accent-color);
+  opacity: 1;
+}
+
+/* Ensure good contrast for text in dark mode */
+.dark .newsletter-content-html,
+.dark .newsletter-content-html p,
+.dark .newsletter-content-html li,
+.dark .newsletter-content-html div,
+.dark .newsletter-content-html span {
+  color: var(--text-color) !important;
+  opacity: 0.9 !important;
+}
+
+/* Fix for light gray text in dark mode */
+.dark .newsletter-content-html p,
+.dark .newsletter-content-html li,
+.dark .newsletter-content-html div {
+  opacity: 0.9 !important;
 }
 
 .newsletter-content-html h1,
@@ -465,10 +552,12 @@ body {
 }
 
 .newsletter-content-html a {
-  color: var(--text-color);
-  opacity: 0.6;
+  color: var(--accent-color);
   text-decoration: none;
-  border-bottom: 1px solid #bee3f8;
+  border-bottom: 1px solid var(--accent-color);
+  transition: all 0.2s ease;
+  opacity: 0.9;
+  font-weight: 500;
   transition: all 0.2s ease;
   word-break: break-all;
 }
