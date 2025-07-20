@@ -119,23 +119,98 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Links */
+/* Base link styles */
 a {
-  color: #4299e1; /* Brighter blue for better visibility */
-  text-decoration: none;
-  transition: color 0.2s ease;
+  color: #2563eb; /* Brighter blue for better visibility */
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.2s ease, opacity 0.2s ease;
+  font-weight: 500;
 }
 
 a:hover {
-  color: #3182ce;
-  text-decoration: underline;
+  color: #1d4ed8; /* Slightly darker on hover */
+  text-decoration-thickness: 2px;
+  opacity: 0.9;
 }
 
+/* Visited links */
+a:visited {
+  color: #7c3aed; /* Purple for visited links */
+}
+
+/* Dark mode link overrides */
 .dark a {
-  color: #63b3ed; /* Lighter blue for dark mode */
+  color: #60a5fa !important; /* Lighter blue for dark mode */
+  text-decoration: underline !important;
+}
+
+.dark a:visited {
+  color: #a78bfa !important; /* Lighter purple for visited links in dark mode */
 }
 
 .dark a:hover {
-  color: #90cdf4;
+  color: #93c5fd !important; /* Even lighter on hover in dark mode */
+  text-decoration-thickness: 2px !important;
+}
+
+/* Content area links */
+.newsletter-content a,
+.newsletter-content-html a,
+.newsletter-preview a,
+.newsletter-content p a,
+.newsletter-content-html p a,
+.newsletter-preview p a {
+  color: #2563eb !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+}
+
+.dark .newsletter-content a,
+.dark .newsletter-content-html a,
+.dark .newsletter-preview a,
+.dark .newsletter-content p a,
+.dark .newsletter-content-html p a,
+.dark .newsletter-preview p a {
+  color: #60a5fa !important;
+}
+
+.newsletter-content a:visited,
+.newsletter-content-html a:visited,
+.newsletter-preview a:visited,
+.newsletter-content p a:visited,
+.newsletter-content-html p a:visited,
+.newsletter-preview p a:visited {
+  color: #7c3aed !important;
+}
+
+.dark .newsletter-content a:visited,
+.dark .newsletter-content-html a:visited,
+.dark .newsletter-preview a:visited,
+.dark .newsletter-content p a:visited,
+.dark .newsletter-content-html p a:visited,
+.dark .newsletter-preview p a:visited {
+  color: #a78bfa !important;
+}
+
+.newsletter-content a:hover,
+.newsletter-content-html a:hover,
+.newsletter-preview a:hover,
+.newsletter-content p a:hover,
+.newsletter-content-html p a:hover,
+.newsletter-preview p a:hover {
+  color: #1d4ed8 !important;
+  text-decoration-thickness: 2px !important;
+  opacity: 0.9 !important;
+}
+
+.dark .newsletter-content a:hover,
+.dark .newsletter-content-html a:hover,
+.dark .newsletter-preview a:hover,
+.dark .newsletter-content p a:hover,
+.dark .newsletter-content-html p a:hover,
+.dark .newsletter-preview p a:hover {
+  color: #93c5fd !important;
 }
 
 .stats {
