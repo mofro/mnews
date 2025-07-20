@@ -203,6 +203,7 @@ a:hover {
   /* default mobile: single column flex */
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
   gap: 15px;
 }
 
@@ -211,6 +212,7 @@ a:hover {
   .newsletters {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
+    align-items: flex-start;
     gap: 24px;
   }
   .newsletters > .newsletter-item {
@@ -227,6 +229,7 @@ a:hover {
   .newsletters {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
+    align-items: flex-start;
     gap: 24px;
   }
   .newsletters > .newsletter-item {
@@ -422,8 +425,23 @@ a:hover {
   line-height: 1.4;
 }
 
-dark.preview {
-  color: #cfcfcf;
+/* Preview section in dark mode */
+.dark .preview {
+  color: #e2e8f0 !important; /* Lighter text for better contrast in dark mode */
+}
+
+/* Ensure preview content is visible in dark mode */
+.dark .newsletter-content-preview {
+  color: #e2e8f0 !important;
+  opacity: 0.9;
+}
+
+/* Adjust preview text color in dark mode */
+.dark .newsletter-content-preview p,
+.dark .newsletter-content-preview div,
+.dark .newsletter-content-preview span {
+  color: #e2e8f0 !important;
+  opacity: 0.9;
 }
 
 
