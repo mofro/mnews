@@ -112,10 +112,14 @@ function NewsletterItem({ newsletter, index }: { newsletter: NewsletterEmail, in
   const [expanded, setExpanded] = useState(false)
   const itemRef = useRef<HTMLDivElement>(null)
 
-  // Debug log for Redis index
+  // Enhanced debug logging for Redis index
   useEffect(() => {
-    console.log('Newsletter metadata:', newsletter.metadata)
-    console.log('Redis index:', newsletter.metadata?.redisIndex)
+    console.log('Newsletter item data:', {
+      id: newsletter.id,
+      metadata: newsletter.metadata,
+      hasRedisIndex: !!newsletter.metadata?.redisIndex,
+      redisIndex: newsletter.metadata?.redisIndex || 'Not found'
+    })
   }, [newsletter])
 
   // Scroll into view on mobile when expanded
@@ -196,11 +200,26 @@ function NewsletterItem({ newsletter, index }: { newsletter: NewsletterEmail, in
           }} 
         />
       )}
-      {newsletter.metadata?.redisIndex && (
-        <div className="redis-index">
-          <span>ID: {newsletter.metadata.redisIndex}</span>
-        </div>
-      )}
+      <div className="redis-index" style={{
+        display: 'flex',
+        justifyContent: 'flex-end',
+        padding: '0.5rem 1rem',
+        backgroundColor: 'rgba(0,0,0,0.03)',
+        borderTop: '1px solid #e2e8f0',
+        fontSize: '0.75rem',
+        color: '#4a5568'
+      }}>
+        <span style={{
+          backgroundColor: 'rgba(0,0,0,0.05)',
+          padding: '0.25rem 0.5rem',
+          borderRadius: '4px',
+          fontFamily: 'monospace',
+          fontWeight: 500
+        }}>
+          ID: {newsletter.id || 'N/A'}
+          {newsletter.metadata?.redisIndex && ` (Redis: ${newsletter.metadata.redisIndex})`}
+        </span>
+      </div>
     </div>
   )
 }

@@ -555,45 +555,61 @@ body {
   border-color: var(--border-color);
 }
 
-/* Redis Index Styles */
+/* Redis Index Styles - Enhanced for visibility */
 .redis-index {
+  --redis-bg: rgba(0, 0, 0, 0.03);
+  --redis-border: #e2e8f0;
+  --redis-text: #4a5568;
+  --redis-span-bg: rgba(0, 0, 0, 0.05);
+  --redis-span-text: #2d3748;
+  
+  display: flex;
+  justify-content: flex-end;
   padding: 0.75rem 1.5rem;
   margin: 0;
   font-size: 0.75rem;
   font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
-  color: #4a5568; /* Slightly darker gray for better contrast */
-  text-align: right;
-  border-top: 1px solid #e2e8f0; /* Lighter border */
-  background-color: #f8fafc; /* Light background */
+  color: var(--redis-text);
+  border-top: 1px solid var(--redis-border);
+  background-color: var(--redis-bg);
   transition: all 0.3s ease;
-  position: relative;
-  z-index: 1;
 }
 
+/* Dark mode overrides */
 .dark .redis-index {
-  background-color: #1a202c; /* Dark background */
-  border-top-color: #2d3748; /* Darker border */
-  color: #cbd5e0; /* Lighter text for dark mode */
+  --redis-bg: #1a202c;
+  --redis-border: #2d3748;
+  --redis-text: #cbd5e0;
+  --redis-span-bg: #2d3748;
+  --redis-span-text: #e2e8f0;
 }
 
 .redis-index span {
   display: inline-flex;
   align-items: center;
-  padding: 0.25rem 0.75rem;
-  background-color: #edf2f7;
-  border-radius: 9999px; /* Pill shape */
-  font-weight: 600;
-  letter-spacing: 0.025em;
+  padding: 0.35rem 0.85rem;
+  background-color: var(--redis-span-bg);
+  color: var(--redis-span-text);
+  border-radius: 4px;
   font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace;
-  font-size: 0.7rem;
-  color: #2d3748;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
 }
 
-.dark .redis-index span {
-  background-color: #2d3748;
-  color: #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+/* Force styles for the inline-styled Redis index */
+.theme-wrapper .redis-index {
+  background-color: var(--redis-bg) !important;
+  border-top-color: var(--redis-border) !important;
+  color: var(--redis-text) !important;
+}
+
+.theme-wrapper .redis-index span {
+  background-color: var(--redis-span-bg) !important;
+  color: var(--redis-span-text) !important;
+  font-family: 'SF Mono', 'Roboto Mono', 'Courier New', monospace !important;
 }
 
 /* Ensure the index is visible even when content is scrolled */
