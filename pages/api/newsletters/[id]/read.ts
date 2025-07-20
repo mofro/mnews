@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { updateNewsletterReadStatus } from '@/lib/redis';
+import { getRedisClient } from '@/lib/redis';
 
 interface ReadRequest extends NextApiRequest {
   body: {
@@ -27,7 +28,26 @@ export default async function handler(
     const success = await updateNewsletterReadStatus(id as string, isRead);
     
     if (!success) {
-      return res.status(404).json({ message: 'Newsletter not found' });
+      // Try to list all newsletter keys for debugging
+      try {
+        const client = getRedisClient();
+        // @ts-ignore - Using internal Redis commands for debugging
+        const keys = await client.keys('newsletter:*');
+        console.log('Available newsletter keys:', keys);
+        return res.status(404).json({ 
+          message: 'Newsletter not found',
+          debug: {
+            requestedId: id,
+            availableKeys: keys
+          }
+        });
+      } catch (e) {
+        console.error('Error listing newsletter keys:', e);
+        return res.status(404).json({ 
+          message: 'Newsletter not found',
+          error: 'Could not list available newsletter keys'
+        });
+      }
     }
 
     return res.status(200).json({ 
