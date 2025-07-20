@@ -1,6 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { updateNewsletterReadStatus } from '@/lib/redis';
-import { getRedisClient } from '@/lib/redis';
+import { updateNewsletterReadStatus, getRedisClient } from '@/lib/redis';
 
 interface ReadRequest extends NextApiRequest {
   body: {
