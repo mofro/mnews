@@ -330,6 +330,53 @@ a:visited {
   margin-bottom: 15px;
 }
 
+/* Mark as read button styles */
+.mark-as-read-button {
+  transition: all 0.2s ease;
+  opacity: 0.8;
+}
+
+.mark-as-read-button:hover {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+/* Read state styles */
+.newsletter-item.read {
+  opacity: 0.7;
+  position: relative;
+}
+
+.newsletter-item.read::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background-color: #a0aec0;
+  opacity: 0.5;
+  border-radius: 4px 0 0 4px;
+}
+
+.newsletter-item.read .subject {
+  font-weight: 500;
+  color: #4a5568;
+}
+
+/* Dark mode adjustments */
+.dark .newsletter-item.read {
+  opacity: 0.6;
+}
+
+.dark .newsletter-item.read::after {
+  background-color: #718096;
+}
+
+.dark .newsletter-item.read .subject {
+  color: #a0aec0;
+}
+
 /* Newsletter Item Styles with Improved Contrast */
 .newsletter-item {
   background: #ffffff;

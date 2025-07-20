@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { format } from 'date-fns'
 import DOMPurify from 'dompurify'
 import { parseDate, formatDateSafely } from '../utils/dateService'
 import { ThemeToggle } from '../components/ThemeToggle'
+import { MarkAsReadButton } from '../components/MarkAsReadButton'
 import type { NewsletterEmail, DashboardStats } from '../lib/types'
 
 export default function Dashboard() {
@@ -38,6 +39,23 @@ export default function Dashboard() {
     
     return matchesSearch && matchesSender
   })
+
+  const handleMarkAsRead = useCallback((id: string) => {
+    setNewsletters(prevNewsletters => 
+      prevNewsletters.map(newsletter => 
+        newsletter.id === id 
+          ? { 
+              ...newsletter, 
+              metadata: { 
+                ...newsletter.metadata, 
+                isRead: true,
+                readAt: new Date().toISOString()
+              } 
+            } 
+          : newsletter
+      )
+    );
+  }, []);
 
   const uniqueSenders = Array.from(new Set(newsletters.map(n => n.sender)))
 
@@ -99,8 +117,13 @@ export default function Dashboard() {
               : "No newsletters match your filters."}
           </div>
         ) : (
-          filteredNewsletters.map((newsletter, idx) => (
-            <NewsletterItem key={newsletter.id} newsletter={newsletter} index={idx} />
+          filteredNewsletters.map((newsletter, index) => (
+            <NewsletterItem 
+              key={newsletter.id} 
+              newsletter={newsletter} 
+              index={index}
+              onMarkAsRead={handleMarkAsRead}
+            />
           ))
         )}
       </div>
@@ -108,8 +131,15 @@ export default function Dashboard() {
   )
 }
 
-function NewsletterItem({ newsletter, index }: { newsletter: NewsletterEmail, index: number }) {
+interface NewsletterItemProps {
+  newsletter: NewsletterEmail;
+  index: number;
+  onMarkAsRead?: (id: string) => void;
+}
+
+function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps) {
   const [expanded, setExpanded] = useState(false)
+  const [isRead, setIsRead] = useState(!!newsletter.metadata?.isRead)
   const itemRef = useRef<HTMLDivElement>(null)
 
   // Enhanced debug logging for Redis index
@@ -164,13 +194,41 @@ function NewsletterItem({ newsletter, index }: { newsletter: NewsletterEmail, in
     return words + (plain.split(' ').length > 40 ? '…' : '')
   })() : null;
 
+  const handleMarkAsRead = async () => {
+    try {
+      // Optimistically update the UI
+      setIsRead(true);
+      
+      // Notify parent component if provided
+      if (onMarkAsRead) {
+        onMarkAsRead(newsletter.id);
+      }
+    } catch (error) {
+      console.error('Error updating read status:', error);
+      // Revert the UI if the API call fails
+      setIsRead(false);
+    }
+  };
+
   return (
-    <div ref={itemRef} className={`newsletter-item ${isNew ? 'new' : ''}`}>
+    <div 
+      ref={itemRef} 
+      className={`newsletter-item ${isRead ? 'read' : ''} ${isNew ? 'new' : ''}`}
+    >
       <div className="newsletter-header" onClick={() => setExpanded(!expanded)}>
         <div className="newsletter-meta">
           <span className="sender">{newsletter.sender}</span>
           <span className="date">{formatDateSafely(newsletter.date, (d) => format(d, 'MMM d, h:mm a'), 'Unknown date')}</span>
-          {isNew && <span className="new-badge">NEW</span>}
+          <div className="flex items-center space-x-2">
+            {isNew && <span className="new-badge">NEW</span>}
+            <MarkAsReadButton 
+              id={newsletter.id}
+              isRead={isRead}
+              onMarkRead={handleMarkAsRead}
+              size="sm"
+              className="ml-2"
+            />
+          </div>
         </div>
         <h3 className="subject">{newsletter.subject}</h3>
         <div className="expand-icon">{expanded ? '📖' : '📄'}</div>

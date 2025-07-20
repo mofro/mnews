@@ -18,6 +18,8 @@ export interface Newsletter {
     links?: Link[];
     wordCount?: number;
     redisIndex?: string;
+    isRead?: boolean;
+    readAt?: string;
   };
   
   // LEGACY: Backward compatibility (will be deprecated)

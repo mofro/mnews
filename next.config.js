@@ -1,5 +1,12 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  webpack: (config) => {
+    // Add path aliases
+    config.resolve.alias['@'] = path.resolve(__dirname);
+    return config;
+  },
   // Remove output: 'export' to enable API routes on Vercel
   images: {
     unoptimized: true
