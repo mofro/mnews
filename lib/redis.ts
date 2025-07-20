@@ -66,49 +66,54 @@ export function getRedisClient(): RedisClient {
 
 export async function updateNewsletterReadStatus(id: string, isRead: boolean): Promise<boolean> {
   try {
-    const redis = getRedisClient();
-    if (!id) {
-      console.error('Invalid newsletter ID:', id);
-      return false;
-    }
-    
+    const client = getRedisClient();
     const key = `newsletter:${id}`;
-    const now = new Date().toISOString();
     
-    // Get the current newsletter data
-    const newsletter = await redis.hgetall(key);
-    if (!newsletter) {
-      console.error('Newsletter not found:', id);
+    console.log(`[DEBUG] Updating read status for newsletter:`, { id, key, isRead });
+    
+    // Get the existing data
+    const data = await client.hgetall(key);
+    console.log(`[DEBUG] Retrieved data from Redis:`, data);
+    
+    if (!data || Object.keys(data).length === 0) {
+      console.error(`[ERROR] Newsletter ${id} not found in Redis. Key: ${key}`);
+      // Try to list all newsletter keys to help with debugging
+      try {
+        // @ts-ignore - Using internal Redis commands for debugging
+        const keys = await client.keys('newsletter:*');
+        console.log(`[DEBUG] Available newsletter keys:`, keys);
+      } catch (e) {
+        console.error('[DEBUG] Could not list newsletter keys:', e);
+      }
       return false;
     }
     
-    // Parse the current metadata or initialize if it doesn't exist
-    const currentMetadata = newsletter.metadata 
-      ? JSON.parse(newsletter.metadata as string)
-      : {};
+    // Parse the metadata or initialize if it doesn't exist
+    const metadata = data.metadata ? JSON.parse(data.metadata as string) : {};
+    console.log(`[DEBUG] Current metadata:`, metadata);
     
     // Update the read status and timestamp
+    const now = new Date().toISOString();
     const updatedMetadata = {
-      ...currentMetadata,
+      ...metadata,
       isRead,
-      readAt: isRead ? now : null,
-      updatedAt: now
+      updatedAt: now,
+      ...(isRead && { readAt: now })
     };
     
-    // Update the newsletter in Redis with the new metadata
-    await redis.hset(key, 
-      'metadata', JSON.stringify(updatedMetadata),
-      'updatedAt', now
-    );
+    console.log(`[DEBUG] Updating metadata to:`, updatedMetadata);
     
-    console.log(`Successfully ${isRead ? 'marked as read' : 'marked as unread'}:`, id);
+    // Update the hash
+    const result = await client.hset(key, 'metadata', JSON.stringify(updatedMetadata));
+    console.log(`[DEBUG] Redis HSET result:`, result);
+    
+    // Verify the update
+    const updatedData = await client.hgetall(key);
+    console.log(`[DEBUG] Verification - Updated data:`, updatedData);
+    
     return true;
-    
   } catch (error) {
-    console.error('Error updating newsletter read status:', error);
-    if (error instanceof Error) {
-      console.error('Error details:', error.message, error.stack);
-    }
+    console.error('[ERROR] Error updating newsletter read status:', error);
     return false;
   }
 }
