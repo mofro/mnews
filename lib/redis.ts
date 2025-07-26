@@ -1,67 +1,94 @@
 import { Redis } from '@upstash/redis';
 
-// Create a type for the Redis client instance
-type RedisClient = {
-  hgetall: (key: string) => Promise<Record<string, any> | null>;
-  hset: (key: string, ...args: any[]) => Promise<number>;
-};
+// Simple Redis client wrapper
+class RedisClientWrapper {
+  private client: Redis;
+  
+  constructor() {
+    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
+      throw new Error('Missing Redis connection environment variables');
+    }
+    
+    this.client = new Redis({
+      url: process.env.KV_REST_API_URL,
+      token: process.env.KV_REST_API_TOKEN,
+    });
+  }
+  
+  async hgetall(key: string): Promise<Record<string, any> | null> {
+    try {
+      console.log(`[REDIS] Getting key: ${key}`);
+      const result = await this.client.hgetall(key);
+      console.log(`[REDIS] Got result for ${key}:`, result);
+      return result as Record<string, any>;
+    } catch (error) {
+      console.error(`[REDIS] Error in hgetall for key ${key}:`, error);
+      throw error;
+    }
+  }
+  
+  async hset(key: string, ...args: any[]): Promise<number> {
+    try {
+      console.log(`[REDIS] Setting key: ${key} with args:`, args);
+      const fields: Record<string, string> = {};
+      
+      for (let i = 0; i < args.length; i += 2) {
+        if (i + 1 < args.length) {
+          const field = String(args[i]);
+          const value = args[i + 1];
+          fields[field] = typeof value === 'object' ? JSON.stringify(value) : String(value);
+        }
+      }
+      
+      const result = await this.client.hset(key, fields);
+      console.log(`[REDIS] Set result for ${key}:`, result);
+      return result;
+    } catch (error) {
+      console.error(`[REDIS] Error in hset for key ${key}:`, error);
+      throw error;
+    }
+  }
+  
+  async hdel(key: string, ...fields: string[]): Promise<number> {
+    try {
+      console.log(`[REDIS] Deleting fields from ${key}:`, fields);
+      const result = await this.client.hdel(key, ...fields);
+      console.log(`[REDIS] Delete result for ${key}:`, result);
+      return result;
+    } catch (error) {
+      console.error(`[REDIS] Error in hdel for key ${key}:`, error);
+      throw error;
+    }
+  }
+  
+  async scan(cursor: number, options: { match: string; count: number }): Promise<[string, string[]]> {
+    try {
+      console.log(`[REDIS] Scanning with cursor ${cursor}, match: ${options.match}`);
+      const result = await this.client.scan(cursor, options);
+      console.log(`[REDIS] Scan result (cursor: ${cursor}):`, result);
+      return result as [string, string[]];
+    } catch (error) {
+      console.error(`[REDIS] Error in scan:`, error);
+      throw error;
+    }
+  }
+}
+
+// Singleton instance
+let redisInstance: RedisClientWrapper | null = null;
+
+export function getRedisClient(): RedisClientWrapper {
+  if (!redisInstance) {
+    redisInstance = new RedisClientWrapper();
+  }
+  return redisInstance;
+}
 
 // Type for newsletter data from Redis
 interface NewsletterData {
   id: string;
   metadata?: string;
   [key: string]: any;
-}
-
-let redis: RedisClient | null = null;
-
-export function getRedisClient(): RedisClient {
-  if (!redis) {
-    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
-      throw new Error('Missing Redis connection environment variables');
-    }
-    
-    // Initialize the Redis client with type assertion
-    const redisInstance = new Redis({
-      url: process.env.KV_REST_API_URL,
-      token: process.env.KV_REST_API_TOKEN,
-    });
-    
-    // Create a proxy object with just the methods we need
-    redis = {
-      hgetall: async (key: string) => {
-        const result = await redisInstance.hgetall(key);
-        return result ? (result as Record<string, any>) : null;
-      },
-      hset: async (key: string, ...args: any[]) => {
-        // For hset, we'll use the pipeline approach which is more type-safe
-        const pipeline = redisInstance.pipeline();
-        
-        // Process key-value pairs
-        for (let i = 0; i < args.length; i += 2) {
-          if (i + 1 < args.length) {
-            const field = String(args[i]);
-            let value = args[i + 1];
-            
-            // Stringify objects and arrays
-            if (typeof value === 'object' && value !== null) {
-              value = JSON.stringify(value);
-            } else {
-              value = String(value);
-            }
-            
-            pipeline.hset(key, { [field]: value });
-          }
-        }
-        
-        // Execute the pipeline
-        const results = await pipeline.exec();
-        return results ? results.length : 0;
-      }
-    };
-  }
-  
-  return redis;
 }
 
 export async function updateNewsletterReadStatus(id: string, isRead: boolean): Promise<boolean> {
