@@ -61,10 +61,15 @@ class RedisClientWrapper {
     }
   }
   
-  async scan(cursor: number, options: { match: string; count: number }): Promise<[string, string[]]> {
+  async scan(cursor: number, options: { match?: string; count?: number } = {}): Promise<[string, string[]]> {
     try {
-      console.log(`[REDIS] Scanning with cursor ${cursor}, match: ${options.match}`);
-      const result = await this.client.scan(cursor, options);
+      console.log(`[REDIS] Scanning with cursor ${cursor}, match: ${options.match || '*'}`);
+      // Prepare the options object with defaults
+      const scanOptions = {
+        match: options.match || '*',
+        count: options.count || 10 // Default count if not specified
+      };
+      const result = await this.client.scan(cursor, scanOptions);
       console.log(`[REDIS] Scan result (cursor: ${cursor}):`, result);
       return result as [string, string[]];
     } catch (error) {
@@ -106,9 +111,10 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
       console.error(`[ERROR] Newsletter ${id} not found in Redis. Key: ${key}`);
       // Try to list all newsletter keys to help with debugging
       try {
-        // @ts-ignore - Using internal Redis commands for debugging
-        const keys = await client.keys('newsletter:*');
+        // Use the scan method with a pattern
+        const [cursor, keys] = await client.scan(0, { match: 'newsletter:*' });
         console.log(`[DEBUG] Available newsletter keys:`, keys);
+        console.log(`[DEBUG] Next cursor:`, cursor);
       } catch (e) {
         console.error('[DEBUG] Could not list newsletter keys:', e);
       }
