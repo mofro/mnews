@@ -117,7 +117,11 @@ interface NewsletterData {
   [key: string]: any;
 }
 
-export async function updateNewsletterReadStatus(id: string, isRead: boolean): Promise<boolean> {
+type UpdateResult = 
+  | { success: true }
+  | { success: false; error: string; details?: any };
+
+export async function updateNewsletterReadStatus(id: string, isRead: boolean): Promise<UpdateResult | boolean> {
   const client = getRedisClient();
   // Handle both prefixed and non-prefixed IDs
   const key = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
@@ -131,8 +135,9 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
     const data = await client.hgetall(key);
     
     if (!data) {
-      console.error(`[ERROR] No data returned from Redis for key: ${key}`);
-      return false;
+      const error = `No data returned from Redis for key: ${key}`;
+      console.error(`[ERROR] ${error}`);
+      return { success: false, error, details: { key } };
     }
     
     console.log(`[DEBUG] Retrieved data for ${key}:`, {
@@ -142,8 +147,16 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
     });
     
     if (Object.keys(data).length === 0) {
-      console.error(`[ERROR] Empty data object returned from Redis for key: ${key}`);
-      return false;
+      const error = `Empty data object returned from Redis for key: ${key}`;
+      console.error(`[ERROR] ${error}`);
+      return { 
+        success: false, 
+        error,
+        details: { 
+          key,
+          availableFields: Object.keys(data) 
+        } 
+      };
     }
     
     // Parse the existing metadata
@@ -153,9 +166,22 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
         metadata = typeof data.metadata === 'string' 
           ? JSON.parse(data.metadata) 
           : data.metadata;
+        console.log(`[DEBUG] Successfully parsed metadata for ${key}`);
       } catch (e) {
-        console.error(`[ERROR] Failed to parse metadata for ${key}:`, e);
+        const error = `Failed to parse metadata for ${key}`;
+        console.error(`[ERROR] ${error}:`, e);
+        return { 
+          success: false, 
+          error,
+          details: { 
+            key,
+            metadataRaw: data.metadata,
+            error: e instanceof Error ? e.message : String(e)
+          }
+        };
       }
+    } else {
+      console.log(`[DEBUG] No metadata found for ${key}, initializing new metadata`);
     }
     
     // Prepare the update
@@ -170,12 +196,29 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
     console.log(`[DEBUG] Updating newsletter ${key} with:`, updatedMetadata);
     
     // Perform the update
-    await client.hset(key, 'metadata', JSON.stringify(updatedMetadata));
-    console.log(`[DEBUG] Successfully updated newsletter ${key}`);
-    
-    return true;
+    try {
+      await client.hset(key, 'metadata', JSON.stringify(updatedMetadata));
+      console.log(`[DEBUG] Successfully updated newsletter ${key}`);
+      return { success: true };
+    } catch (e) {
+      const error = `Failed to update newsletter ${key}`;
+      console.error(`[ERROR] ${error}:`, e);
+      return { 
+        success: false, 
+        error,
+        details: {
+          key,
+          error: e instanceof Error ? e.message : String(e)
+        }
+      };
+    }
   } catch (error) {
-    console.error('[ERROR] Error updating newsletter read status:', error);
-    return false;
+    const errorMessage = 'Error updating newsletter read status';
+    console.error(`[ERROR] ${errorMessage}:`, error);
+    return { 
+      success: false, 
+      error: errorMessage,
+      details: error instanceof Error ? error.message : String(error)
+    };
   }
 }

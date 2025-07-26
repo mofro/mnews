@@ -1,6 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { updateNewsletterReadStatus, getRedisClient } from '@/lib/redis';
 
+type UpdateResult = 
+  | { success: true }
+  | { success: false; error: string; details?: any }
+  | boolean; // For backward compatibility
+
 interface ReadRequest extends NextApiRequest {
   body: {
     isRead?: boolean;
@@ -28,25 +33,74 @@ export default async function handler(
     const newsletterId = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
     console.log(`[API] Updating read status for ID: ${id} (normalized to: ${newsletterId})`);
     
-    const success = await updateNewsletterReadStatus(newsletterId, isRead);
+    const result: UpdateResult = await updateNewsletterReadStatus(newsletterId, isRead);
     
-    if (!success) {
+    // Handle the case where updateNewsletterReadStatus returns a boolean for backward compatibility
+    if (result === true) {
+      return res.status(200).json({ 
+        success: true,
+        isRead,
+        timestamp: new Date().toISOString()
+      });
+    }
+    
+    // Handle the new UpdateResult type
+    if (typeof result === 'object' && result !== null && 'success' in result) {
+      const typedResult = result as { success: boolean; error?: string; details?: any };
+      if (typedResult.success) {
+        return res.status(200).json({ 
+          success: true,
+          isRead,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        // Extract error details from the result
+        const { error, details } = typedResult;
+        return res.status(404).json({
+          message: 'Failed to update newsletter',
+          debug: {
+            requestedId: id,
+            resolvedKey: newsletterId,
+            error,
+            details: details || 'No additional details available'
+          },
+          suggestion: 'Check the debug information for details on what went wrong'
+        });
+      }
+    }
+    
+    if (result === false) {
       // Try to list all newsletter keys for debugging
       try {
         const client = getRedisClient();
         // Try to get a sample of newsletter keys using SCAN
-        // @ts-ignore - Using internal Redis commands for debugging
         const [cursor, keys] = await client.scan(0, { match: 'newsletter:*', count: 10 });
         console.log('Sample of available newsletter keys:', keys);
+        
+        // Try to get the requested key directly for more details
+        let keyDetails = null;
+        try {
+          const keyData = await client.hgetall(newsletterId);
+          keyDetails = {
+            exists: keyData !== null,
+            fields: keyData ? Object.keys(keyData) : [],
+            metadataType: keyData?.metadata ? typeof keyData.metadata : 'none'
+          };
+        } catch (e) {
+          keyDetails = { error: 'Failed to inspect key details' };
+        }
+        
         return res.status(404).json({ 
-          message: 'Newsletter not found',
+          message: 'Newsletter not found or could not be updated',
           debug: {
             requestedId: id,
+            resolvedKey: newsletterId,
+            keyInspection: keyDetails,
             availableKeysSample: keys,
             totalKeys: keys.length,
             nextCursor: cursor
           },
-          suggestion: 'Try using one of the IDs from the availableKeysSample array'
+          suggestion: 'Verify the newsletter ID and try again. Check the debug information for more details.'
         });
       } catch (e) {
         console.error('Error scanning newsletter keys:', e);
