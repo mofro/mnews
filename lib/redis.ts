@@ -19,7 +19,28 @@ class RedisClientWrapper {
     try {
       console.log(`[REDIS] Getting key: ${key}`);
       const result = await this.client.hgetall(key);
-      console.log(`[REDIS] Got result for ${key}:`, result);
+      console.log(`[REDIS] Raw result for ${key}:`, JSON.stringify(result, null, 2));
+      
+      if (!result) {
+        console.log(`[REDIS] No data found for key: ${key}`);
+        return null;
+      }
+      
+      // Log the type and structure of the result
+      console.log(`[REDIS] Result type:`, typeof result);
+      console.log(`[REDIS] Result keys:`, Object.keys(result));
+      
+      // If metadata exists as a string, try to parse it
+      if (result.metadata && typeof result.metadata === 'string') {
+        try {
+          const parsed = JSON.parse(result.metadata);
+          console.log(`[REDIS] Parsed metadata:`, parsed);
+          result.metadata = parsed;
+        } catch (e) {
+          console.error(`[REDIS] Error parsing metadata for ${key}:`, e);
+        }
+      }
+      
       return result as Record<string, any>;
     } catch (error) {
       console.error(`[REDIS] Error in hgetall for key ${key}:`, error);
@@ -97,63 +118,60 @@ interface NewsletterData {
 }
 
 export async function updateNewsletterReadStatus(id: string, isRead: boolean): Promise<boolean> {
+  const client = getRedisClient();
+  // Handle both prefixed and non-prefixed IDs
+  const key = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
+  
+  console.log(`[DEBUG] === Starting updateNewsletterReadStatus ===`);
+  console.log(`[DEBUG] Input - id: ${id}, isRead: ${isRead}, resolved key: ${key}`);
+  
   try {
-    const client = getRedisClient();
-    // Handle both prefixed and non-prefixed IDs
-    const key = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
-    
-    console.log(`[DEBUG] Updating read status for newsletter:`, { id, key, isRead });
-    
     // Get the existing data
     console.log(`[DEBUG] Fetching data from Redis for key: ${key}`);
     const data = await client.hgetall(key);
-    console.log(`[DEBUG] Raw data from Redis for ${key}:`, JSON.stringify(data, null, 2));
     
-    if (!data || Object.keys(data).length === 0) {
-      console.error(`[ERROR] Newsletter ${id} not found in Redis. Key: ${key}`);
-      
-      // Get more detailed debug info
-      try {
-        console.log('[DEBUG] Attempting to scan for all newsletter keys...');
-        const [cursor, keys] = await client.scan(0, { match: 'newsletter:*', count: 50 });
-        console.log(`[DEBUG] Found ${keys.length} newsletter keys. First 10:`, keys.slice(0, 10));
-        console.log(`[DEBUG] Next cursor: ${cursor}`);
-        
-        // Try to get one of the keys directly
-        if (keys.length > 0) {
-          const testKey = keys[0];
-          console.log(`[DEBUG] Testing direct access to key: ${testKey}`);
-          const testData = await client.hgetall(testKey);
-          console.log(`[DEBUG] Direct access result for ${testKey}:`, JSON.stringify(testData, null, 2));
-        }
-      } catch (e) {
-        console.error('[DEBUG] Error during debug operations:', e);
-      }
+    if (!data) {
+      console.error(`[ERROR] No data returned from Redis for key: ${key}`);
       return false;
     }
     
-    // Parse the metadata or initialize if it doesn't exist
-    const metadata = data.metadata ? JSON.parse(data.metadata as string) : {};
-    console.log(`[DEBUG] Current metadata:`, metadata);
+    console.log(`[DEBUG] Retrieved data for ${key}:`, {
+      keys: Object.keys(data),
+      hasMetadata: 'metadata' in data,
+      metadataType: data.metadata ? typeof data.metadata : 'undefined'
+    });
     
-    // Update the read status and timestamp
-    const now = new Date().toISOString();
+    if (Object.keys(data).length === 0) {
+      console.error(`[ERROR] Empty data object returned from Redis for key: ${key}`);
+      return false;
+    }
+    
+    // Parse the existing metadata
+    let metadata: any = {};
+    if (data.metadata) {
+      try {
+        metadata = typeof data.metadata === 'string' 
+          ? JSON.parse(data.metadata) 
+          : data.metadata;
+      } catch (e) {
+        console.error(`[ERROR] Failed to parse metadata for ${key}:`, e);
+      }
+    }
+    
+    // Prepare the update
+    const updatedAt = new Date().toISOString();
     const updatedMetadata = {
       ...metadata,
       isRead,
-      updatedAt: now,
-      ...(isRead && { readAt: now })
+      updatedAt,
+      readAt: isRead ? (metadata.readAt || updatedAt) : null
     };
     
-    console.log(`[DEBUG] Updating metadata to:`, updatedMetadata);
+    console.log(`[DEBUG] Updating newsletter ${key} with:`, updatedMetadata);
     
-    // Update the hash
-    const result = await client.hset(key, 'metadata', JSON.stringify(updatedMetadata));
-    console.log(`[DEBUG] Redis HSET result:`, result);
-    
-    // Verify the update
-    const updatedData = await client.hgetall(key);
-    console.log(`[DEBUG] Verification - Updated data:`, updatedData);
+    // Perform the update
+    await client.hset(key, 'metadata', JSON.stringify(updatedMetadata));
+    console.log(`[DEBUG] Successfully updated newsletter ${key}`);
     
     return true;
   } catch (error) {
