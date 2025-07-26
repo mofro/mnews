@@ -99,7 +99,8 @@ interface NewsletterData {
 export async function updateNewsletterReadStatus(id: string, isRead: boolean): Promise<boolean> {
   try {
     const client = getRedisClient();
-    const key = `newsletter:${id}`;
+    // Handle both prefixed and non-prefixed IDs
+    const key = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
     
     console.log(`[DEBUG] Updating read status for newsletter:`, { id, key, isRead });
     

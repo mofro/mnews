@@ -24,7 +24,11 @@ export default async function handler(
     // Default to true for backward compatibility
     const { isRead = true } = req.body;
     
-    const success = await updateNewsletterReadStatus(id as string, isRead);
+    // Ensure we're using the correct ID format
+    const newsletterId = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
+    console.log(`[API] Updating read status for ID: ${id} (normalized to: ${newsletterId})`);
+    
+    const success = await updateNewsletterReadStatus(newsletterId, isRead);
     
     if (!success) {
       // Try to list all newsletter keys for debugging
