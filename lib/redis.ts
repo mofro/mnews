@@ -104,19 +104,29 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
     console.log(`[DEBUG] Updating read status for newsletter:`, { id, key, isRead });
     
     // Get the existing data
+    console.log(`[DEBUG] Fetching data from Redis for key: ${key}`);
     const data = await client.hgetall(key);
-    console.log(`[DEBUG] Retrieved data from Redis:`, data);
+    console.log(`[DEBUG] Raw data from Redis for ${key}:`, JSON.stringify(data, null, 2));
     
     if (!data || Object.keys(data).length === 0) {
       console.error(`[ERROR] Newsletter ${id} not found in Redis. Key: ${key}`);
-      // Try to list all newsletter keys to help with debugging
+      
+      // Get more detailed debug info
       try {
-        // Use the scan method with a pattern
-        const [cursor, keys] = await client.scan(0, { match: 'newsletter:*' });
-        console.log(`[DEBUG] Available newsletter keys:`, keys);
-        console.log(`[DEBUG] Next cursor:`, cursor);
+        console.log('[DEBUG] Attempting to scan for all newsletter keys...');
+        const [cursor, keys] = await client.scan(0, { match: 'newsletter:*', count: 50 });
+        console.log(`[DEBUG] Found ${keys.length} newsletter keys. First 10:`, keys.slice(0, 10));
+        console.log(`[DEBUG] Next cursor: ${cursor}`);
+        
+        // Try to get one of the keys directly
+        if (keys.length > 0) {
+          const testKey = keys[0];
+          console.log(`[DEBUG] Testing direct access to key: ${testKey}`);
+          const testData = await client.hgetall(testKey);
+          console.log(`[DEBUG] Direct access result for ${testKey}:`, JSON.stringify(testData, null, 2));
+        }
       } catch (e) {
-        console.error('[DEBUG] Could not list newsletter keys:', e);
+        console.error('[DEBUG] Error during debug operations:', e);
       }
       return false;
     }
