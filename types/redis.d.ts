@@ -7,6 +7,7 @@ declare module '@/lib/redis' {
     hset(key: string, ...args: any[]): Promise<number>;
     hdel(key: string, ...fields: string[]): Promise<number>;
     scan(cursor: number, options?: { match?: string; count?: number }): Promise<[string, string[]]>;
+    get(key: string): Promise<string | null>;
   }
 
   // Export the client factory function

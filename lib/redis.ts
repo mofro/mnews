@@ -98,6 +98,19 @@ class RedisClientWrapper {
       throw error;
     }
   }
+
+  async get(key: string): Promise<string | null> {
+    try {
+      console.log(`[REDIS] Getting string value for key: ${key}`);
+      // Type assertion to access the underlying Redis client's get method
+      const result = await (this.client as any).get(key) as string | null;
+      console.log(`[REDIS] Get result for ${key}:`, result);
+      return result;
+    } catch (error) {
+      console.error(`[REDIS] Error in get for key ${key}:`, error);
+      throw error;
+    }
+  }
 }
 
 // Singleton instance
@@ -132,12 +145,60 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
   try {
     // Get the existing data
     console.log(`[DEBUG] Fetching data from Redis for key: ${key}`);
-    const data = await client.hgetall(key);
+    
+    let data: any;
+    try {
+      // First try to get it as a hash
+      data = await client.hgetall(key);
+      console.log(`[DEBUG] Retrieved hash data for ${key}:`, data);
+      
+      if (!data || Object.keys(data).length === 0) {
+        // If no hash data, try to get it as a string
+        console.log(`[DEBUG] No hash data found, trying to get as string...`);
+        const stringData = await client.get(key);
+        if (stringData) {
+          console.log(`[DEBUG] Found string data:`, stringData);
+          // Try to parse it as JSON
+          try {
+            data = { metadata: stringData };
+            console.log(`[DEBUG] Successfully parsed string data as metadata`);
+          } catch (e) {
+            console.error(`[ERROR] Failed to parse string data as JSON:`, e);
+            return { 
+              success: false, 
+              error: 'Newsletter data is not in a valid format',
+              details: { 
+                key,
+                rawData: stringData,
+                error: e instanceof Error ? e.message : String(e)
+              }
+            };
+          }
+        }
+      }
+    } catch (e) {
+      console.error(`[ERROR] Error fetching data for key ${key}:`, e);
+      return { 
+        success: false, 
+        error: 'Failed to fetch newsletter data',
+        details: { 
+          key,
+          error: e instanceof Error ? e.message : String(e)
+        }
+      };
+    }
     
     if (!data) {
-      const error = `No data returned from Redis for key: ${key}`;
+      const error = `No data found for key: ${key}`;
       console.error(`[ERROR] ${error}`);
-      return { success: false, error, details: { key } };
+      return { 
+        success: false, 
+        error,
+        details: { 
+          key,
+          dataType: typeof data
+        } 
+      };
     }
     
     console.log(`[DEBUG] Retrieved data for ${key}:`, {
