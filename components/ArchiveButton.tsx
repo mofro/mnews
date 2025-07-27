@@ -25,6 +25,7 @@ const ArchiveButton: React.FC<ArchiveButtonProps> = ({
   const isDark = theme === 'dark';
 
   const handleClick = async (e: React.MouseEvent) => {
+    // Stop event from bubbling up to parent elements
     e.preventDefault();
     e.stopPropagation();
     
@@ -48,19 +49,21 @@ const ArchiveButton: React.FC<ArchiveButtonProps> = ({
   };
 
   const buttonClasses = cn(
-    'inline-flex items-center justify-center rounded font-medium transition-all',
+    'inline-flex items-center justify-center rounded-md font-medium transition-all',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-    'px-3 py-1.5 text-sm',
+    'px-4 py-2 text-sm',
     'border',
     'shadow-sm',
     'active:scale-95',
-    'transition-colors duration-150',
-    'min-w-[100px]',
+    'transition-all duration-150',
+    'min-w-[120px]',
     variant === 'default' 
       ? isArchived 
-        ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border-yellow-200 hover:border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-800/50 dark:text-yellow-300 dark:hover:bg-yellow-900/30'
-        : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-gray-200 hover:border-gray-300 dark:bg-gray-800/50 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700/50'
-      : 'hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent',
+        ? 'bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800/70 dark:text-amber-200 dark:hover:bg-amber-900/40'
+        : 'bg-gray-500/10 text-gray-700 hover:bg-gray-500/20 border-gray-200 dark:bg-gray-800/30 dark:border-gray-700/70 dark:text-gray-200 dark:hover:bg-gray-800/40'
+      : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 border-transparent',
+    'font-medium tracking-wide',
+    'hover:shadow-md',
     className
   );
 
@@ -73,18 +76,18 @@ const ArchiveButton: React.FC<ArchiveButtonProps> = ({
       title={isArchived ? 'Unarchive' : 'Archive'}
     >
       {isLoading ? (
-        <span className="inline-flex items-center justify-center w-full">
-          <RotateCcw className="w-3.5 h-3.5 mr-2 animate-spin" />
+        <span className="inline-flex items-center justify-center w-full gap-2">
+          <RotateCcw className="w-3.5 h-3.5 animate-spin" />
           <span className="text-sm font-medium">
             {isArchived ? 'Unarchiving...' : 'Archiving...'}
           </span>
         </span>
       ) : (
-        <span className="inline-flex items-center justify-center w-full">
+        <span className="inline-flex items-center justify-center w-full gap-2">
           {isArchived ? (
-            <Archive className="w-3.5 h-3.5 mr-2" />
+            <Archive className="w-4 h-4" />
           ) : (
-            <Trash2 className="w-3.5 h-3.5 mr-2" />
+            <Trash2 className="w-4 h-4" />
           )}
           <span className="text-sm font-medium">
             {isArchived ? 'Unarchive' : 'Archive'}

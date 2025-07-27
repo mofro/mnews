@@ -305,25 +305,23 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
         <div className="newsletter-meta">
           <span className="sender">{newsletter.sender}</span>
           <span className="date">{formatDateSafely(newsletter.date, (d) => format(d, 'MMM d, h:mm a'), 'Unknown date')}</span>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             {isNew && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-md whitespace-nowrap">
+              <span className="px-2.5 py-1 text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 rounded whitespace-nowrap">
                 NEW
               </span>
             )}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-4">
               <MarkAsReadButton 
                 id={newsletter.id}
                 isRead={isRead}
                 onMarkRead={() => handleMarkAsRead(!isRead)}
-                size="sm"
                 variant="default"
               />
               <ArchiveButton
                 id={newsletter.id}
                 isArchived={isArchived}
                 onArchive={(id: string, newArchivedStatus: boolean) => handleArchive(id, newArchivedStatus)}
-                size="sm"
                 variant="default"
               />
             </div>
