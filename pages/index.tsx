@@ -7,6 +7,77 @@ import MarkAsReadButton from '../components/MarkAsReadButton'
 import ArchiveButton from '../components/ArchiveButton'
 import type { NewsletterEmail, DashboardStats } from '../lib/types'
 
+// Test data for development
+const TEST_NEWSLETTERS: NewsletterEmail[] = [
+  {
+    id: 'test-1',
+    subject: 'Test Newsletter 1 - Check out our latest updates!',
+    sender: 'Test Company',
+    date: new Date().toISOString(),
+    rawContent: '<p>This is a test newsletter content. It contains some sample text to demonstrate the layout and styling of the newsletter viewer.</p>',
+    cleanContent: '<p>This is a test newsletter content. It contains some sample text to demonstrate the layout and styling of the newsletter viewer.</p>',
+    content: '<p>This is a test newsletter content. It contains some sample text to demonstrate the layout and styling of the newsletter viewer.</p>',
+    isNew: true,
+    metadata: {
+      processingVersion: '1.0',
+      processedAt: new Date().toISOString(),
+      isRead: false,
+      archived: false,
+      sections: [],
+      links: []
+    }
+  },
+  {
+    id: 'test-2',
+    subject: 'Test Newsletter 2 - Important Announcement',
+    sender: 'Test Company',
+    date: new Date(Date.now() - 86400000).toISOString(),
+    rawContent: '<p>This is another test newsletter with important information about our services and updates.</p>',
+    cleanContent: '<p>This is another test newsletter with important information about our services and updates.</p>',
+    content: '<p>This is another test newsletter with important information about our services and updates.</p>',
+    isNew: false,
+    metadata: {
+      processingVersion: '1.0',
+      processedAt: new Date(Date.now() - 86400000).toISOString(),
+      isRead: true,
+      readAt: new Date(Date.now() - 86400000).toISOString(),
+      archived: false,
+      sections: [],
+      links: []
+    }
+  },
+  {
+    id: 'test-3',
+    subject: 'Test Archived Newsletter',
+    sender: 'Archive Test',
+    date: new Date(Date.now() - 172800000).toISOString(),
+    rawContent: '<p>This newsletter has been archived for testing purposes.</p>',
+    cleanContent: '<p>This newsletter has been archived for testing purposes.</p>',
+    content: '<p>This newsletter has been archived for testing purposes.</p>',
+    isNew: false,
+    metadata: {
+      processingVersion: '1.0',
+      processedAt: new Date(Date.now() - 172800000).toISOString(),
+      isRead: true,
+      readAt: new Date(Date.now() - 172800000).toISOString(),
+      archived: true,
+      archivedAt: new Date(Date.now() - 172800000).toISOString(),
+      sections: [],
+      links: []
+    }
+  }
+];
+
+const TEST_STATS: DashboardStats = {
+  totalNewsletters: 3,
+  todayCount: 1, // Assuming one newsletter is from today
+  uniqueSenders: 2, // Test Company and Archive Test
+  total: 3,
+  withCleanContent: 3,
+  needsProcessing: 0,
+  avgWordCount: 25 // Approximate word count for test content
+};
+
 export default function Dashboard() {
   const [newsletters, setNewsletters] = useState<NewsletterEmail[]>([])
   const [stats, setStats] = useState<DashboardStats | null>(null)
@@ -15,20 +86,48 @@ export default function Dashboard() {
   const [showArchived, setShowArchived] = useState(false)
   const [loading, setLoading] = useState(true)
 
+  const useTestData = () => {
+    setNewsletters(TEST_NEWSLETTERS)
+    setStats(TEST_STATS)
+    setLoading(false)
+  }
+
   useEffect(() => {
     loadNewsletters()
   }, [])
 
   const loadNewsletters = async () => {
-    try {
-      const response = await fetch('/api/newsletters')
-      const data = await response.json()
-      setNewsletters(data.newsletters || [])
-      setStats(data.stats)
-    } catch (error) {
-      console.error('Failed to load newsletters:', error)
-    } finally {
-      setLoading(false)
+    // In development, use test data if API call fails or returns empty
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        const response = await fetch('/api/newsletters')
+        const data = await response.json()
+        
+        if (data.newsletters && data.newsletters.length > 0) {
+          setNewsletters(data.newsletters)
+          setStats(data.stats)
+        } else {
+          // Fallback to test data if API returns empty
+          useTestData()
+        }
+      } catch (error) {
+        console.warn('Using test data due to API error:', error)
+        useTestData()
+      } finally {
+        setLoading(false)
+      }
+    } else {
+      // Production: Use real API
+      try {
+        const response = await fetch('/api/newsletters')
+        const data = await response.json()
+        setNewsletters(data.newsletters || [])
+        setStats(data.stats)
+      } catch (error) {
+        console.error('Failed to load newsletters:', error)
+      } finally {
+        setLoading(false)
+      }
     }
   }
 
