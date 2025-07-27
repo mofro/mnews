@@ -111,6 +111,19 @@ class RedisClientWrapper {
       throw error;
     }
   }
+
+  async type(key: string): Promise<string> {
+    try {
+      console.log(`[REDIS] Getting type of key: ${key}`);
+      // @ts-ignore - Using internal Redis command for TYPE
+      const result = await this.client.sendCommand(['TYPE', key]);
+      console.log(`[REDIS] Type of ${key}:`, result);
+      return result as string;
+    } catch (error) {
+      console.error(`[REDIS] Error getting type for key ${key}:`, error);
+      throw error;
+    }
+  }
 }
 
 // Singleton instance
@@ -143,47 +156,69 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
   console.log(`[DEBUG] Input - id: ${id}, isRead: ${isRead}, resolved key: ${key}`);
   
   try {
-    // Get the existing data
-    console.log(`[DEBUG] Fetching data from Redis for key: ${key}`);
-    
+    // First, check the type of the key
+    console.log(`[DEBUG] Checking type of key: ${key}`);
+    const keyType = await client.type(key);
+    console.log(`[DEBUG] Key type for ${key}:`, keyType);
+
     let data: any;
-    try {
-      // First try to get it as a hash
+    
+    if (keyType === 'hash') {
+      // Handle hash type
+      console.log(`[DEBUG] Key is a hash, using HGETALL`);
       data = await client.hgetall(key);
       console.log(`[DEBUG] Retrieved hash data for ${key}:`, data);
       
       if (!data || Object.keys(data).length === 0) {
-        // If no hash data, try to get it as a string
-        console.log(`[DEBUG] No hash data found, trying to get as string...`);
-        const stringData = await client.get(key);
-        if (stringData) {
-          console.log(`[DEBUG] Found string data:`, stringData);
-          // Try to parse it as JSON
-          try {
-            data = { metadata: stringData };
-            console.log(`[DEBUG] Successfully parsed string data as metadata`);
-          } catch (e) {
-            console.error(`[ERROR] Failed to parse string data as JSON:`, e);
-            return { 
-              success: false, 
-              error: 'Newsletter data is not in a valid format',
-              details: { 
-                key,
-                rawData: stringData,
-                error: e instanceof Error ? e.message : String(e)
-              }
-            };
-          }
-        }
+        console.log(`[DEBUG] Empty hash data for ${key}`);
+        data = { metadata: '{}' }; // Initialize with empty metadata
       }
-    } catch (e) {
-      console.error(`[ERROR] Error fetching data for key ${key}:`, e);
+    } else if (keyType === 'string') {
+      // Handle string type
+      console.log(`[DEBUG] Key is a string, using GET`);
+      const stringData = await client.get(key);
+      console.log(`[DEBUG] Retrieved string data for ${key}:`, stringData);
+      
+      if (stringData) {
+        try {
+          // Try to parse the string as JSON
+          const parsed = JSON.parse(stringData);
+          data = { metadata: stringData, ...parsed };
+          console.log(`[DEBUG] Successfully parsed string data as JSON`);
+        } catch (e) {
+          console.error(`[ERROR] Failed to parse string data as JSON:`, e);
+          // If it's not valid JSON, treat it as raw content
+          data = { 
+            content: stringData,
+            metadata: JSON.stringify({ isRead, updatedAt: new Date().toISOString() })
+          };
+        }
+      } else {
+        console.log(`[DEBUG] No data found for key: ${key}`);
+        return { 
+          success: false, 
+          error: 'Newsletter not found',
+          details: { key, keyType }
+        };
+      }
+    } else if (keyType === 'none') {
+      // Key doesn't exist
+      console.error(`[ERROR] Key does not exist: ${key}`);
       return { 
         success: false, 
-        error: 'Failed to fetch newsletter data',
+        error: 'Newsletter not found',
+        details: { key, keyType }
+      };
+    } else {
+      // Unsupported key type
+      console.error(`[ERROR] Unsupported key type '${keyType}' for key: ${key}`);
+      return { 
+        success: false, 
+        error: 'Unsupported data format',
         details: { 
-          key,
-          error: e instanceof Error ? e.message : String(e)
+          key, 
+          keyType,
+          message: `Expected 'hash' or 'string' but got '${keyType}'`
         }
       };
     }
