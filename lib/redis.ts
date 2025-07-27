@@ -233,28 +233,49 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
 
     console.log(`[DEBUG] Updating ${key} (${keyType}) with:`, updatedMetadata);
     
-    if (keyType === 'hash') {
-      // For hash type, update the metadata field
-      await client.hset(key, 'metadata', JSON.stringify(updatedMetadata));
-    } else if (keyType === 'string') {
-      // For string type, update the entire value
-      const currentValue = await client.get(key);
-      const data = currentValue ? JSON.parse(currentValue) : {};
-      data.metadata = updatedMetadata;
-      await client.set(key, JSON.stringify(data));
-    } else {
-      // Unsupported type
-      const error = `Unsupported Redis key type: ${keyType}`;
-      console.error(`[ERROR] ${error}`);
-      return {
-        success: false,
-        error,
-        details: { key, keyType }
-      };
+    try {
+      if (keyType === 'hash') {
+        // For hash type, update the metadata field
+        console.log(`[DEBUG] Updating hash key: ${key} with metadata:`, updatedMetadata);
+        await client.hset(key, { metadata: JSON.stringify(updatedMetadata) });
+      } else if (keyType === 'string') {
+        // For string type, update the entire value
+        const currentValue = await client.get(key);
+        console.log(`[DEBUG] Current value for ${key}:`, currentValue);
+        
+        let data: any = {};
+        if (currentValue) {
+          try {
+            data = typeof currentValue === 'string' ? JSON.parse(currentValue) : currentValue;
+          } catch (e) {
+            console.error(`[ERROR] Failed to parse current value for ${key}:`, e);
+            // If we can't parse the current value, create a new object with the content
+            data = { content: currentValue };
+          }
+        }
+        
+        // Update the metadata
+        data.metadata = updatedMetadata;
+        
+        console.log(`[DEBUG] Setting new value for ${key}:`, data);
+        await client.set(key, JSON.stringify(data));
+      } else {
+        // Unsupported type
+        const error = `Unsupported Redis key type: ${keyType}`;
+        console.error(`[ERROR] ${error}`);
+        return {
+          success: false,
+          error,
+          details: { key, keyType }
+        };
+      }
+      
+      console.log(`[DEBUG] Successfully updated ${key}`);
+      return { success: true };
+    } catch (error) {
+      console.error(`[ERROR] Error updating Redis key ${key}:`, error);
+      throw error; // Re-throw to be caught by the outer catch
     }
-    
-    console.log(`[DEBUG] Successfully updated ${key}`);
-    return { success: true };
   } catch (error) {
     const errorMessage = 'Error updating newsletter read status';
     console.error(`[ERROR] ${errorMessage}:`, error);
