@@ -124,6 +124,44 @@ class RedisClientWrapper {
       throw error;
     }
   }
+
+  async getRaw(key: string): Promise<{type: string, value: any}> {
+    try {
+      console.log(`[REDIS] Getting raw value for key: ${key}`);
+      // First get the type
+      const type = await this.type(key);
+      
+      if (type === 'none') {
+        return { type, value: null };
+      }
+      
+      let value: any;
+      
+      // Get the value based on type
+      if (type === 'string') {
+        value = await this.get(key);
+      } else if (type === 'hash') {
+        value = await this.hgetall(key);
+      } else if (type === 'list') {
+        // @ts-ignore - Using internal Redis command for LRANGE
+        value = await this.client.sendCommand(['LRANGE', key, '0', '-1']);
+      } else if (type === 'set') {
+        // @ts-ignore - Using internal Redis command for SMEMBERS
+        value = await this.client.sendCommand(['SMEMBERS', key]);
+      } else if (type === 'zset') {
+        // @ts-ignore - Using internal Redis command for ZRANGE
+        value = await this.client.sendCommand(['ZRANGE', key, '0', '-1', 'WITHSCORES']);
+      } else {
+        throw new Error(`Unsupported Redis type: ${type}`);
+      }
+      
+      console.log(`[REDIS] Raw value for ${key} (${type}):`, value);
+      return { type, value };
+    } catch (error) {
+      console.error(`[REDIS] Error getting raw value for key ${key}:`, error);
+      throw error;
+    }
+  }
 }
 
 // Singleton instance
@@ -156,165 +194,74 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
   console.log(`[DEBUG] Input - id: ${id}, isRead: ${isRead}, resolved key: ${key}`);
   
   try {
-    // First, check the type of the key
-    console.log(`[DEBUG] Checking type of key: ${key}`);
-    const keyType = await client.type(key);
-    console.log(`[DEBUG] Key type for ${key}:`, keyType);
-
-    let data: any;
+    // Get the raw value and its type
+    console.log(`[DEBUG] Getting raw value for key: ${key}`);
+    const { type: keyType, value: rawValue } = await client.getRaw(key);
     
-    if (keyType === 'hash') {
-      // Handle hash type
-      console.log(`[DEBUG] Key is a hash, using HGETALL`);
-      data = await client.hgetall(key);
-      console.log(`[DEBUG] Retrieved hash data for ${key}:`, data);
-      
-      if (!data || Object.keys(data).length === 0) {
-        console.log(`[DEBUG] Empty hash data for ${key}`);
-        data = { metadata: '{}' }; // Initialize with empty metadata
-      }
-    } else if (keyType === 'string') {
-      // Handle string type
-      console.log(`[DEBUG] Key is a string, using GET`);
-      const stringData = await client.get(key);
-      console.log(`[DEBUG] Retrieved string data for ${key}:`, stringData);
-      
-      if (stringData) {
-        try {
-          // Try to parse the string as JSON
-          const parsed = JSON.parse(stringData);
-          data = { metadata: stringData, ...parsed };
-          console.log(`[DEBUG] Successfully parsed string data as JSON`);
-        } catch (e) {
-          console.error(`[ERROR] Failed to parse string data as JSON:`, e);
-          // If it's not valid JSON, treat it as raw content
-          data = { 
-            content: stringData,
-            metadata: JSON.stringify({ isRead, updatedAt: new Date().toISOString() })
-          };
-        }
-      } else {
-        console.log(`[DEBUG] No data found for key: ${key}`);
-        return { 
-          success: false, 
-          error: 'Newsletter not found',
-          details: { key, keyType }
-        };
-      }
-    } else if (keyType === 'none') {
-      // Key doesn't exist
+    if (keyType === 'none') {
       console.error(`[ERROR] Key does not exist: ${key}`);
       return { 
         success: false, 
         error: 'Newsletter not found',
         details: { key, keyType }
       };
-    } else {
-      // Unsupported key type
-      console.error(`[ERROR] Unsupported key type '${keyType}' for key: ${key}`);
-      return { 
-        success: false, 
-        error: 'Unsupported data format',
-        details: { 
-          key, 
-          keyType,
-          message: `Expected 'hash' or 'string' but got '${keyType}'`
-        }
-      };
     }
     
-    if (!data) {
-      const error = `No data found for key: ${key}`;
-      console.error(`[ERROR] ${error}`);
-      return { 
-        success: false, 
-        error,
-        details: { 
-          key,
-          dataType: typeof data
-        } 
-      };
-    }
+    console.log(`[DEBUG] Retrieved raw value for ${key} (${keyType}):`, rawValue);
     
-    console.log(`[DEBUG] Retrieved data for ${key}:`, {
-      keys: Object.keys(data),
-      hasMetadata: 'metadata' in data,
-      metadataType: data.metadata ? typeof data.metadata : 'undefined'
-    });
-    
-    if (Object.keys(data).length === 0) {
-      const error = `Empty data object returned from Redis for key: ${key}`;
-      console.error(`[ERROR] ${error}`);
-      return { 
-        success: false, 
-        error,
-        details: { 
-          key,
-          availableFields: Object.keys(data) 
-        } 
-      };
-    }
-    
-    // Parse the existing metadata
-    let metadata: any = {};
-    if (data.metadata) {
-      try {
-        metadata = typeof data.metadata === 'string' 
-          ? JSON.parse(data.metadata) 
-          : data.metadata;
-        console.log(`[DEBUG] Successfully parsed metadata for ${key}`);
-      } catch (e) {
-        const error = `Failed to parse metadata for ${key}`;
-        console.error(`[ERROR] ${error}:`, e);
-        return { 
-          success: false, 
-          error,
-          details: { 
-            key,
-            metadataRaw: data.metadata,
-            error: e instanceof Error ? e.message : String(e)
-          }
-        };
-      }
-    } else {
-      console.log(`[DEBUG] No metadata found for ${key}, initializing new metadata`);
-    }
-    
-    // Prepare the update
+    // Prepare the metadata update
     const updatedAt = new Date().toISOString();
+    const readAt = isRead ? (rawValue?.readAt || updatedAt) : null;
+    
+    // Create the updated metadata
     const updatedMetadata = {
-      ...metadata,
+      ...(typeof rawValue === 'object' ? rawValue : {}),
       isRead,
       updatedAt,
-      readAt: isRead ? (metadata.readAt || updatedAt) : null
+      readAt
     };
     
-    console.log(`[DEBUG] Updating newsletter ${key} with:`, updatedMetadata);
+    console.log(`[DEBUG] Updating ${key} with:`, updatedMetadata);
     
-    // Perform the update
-    try {
+    // Save the updated metadata based on the key type
+    if (keyType === 'hash') {
+      // For hash type, use HSET to update just the metadata field
       await client.hset(key, 'metadata', JSON.stringify(updatedMetadata));
-      console.log(`[DEBUG] Successfully updated newsletter ${key}`);
-      return { success: true };
-    } catch (e) {
-      const error = `Failed to update newsletter ${key}`;
-      console.error(`[ERROR] ${error}:`, e);
-      return { 
-        success: false, 
-        error,
-        details: {
-          key,
-          error: e instanceof Error ? e.message : String(e)
-        }
-      };
+    } else {
+      // For other types, convert to string and update
+      await client.hset(key, { 
+        content: typeof rawValue === 'string' ? rawValue : JSON.stringify(rawValue),
+        metadata: JSON.stringify(updatedMetadata)
+      });
     }
+    
+    console.log(`[DEBUG] Successfully updated ${key}`);
+    return { success: true };
   } catch (error) {
     const errorMessage = 'Error updating newsletter read status';
     console.error(`[ERROR] ${errorMessage}:`, error);
+    
+    // More detailed error information
+    let keyType = 'unknown';
+    try {
+      keyType = await client.type(key);
+    } catch (e) {
+      console.error(`[ERROR] Failed to get key type for ${key}:`, e);
+    }
+    
+    const errorDetails = {
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+      timestamp: new Date().toISOString(),
+      key,
+      isRead,
+      keyType
+    };
+    
     return { 
       success: false, 
       error: errorMessage,
-      details: error instanceof Error ? error.message : String(error)
+      details: errorDetails
     };
   }
 }
