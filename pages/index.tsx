@@ -301,34 +301,45 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
       `}
       aria-expanded={expanded}
     >
-      <div className="newsletter-header" onClick={() => setExpanded(!expanded)}>
-        <div className="newsletter-meta">
-          <span className="sender">{newsletter.sender}</span>
-          <span className="date">{formatDateSafely(newsletter.date, (d) => format(d, 'MMM d, h:mm a'), 'Unknown date')}</span>
-          <div className="flex items-center gap-4">
-            {isNew && (
-              <span className="px-2.5 py-1 text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 rounded whitespace-nowrap">
-                NEW
-              </span>
-            )}
-            <div className="flex items-center gap-4">
-              <MarkAsReadButton 
-                id={newsletter.id}
-                isRead={isRead}
-                onMarkRead={() => handleMarkAsRead(!isRead)}
-                variant="default"
-              />
-              <ArchiveButton
-                id={newsletter.id}
-                isArchived={isArchived}
-                onArchive={(id: string, newArchivedStatus: boolean) => handleArchive(id, newArchivedStatus)}
-                variant="default"
-              />
+      <div className="flex items-start justify-between gap-4">
+        <div 
+          className="flex-1 cursor-pointer" 
+          onClick={() => setExpanded(!expanded)}
+        >
+          <div className="newsletter-header">
+            <div className="newsletter-meta">
+              <span className="sender">{newsletter.sender}</span>
+              <span className="date">{formatDateSafely(newsletter.date, (d) => format(d, 'MMM d, h:mm a'), 'Unknown date')}</span>
             </div>
+            <h3 className="subject">{newsletter.subject}</h3>
+            <div className="expand-icon">{expanded ? '📖' : '📄'}</div>
           </div>
         </div>
-        <h3 className="subject">{newsletter.subject}</h3>
-        <div className="expand-icon">{expanded ? '📖' : '📄'}</div>
+        
+        <div className="flex items-center gap-3 flex-shrink-0">
+          {isNew && (
+            <span 
+              className="px-2.5 py-1 text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 rounded whitespace-nowrap"
+              onClick={(e) => e.stopPropagation()}
+            >
+              NEW
+            </span>
+          )}
+          <div className="flex items-center gap-3">
+            <MarkAsReadButton 
+              id={newsletter.id}
+              isRead={isRead}
+              onMarkRead={() => handleMarkAsRead(!isRead)}
+              variant="default"
+            />
+            <ArchiveButton
+              id={newsletter.id}
+              isArchived={isArchived}
+              onArchive={(id: string, newArchivedStatus: boolean) => handleArchive(id, newArchivedStatus)}
+              variant="default"
+            />
+          </div>
+        </div>
       </div>
       
       {!expanded && preview && (

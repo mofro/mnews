@@ -436,19 +436,51 @@ a:visited {
 }
 
 /* Make the read status more prominent */
-.newsletter-item .newsletter-meta {
+.newsletter-item .newsletter-header {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-bottom: 0.5rem;
-  font-size: 0.875rem;
-  color: #4a5568;
-  font-weight: 500;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding-right: 2rem;
+  position: relative;
 }
 
-.dark .newsletter-meta {
-  color: #cbd5e0;
+.newsletter-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.sender {
+  font-weight: 500;
+  color: #111827;
+}
+
+.date {
+  color: #6b7280;
+  font-size: 0.8125rem;
+}
+
+.subject {
+  font-weight: 500;
+  color: #111827;
+  margin: 0.35rem 0 0;
+  line-height: 1.4;
+  font-size: 0.9375rem;
+}
+
+.expand-icon {
+  position: absolute;
+  right: 0;
+  top: 0;
+  opacity: 0.7;
+  transition: transform 0.2s ease;
+}
+
+.newsletter-item.expanded .expand-icon {
+  transform: rotate(180deg);
 }
 
 .filters {
