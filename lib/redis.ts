@@ -115,10 +115,10 @@ class RedisClientWrapper {
   async type(key: string): Promise<string> {
     try {
       console.log(`[REDIS] Getting type of key: ${key}`);
-      // @ts-ignore - Using internal Redis command for TYPE
-      const result = await this.client.sendCommand(['TYPE', key]);
+      // Use the type method from @upstash/redis
+      const result = await this.client.type(key);
       console.log(`[REDIS] Type of ${key}:`, result);
-      return result as string;
+      return result;
     } catch (error) {
       console.error(`[REDIS] Error getting type for key ${key}:`, error);
       throw error;
@@ -128,8 +128,8 @@ class RedisClientWrapper {
   async set(key: string, value: string): Promise<void> {
     try {
       console.log(`[REDIS] Setting key: ${key}`);
-      // @ts-ignore - Using internal Redis command for SET
-      await this.client.sendCommand(['SET', key, value]);
+      // Use the set method from @upstash/redis
+      await this.client.set(key, value);
       console.log(`[REDIS] Successfully set key: ${key}`);
     } catch (error) {
       console.error(`[REDIS] Error setting key ${key}:`, error);
