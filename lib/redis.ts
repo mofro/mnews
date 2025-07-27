@@ -125,6 +125,18 @@ class RedisClientWrapper {
     }
   }
 
+  async set(key: string, value: string): Promise<void> {
+    try {
+      console.log(`[REDIS] Setting key: ${key}`);
+      // @ts-ignore - Using internal Redis command for SET
+      await this.client.sendCommand(['SET', key, value]);
+      console.log(`[REDIS] Successfully set key: ${key}`);
+    } catch (error) {
+      console.error(`[REDIS] Error setting key ${key}:`, error);
+      throw error;
+    }
+  }
+
   async getRaw(key: string): Promise<{type: string, value: any}> {
     try {
       console.log(`[REDIS] Getting raw value for key: ${key}`);
@@ -194,45 +206,51 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
   console.log(`[DEBUG] Input - id: ${id}, isRead: ${isRead}, resolved key: ${key}`);
   
   try {
-    // Get the raw value and its type
-    console.log(`[DEBUG] Getting raw value for key: ${key}`);
-    const { type: keyType, value: rawValue } = await client.getRaw(key);
-    
+    // First, check if the key exists and get its type
+    console.log(`[DEBUG] Checking type of key: ${key}`);
+    const keyType = await client.type(key);
+    console.log(`[DEBUG] Key type for ${key}: ${keyType}`);
+
     if (keyType === 'none') {
-      console.error(`[ERROR] Key does not exist: ${key}`);
+      console.error(`[ERROR] Newsletter not found: ${key}`);
       return { 
         success: false, 
         error: 'Newsletter not found',
         details: { key, keyType }
       };
     }
-    
-    console.log(`[DEBUG] Retrieved raw value for ${key} (${keyType}):`, rawValue);
-    
+
     // Prepare the metadata update
     const updatedAt = new Date().toISOString();
-    const readAt = isRead ? (rawValue?.readAt || updatedAt) : null;
+    const readAt = isRead ? updatedAt : null;
     
     // Create the updated metadata
     const updatedMetadata = {
-      ...(typeof rawValue === 'object' ? rawValue : {}),
       isRead,
       updatedAt,
       readAt
     };
+
+    console.log(`[DEBUG] Updating ${key} (${keyType}) with:`, updatedMetadata);
     
-    console.log(`[DEBUG] Updating ${key} with:`, updatedMetadata);
-    
-    // Save the updated metadata based on the key type
     if (keyType === 'hash') {
-      // For hash type, use HSET to update just the metadata field
+      // For hash type, update the metadata field
       await client.hset(key, 'metadata', JSON.stringify(updatedMetadata));
+    } else if (keyType === 'string') {
+      // For string type, update the entire value
+      const currentValue = await client.get(key);
+      const data = currentValue ? JSON.parse(currentValue) : {};
+      data.metadata = updatedMetadata;
+      await client.set(key, JSON.stringify(data));
     } else {
-      // For other types, convert to string and update
-      await client.hset(key, { 
-        content: typeof rawValue === 'string' ? rawValue : JSON.stringify(rawValue),
-        metadata: JSON.stringify(updatedMetadata)
-      });
+      // Unsupported type
+      const error = `Unsupported Redis key type: ${keyType}`;
+      console.error(`[ERROR] ${error}`);
+      return {
+        success: false,
+        error,
+        details: { key, keyType }
+      };
     }
     
     console.log(`[DEBUG] Successfully updated ${key}`);
@@ -241,21 +259,12 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
     const errorMessage = 'Error updating newsletter read status';
     console.error(`[ERROR] ${errorMessage}:`, error);
     
-    // More detailed error information
-    let keyType = 'unknown';
-    try {
-      keyType = await client.type(key);
-    } catch (e) {
-      console.error(`[ERROR] Failed to get key type for ${key}:`, e);
-    }
-    
+    // Simple error details
     const errorDetails = {
       message: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
       timestamp: new Date().toISOString(),
       key,
-      isRead,
-      keyType
+      isRead
     };
     
     return { 

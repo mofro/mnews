@@ -9,6 +9,7 @@ declare module '@/lib/redis' {
     scan(cursor: number, options?: { match?: string; count?: number }): Promise<[string, string[]]>;
     get(key: string): Promise<string | null>;
     type(key: string): Promise<string>;
+    set(key: string, value: string): Promise<void>;
     getRaw(key: string): Promise<{type: string, value: any}>;
   }
 
