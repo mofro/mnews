@@ -55,17 +55,18 @@ const MarkAsReadButton: React.FC<MarkAsReadButtonProps> = ({
   };
 
   const buttonClasses = cn(
-    'inline-flex items-center justify-center rounded-md font-medium transition-all',
+    'inline-flex items-center justify-center rounded font-medium transition-all',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-    'px-2.5 py-1.5 text-sm',
+    'px-3 py-1.5 text-sm',
     'border',
     'shadow-sm',
     'active:scale-95',
     'transition-colors duration-150',
+    'min-w-[100px]',
     variant === 'default' 
       ? readStatus 
-        ? 'bg-green-50 text-green-700 hover:bg-green-100 border-green-200 hover:border-green-300' 
-        : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 hover:border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-900/50'
+        ? 'bg-green-50 text-green-700 hover:bg-green-100 border-green-200 hover:border-green-300 dark:bg-green-900/20 dark:border-green-800/50 dark:text-green-300 dark:hover:bg-green-900/30' 
+        : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 hover:border-blue-300 dark:bg-blue-900/20 dark:border-blue-800/50 dark:text-blue-300 dark:hover:bg-blue-900/30'
       : 'hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent',
     className
   );
@@ -79,19 +80,19 @@ const MarkAsReadButton: React.FC<MarkAsReadButtonProps> = ({
       title={readStatus ? 'Mark as unread' : 'Mark as read'}
     >
       {isLoading ? (
-        <span className="inline-flex items-center">
-          <span className="w-4 h-4 mr-1.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
-          <span className="text-xs font-medium">
+        <span className="inline-flex items-center justify-center w-full">
+          <span className="w-3.5 h-3.5 mr-2 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <span className="text-sm font-medium">
             {readStatus ? 'Read' : 'Reading...'}
           </span>
         </span>
       ) : readStatus ? (
-        <span className="inline-flex items-center">
-          <span className="text-green-600 mr-1.5">✓</span>
-          <span className="text-xs font-medium">Read</span>
+        <span className="inline-flex items-center justify-center w-full">
+          <span className="text-green-600 mr-2">✓</span>
+          <span className="text-sm font-medium">Read</span>
         </span>
       ) : (
-        <span className="text-xs font-medium">Mark as Read</span>
+        <span className="text-sm font-medium">Mark as Read</span>
       )}
     </button>
   );

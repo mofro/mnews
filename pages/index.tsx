@@ -305,32 +305,29 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
         <div className="newsletter-meta">
           <span className="sender">{newsletter.sender}</span>
           <span className="date">{formatDateSafely(newsletter.date, (d) => format(d, 'MMM d, h:mm a'), 'Unknown date')}</span>
-          <div className="flex items-center gap-2">
-          {isNew && (
-            <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-md">
-              NEW
-            </span>
-          )}
-          <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800/50 rounded-md p-0.5">
-            <MarkAsReadButton 
-              id={newsletter.id}
-              isRead={isRead}
-              onMarkRead={() => handleMarkAsRead(!isRead)}
-              size="sm"
-              variant="default"
-              className="h-7"
-            />
-            <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
-            <ArchiveButton
-              id={newsletter.id}
-              isArchived={isArchived}
-              onArchive={(id: string, newArchivedStatus: boolean) => handleArchive(id, newArchivedStatus)}
-              size="sm"
-              variant="default"
-              className="h-7"
-            />
+          <div className="flex items-center gap-3">
+            {isNew && (
+              <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-md whitespace-nowrap">
+                NEW
+              </span>
+            )}
+            <div className="flex items-center gap-3">
+              <MarkAsReadButton 
+                id={newsletter.id}
+                isRead={isRead}
+                onMarkRead={() => handleMarkAsRead(!isRead)}
+                size="sm"
+                variant="default"
+              />
+              <ArchiveButton
+                id={newsletter.id}
+                isArchived={isArchived}
+                onArchive={(id: string, newArchivedStatus: boolean) => handleArchive(id, newArchivedStatus)}
+                size="sm"
+                variant="default"
+              />
+            </div>
           </div>
-        </div>
         </div>
         <h3 className="subject">{newsletter.subject}</h3>
         <div className="expand-icon">{expanded ? '📖' : '📄'}</div>

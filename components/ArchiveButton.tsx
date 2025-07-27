@@ -48,18 +48,19 @@ const ArchiveButton: React.FC<ArchiveButtonProps> = ({
   };
 
   const buttonClasses = cn(
-    'inline-flex items-center justify-center rounded-md font-medium transition-all',
+    'inline-flex items-center justify-center rounded font-medium transition-all',
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
-    'px-2.5 py-1.5 text-sm',
-    'border border-transparent',
+    'px-3 py-1.5 text-sm',
+    'border',
     'shadow-sm',
-    variant === 'default' 
-      ? isArchived 
-        ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border-yellow-200 hover:border-yellow-300' 
-        : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-gray-200 hover:border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700'
-      : 'hover:bg-gray-100 dark:hover:bg-gray-800',
     'active:scale-95',
     'transition-colors duration-150',
+    'min-w-[100px]',
+    variant === 'default' 
+      ? isArchived 
+        ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border-yellow-200 hover:border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-800/50 dark:text-yellow-300 dark:hover:bg-yellow-900/30'
+        : 'bg-gray-50 text-gray-700 hover:bg-gray-100 border-gray-200 hover:border-gray-300 dark:bg-gray-800/50 dark:text-gray-300 dark:border-gray-700 dark:hover:bg-gray-700/50'
+      : 'hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent',
     className
   );
 
@@ -72,15 +73,24 @@ const ArchiveButton: React.FC<ArchiveButtonProps> = ({
       title={isArchived ? 'Unarchive' : 'Archive'}
     >
       {isLoading ? (
-        <RotateCcw className="w-4 h-4 mr-1.5 animate-spin" />
-      ) : isArchived ? (
-        <Archive className="w-4 h-4 mr-1.5" />
+        <span className="inline-flex items-center justify-center w-full">
+          <RotateCcw className="w-3.5 h-3.5 mr-2 animate-spin" />
+          <span className="text-sm font-medium">
+            {isArchived ? 'Unarchiving...' : 'Archiving...'}
+          </span>
+        </span>
       ) : (
-        <Trash2 className="w-4 h-4 mr-1.5" />
+        <span className="inline-flex items-center justify-center w-full">
+          {isArchived ? (
+            <Archive className="w-3.5 h-3.5 mr-2" />
+          ) : (
+            <Trash2 className="w-3.5 h-3.5 mr-2" />
+          )}
+          <span className="text-sm font-medium">
+            {isArchived ? 'Unarchive' : 'Archive'}
+          </span>
+        </span>
       )}
-      <span className="text-xs font-medium">
-        {isArchived ? 'Unarchive' : 'Archive'}
-      </span>
     </button>
   );
 };
