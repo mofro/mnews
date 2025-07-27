@@ -63,7 +63,8 @@ const MarkAsReadButton: React.FC<MarkAsReadButtonProps> = ({
     'shadow-sm',
     'active:scale-95',
     'transition-all duration-150',
-    'min-w-[120px]',
+    'min-w-[100px]',
+    'h-[38px]',
     variant === 'default' 
       ? readStatus 
         ? 'bg-green-500/10 text-green-700 hover:bg-green-500/20 border-green-200 dark:bg-green-900/30 dark:border-green-800/70 dark:text-green-200 dark:hover:bg-green-900/40' 
@@ -71,14 +72,15 @@ const MarkAsReadButton: React.FC<MarkAsReadButtonProps> = ({
       : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 border-transparent',
     'font-medium tracking-wide',
     'hover:shadow-md',
-    className
   );
 
   return (
     <button
+      type="button"
       onClick={handleClick}
+      className={cn(buttonClasses, className)}
       disabled={isLoading}
-      className={buttonClasses}
+      aria-busy={isLoading}
       aria-label={readStatus ? 'Mark as unread' : 'Mark as read'}
       title={readStatus ? 'Mark as unread' : 'Mark as read'}
     >

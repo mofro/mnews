@@ -56,22 +56,26 @@ const ArchiveButton: React.FC<ArchiveButtonProps> = ({
     'shadow-sm',
     'active:scale-95',
     'transition-all duration-150',
-    'min-w-[120px]',
+    'min-w-[100px]',
+    'h-[38px]',
     variant === 'default' 
       ? isArchived 
         ? 'bg-amber-500/10 text-amber-700 hover:bg-amber-500/20 border-amber-200 dark:bg-amber-900/30 dark:border-amber-800/70 dark:text-amber-200 dark:hover:bg-amber-900/40'
         : 'bg-gray-500/10 text-gray-700 hover:bg-gray-500/20 border-gray-200 dark:bg-gray-800/30 dark:border-gray-700/70 dark:text-gray-200 dark:hover:bg-gray-800/40'
       : 'hover:bg-gray-100 dark:hover:bg-gray-800/50 border-transparent',
     'font-medium tracking-wide',
-    'hover:shadow-md',
-    className
+    'hover:shadow-md'
   );
+  
+  const finalButtonClasses = cn(buttonClasses, className);
 
   return (
     <button
+      type="button"
       onClick={handleClick}
+      className={finalButtonClasses}
       disabled={isLoading}
-      className={buttonClasses}
+      aria-busy={isLoading}
       aria-label={isArchived ? 'Unarchive' : 'Archive'}
       title={isArchived ? 'Unarchive' : 'Archive'}
     >

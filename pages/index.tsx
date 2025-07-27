@@ -316,21 +316,22 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
           </div>
         </div>
         
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="flex items-center flex-shrink-0">
           {isNew && (
             <span 
-              className="px-2.5 py-1 text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 rounded whitespace-nowrap"
+              className="px-2.5 py-1 text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 rounded whitespace-nowrap mr-6"
               onClick={(e) => e.stopPropagation()}
             >
               NEW
             </span>
           )}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center">
             <MarkAsReadButton 
               id={newsletter.id}
               isRead={isRead}
               onMarkRead={() => handleMarkAsRead(!isRead)}
               variant="default"
+              className="mr-6"
             />
             <ArchiveButton
               id={newsletter.id}
