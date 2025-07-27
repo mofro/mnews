@@ -20,6 +20,9 @@ export interface Newsletter {
     redisIndex?: string;
     isRead?: boolean;
     readAt?: string;
+    archived?: boolean;
+    archivedAt?: string;
+    trashedAt?: string; // For future trash implementation
   };
   
   // LEGACY: Backward compatibility (will be deprecated)

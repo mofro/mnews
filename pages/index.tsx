@@ -4,6 +4,7 @@ import DOMPurify from 'dompurify'
 import { parseDate, formatDateSafely } from '../utils/dateService'
 import { ThemeToggle } from '../components/ThemeToggle'
 import { MarkAsReadButton } from '../components/MarkAsReadButton'
+import { ArchiveButton } from '../components/ArchiveButton'
 import type { NewsletterEmail, DashboardStats } from '../lib/types'
 
 export default function Dashboard() {
@@ -11,6 +12,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedSender, setSelectedSender] = useState<string>('')
+  const [showArchived, setShowArchived] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -36,8 +38,9 @@ export default function Dashboard() {
       newsletter.sender.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesSender = !selectedSender || newsletter.sender === selectedSender
+    const matchesArchiveFilter = showArchived ? true : !newsletter.metadata?.archived
     
-    return matchesSearch && matchesSender
+    return matchesSearch && matchesSender && matchesArchiveFilter
   })
 
   const handleMarkAsRead = useCallback((id: string) => {
@@ -89,32 +92,49 @@ export default function Dashboard() {
       </header>
 
       <div className="filters">
-        <input
-          type="text"
-          placeholder="Search newsletters..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="search-input"
-        />
-        
-        <select
-          value={selectedSender}
-          onChange={(e) => setSelectedSender(e.target.value)}
-          className="sender-filter"
-        >
-          <option value="">All sources</option>
-          {uniqueSenders.map(sender => (
-            <option key={sender} value={sender}>{sender}</option>
-          ))}
-        </select>
+        <div className="flex items-center space-x-4">
+          <input
+            type="text"
+            placeholder="Search newsletters..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="search-input"
+          />
+          
+          <select
+            value={selectedSender}
+            onChange={(e) => setSelectedSender(e.target.value)}
+            className="sender-filter"
+          >
+            <option value="">All Senders</option>
+            {uniqueSenders.map(sender => (
+              <option key={sender} value={sender}>{sender}</option>
+            ))}
+          </select>
+          
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+              showArchived 
+                ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {showArchived ? 'Hide Archived' : 'Show Archived'}
+          </button>
+        </div>
       </div>
 
       <div className="newsletters">
         {filteredNewsletters.length === 0 ? (
-          <div className="empty">
-            {newsletters.length === 0 
-              ? "No newsletters yet. Forward some emails to get started!" 
-              : "No newsletters match your filters."}
+          <div className="empty-state text-center py-12">
+            <p className="text-lg text-gray-600">
+              {showArchived 
+                ? "You don't have any archived newsletters yet"
+                : searchTerm || selectedSender
+                  ? "No matching newsletters found"
+                  : "No newsletters found. Check back later!"}
+            </p>
           </div>
         ) : (
           filteredNewsletters.map((newsletter, index) => (
@@ -140,12 +160,14 @@ interface NewsletterItemProps {
 function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps) {
   const [expanded, setExpanded] = useState(false)
   const [isRead, setIsRead] = useState(!!newsletter.metadata?.isRead)
+  const [isArchived, setIsArchived] = useState(!!newsletter.metadata?.archived)
   const itemRef = useRef<HTMLDivElement>(null)
 
-  // Sync the read status when the newsletter prop changes
+  // Sync the read and archive status when the newsletter prop changes
   useEffect(() => {
     setIsRead(!!newsletter.metadata?.isRead);
-  }, [newsletter.metadata?.isRead]);
+    setIsArchived(!!newsletter.metadata?.archived);
+  }, [newsletter.metadata?.isRead, newsletter.metadata?.archived]);
 
   // Enhanced debug logging for Redis index
   useEffect(() => {
@@ -228,6 +250,39 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
     }
   };
 
+  const handleArchive = async (id: string, newArchivedStatus: boolean) => {
+    try {
+      // Optimistically update the UI
+      setIsArchived(newArchivedStatus);
+      
+      // Call the API to update the archive status
+      const response = await fetch(`/api/newsletters/${id}/archive`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isArchived: newArchivedStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update archive status');
+      }
+
+      // Update the local state with the new metadata
+      const updatedNewsletter = await response.json();
+      if (updatedNewsletter.success) {
+        // The parent component will handle the state update
+        if (onMarkAsRead) {
+          onMarkAsRead(id);
+        }
+      }
+    } catch (error) {
+      console.error('Error updating archive status:', error);
+      // Revert the UI if the API call fails
+      setIsArchived(!newArchivedStatus);
+    }
+  };
+
   // Auto-mark as read when expanded
   useEffect(() => {
     if (expanded && !isRead) {
@@ -242,6 +297,7 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
         ${isRead ? 'read' : ''} 
         ${isNew ? 'new' : ''}
         ${expanded ? 'expanded' : ''}
+        ${isArchived ? 'archived' : ''}
       `}
       aria-expanded={expanded}
     >
@@ -249,14 +305,21 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
         <div className="newsletter-meta">
           <span className="sender">{newsletter.sender}</span>
           <span className="date">{formatDateSafely(newsletter.date, (d) => format(d, 'MMM d, h:mm a'), 'Unknown date')}</span>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1">
             {isNew && <span className="new-badge">NEW</span>}
             <MarkAsReadButton 
               id={newsletter.id}
               isRead={isRead}
               onMarkRead={handleMarkAsRead}
               size="sm"
-              className="ml-2"
+              variant="ghost"
+            />
+            <ArchiveButton
+              id={newsletter.id}
+              isArchived={isArchived}
+              onArchive={handleArchive}
+              size="sm"
+              variant="ghost"
             />
           </div>
         </div>
