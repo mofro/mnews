@@ -3,8 +3,8 @@ import { format } from 'date-fns'
 import DOMPurify from 'dompurify'
 import { parseDate, formatDateSafely } from '../utils/dateService'
 import { ThemeToggle } from '../components/ThemeToggle'
-import { MarkAsReadButton } from '../components/MarkAsReadButton'
-import { ArchiveButton } from '../components/ArchiveButton'
+import MarkAsReadButton from '../components/MarkAsReadButton'
+import ArchiveButton from '../components/ArchiveButton'
 import type { NewsletterEmail, DashboardStats } from '../lib/types'
 
 export default function Dashboard() {
@@ -305,23 +305,32 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
         <div className="newsletter-meta">
           <span className="sender">{newsletter.sender}</span>
           <span className="date">{formatDateSafely(newsletter.date, (d) => format(d, 'MMM d, h:mm a'), 'Unknown date')}</span>
-          <div className="flex items-center space-x-1">
-            {isNew && <span className="new-badge">NEW</span>}
+          <div className="flex items-center gap-2">
+          {isNew && (
+            <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 rounded-md">
+              NEW
+            </span>
+          )}
+          <div className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800/50 rounded-md p-0.5">
             <MarkAsReadButton 
               id={newsletter.id}
               isRead={isRead}
-              onMarkRead={handleMarkAsRead}
+              onMarkRead={() => handleMarkAsRead(!isRead)}
               size="sm"
-              variant="ghost"
+              variant="default"
+              className="h-7"
             />
+            <div className="h-4 w-px bg-gray-200 dark:bg-gray-700" />
             <ArchiveButton
               id={newsletter.id}
               isArchived={isArchived}
-              onArchive={handleArchive}
+              onArchive={(id: string, newArchivedStatus: boolean) => handleArchive(id, newArchivedStatus)}
               size="sm"
-              variant="ghost"
+              variant="default"
+              className="h-7"
             />
           </div>
+        </div>
         </div>
         <h3 className="subject">{newsletter.subject}</h3>
         <div className="expand-icon">{expanded ? '📖' : '📄'}</div>

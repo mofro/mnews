@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTheme } from 'next-themes';
+import { cn } from '@/lib/utils';
 
 interface MarkAsReadButtonProps {
   id: string;
@@ -10,14 +11,14 @@ interface MarkAsReadButtonProps {
   variant?: 'default' | 'ghost';
 }
 
-export function MarkAsReadButton({ 
+const MarkAsReadButton: React.FC<MarkAsReadButtonProps> = ({
   id, 
   isRead, 
   onMarkRead,
   className = '',
   size = 'md',
   variant = 'default',
-}: MarkAsReadButtonProps) {
+}) => {
   const [isLoading, setIsLoading] = useState(false);
   const { theme } = useTheme();
   const isDark = theme === 'dark';
@@ -53,34 +54,47 @@ export function MarkAsReadButton({
     }
   };
 
+  const buttonClasses = cn(
+    'inline-flex items-center justify-center rounded-md font-medium transition-all',
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2',
+    'px-2.5 py-1.5 text-sm',
+    'border',
+    'shadow-sm',
+    'active:scale-95',
+    'transition-colors duration-150',
+    variant === 'default' 
+      ? readStatus 
+        ? 'bg-green-50 text-green-700 hover:bg-green-100 border-green-200 hover:border-green-300' 
+        : 'bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200 hover:border-blue-300 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-800 dark:hover:bg-blue-900/50'
+      : 'hover:bg-gray-100 dark:hover:bg-gray-800 border-transparent',
+    className
+  );
+
   return (
     <button
       onClick={handleClick}
       disabled={isLoading}
-      className={`inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ${
-        variant === 'default' 
-          ? `${readStatus ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-blue-600 text-white hover:bg-blue-700'} ${isDark ? 'focus-visible:ring-blue-500' : 'focus-visible:ring-blue-600'}`
-          : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-      } ${
-        size === 'sm' ? 'px-2 py-1 text-xs' : 
-        size === 'lg' ? 'px-4 py-2 text-base' : 
-        'px-3 py-1.5 text-sm'
-      } ${className}`}
+      className={buttonClasses}
       aria-label={readStatus ? 'Mark as unread' : 'Mark as read'}
       title={readStatus ? 'Mark as unread' : 'Mark as read'}
     >
       {isLoading ? (
-        <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent">
-          <span className="sr-only">Loading...</span>
+        <span className="inline-flex items-center">
+          <span className="w-4 h-4 mr-1.5 animate-spin rounded-full border-2 border-current border-t-transparent" />
+          <span className="text-xs font-medium">
+            {readStatus ? 'Read' : 'Reading...'}
+          </span>
         </span>
       ) : readStatus ? (
-        <span className="flex items-center gap-1">
-          <span className="text-green-600">✓</span>
-          <span className="hidden sm:inline">Read</span>
+        <span className="inline-flex items-center">
+          <span className="text-green-600 mr-1.5">✓</span>
+          <span className="text-xs font-medium">Read</span>
         </span>
       ) : (
-        <span>Mark as Read</span>
+        <span className="text-xs font-medium">Mark as Read</span>
       )}
     </button>
   );
-}
+};
+
+export default MarkAsReadButton;
