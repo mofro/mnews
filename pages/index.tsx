@@ -47,9 +47,9 @@ export default function Dashboard() {
           ? { 
               ...newsletter, 
               metadata: { 
-                ...newsletter.metadata, 
-                isRead: true,
-                readAt: new Date().toISOString()
+                ...newsletter.metadata,
+                isRead: !newsletter.metadata?.isRead, // Toggle the read status
+                readAt: newsletter.metadata?.isRead ? undefined : new Date().toISOString()
               } 
             } 
           : newsletter
@@ -142,6 +142,11 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
   const [isRead, setIsRead] = useState(!!newsletter.metadata?.isRead)
   const itemRef = useRef<HTMLDivElement>(null)
 
+  // Sync the read status when the newsletter prop changes
+  useEffect(() => {
+    setIsRead(!!newsletter.metadata?.isRead);
+  }, [newsletter.metadata?.isRead]);
+
   // Enhanced debug logging for Redis index
   useEffect(() => {
     console.log('Newsletter item data:', {
@@ -194,11 +199,24 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
     return words + (plain.split(' ').length > 40 ? '…' : '')
   })() : null;
 
-  const handleMarkAsRead = async () => {
+  const handleMarkAsRead = async (newReadStatus = true) => {
     try {
       // Optimistically update the UI
-      setIsRead(true);
+      setIsRead(newReadStatus);
       
+      // Call the API to update the read status
+      const response = await fetch(`/api/newsletters/${newsletter.id}/read`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ isRead: newReadStatus }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update read status');
+      }
+
       // Notify parent component if provided
       if (onMarkAsRead) {
         onMarkAsRead(newsletter.id);
@@ -206,14 +224,26 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
     } catch (error) {
       console.error('Error updating read status:', error);
       // Revert the UI if the API call fails
-      setIsRead(false);
+      setIsRead(!newReadStatus);
     }
   };
+
+  // Auto-mark as read when expanded
+  useEffect(() => {
+    if (expanded && !isRead) {
+      handleMarkAsRead(true);
+    }
+  }, [expanded, isRead]);
 
   return (
     <div 
       ref={itemRef} 
-      className={`newsletter-item ${isRead ? 'read' : ''} ${isNew ? 'new' : ''}`}
+      className={`newsletter-item 
+        ${isRead ? 'read' : ''} 
+        ${isNew ? 'new' : ''}
+        ${expanded ? 'expanded' : ''}
+      `}
+      aria-expanded={expanded}
     >
       <div className="newsletter-header" onClick={() => setExpanded(!expanded)}>
         <div className="newsletter-meta">
