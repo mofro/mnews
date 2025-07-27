@@ -87,7 +87,7 @@ const ArchiveButton: React.FC<ArchiveButtonProps> = ({
           {isArchived ? (
             <Archive className="w-4 h-4" />
           ) : (
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-2 h-2" />
           )}
           <span className="text-sm font-medium">
             {isArchived ? 'Unarchive' : 'Archive'}
