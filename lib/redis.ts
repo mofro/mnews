@@ -237,16 +237,36 @@ export async function updateNewsletterReadStatus(id: string, isRead: boolean): P
       if (keyType === 'hash') {
         // For hash type, update the metadata field
         console.log(`[DEBUG] Updating hash key: ${key} with metadata:`, updatedMetadata);
-        await client.hset(key, { metadata: JSON.stringify(updatedMetadata) });
+        
+        // First, get the current hash to understand its structure
+        const currentHash = await client.hgetall(key);
+        console.log(`[DEBUG] Current hash for ${key}:`, JSON.stringify(currentHash, null, 2));
+        
+        // Update the metadata field
+        const metadataString = JSON.stringify(updatedMetadata);
+        console.log(`[DEBUG] Setting metadata to:`, metadataString);
+        
+        await client.hset(key, { metadata: metadataString });
       } else if (keyType === 'string') {
         // For string type, update the entire value
         const currentValue = await client.get(key);
+        console.log(`[DEBUG] Current value type for ${key}:`, typeof currentValue);
         console.log(`[DEBUG] Current value for ${key}:`, currentValue);
         
         let data: any = {};
         if (currentValue) {
           try {
-            data = typeof currentValue === 'string' ? JSON.parse(currentValue) : currentValue;
+            // Check if it's already an object
+            if (typeof currentValue === 'object' && currentValue !== null) {
+              data = currentValue;
+            } else if (typeof currentValue === 'string') {
+              // Try to parse only if it's a string
+              data = JSON.parse(currentValue);
+            } else {
+              console.log(`[DEBUG] Current value is not a string, using as is`);
+              data = currentValue;
+            }
+            console.log(`[DEBUG] Parsed data:`, data);
           } catch (e) {
             console.error(`[ERROR] Failed to parse current value for ${key}:`, e);
             // If we can't parse the current value, create a new object with the content
