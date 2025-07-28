@@ -23,6 +23,7 @@ const Card = ({ newsletter, className = '' }: CardProps) => {
   const [isRead, setIsRead] = useState(newsletter.metadata.isRead);
   const [isArchived, setIsArchived] = useState(newsletter.metadata.archived);
   const contentRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState(0);
   
   // Safely parse date with fallback to current date
@@ -71,6 +72,13 @@ const Card = ({ newsletter, className = '' }: CardProps) => {
   const displayContent = newsletter.cleanContent || newsletter.content;
   const imageUrl = newsletter.metadata.imageUrl;
 
+  // Scroll into view when expanded on mobile
+  useEffect(() => {
+    if (expanded && cardRef.current && window.innerWidth <= 768) {
+      cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [expanded]);
+
   const toggleExpand = (e: React.MouseEvent) => {
     // Don't toggle if clicking on buttons or links
     if ((e.target as HTMLElement).closest('button, a')) {
@@ -105,6 +113,7 @@ const Card = ({ newsletter, className = '' }: CardProps) => {
 
   return (
     <div 
+      ref={cardRef}
       className={`flex flex-col w-full bg-white dark:bg-gray-800 transition-all duration-300 border-0 rounded-[0.5rem] overflow-hidden shadow-sm hover:shadow-md ${className} ${
         isRead ? 'opacity-80' : 'opacity-100'
       }`}
@@ -364,16 +373,73 @@ const TEST_NEWSLETTERS: NewsletterCard[] = [
       links: [],
       wordCount: 72,
       imageUrl: 'https://images.unsplash.com/photo-1554224155-3a58922a22c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1765&q=80',
-      tags: ['Finance', 'Investing', 'Wealth']
+      tags: []
     }
   }
 ];
+
+interface DashboardStats {
+  totalNewsletters: number;
+  todayCount: number;
+  uniqueSenders: number;
+  total: number;
+  withCleanContent: number;
+  needsProcessing: number;
+  avgWordCount: number;
+}
 
 export default function TestGrid() {
   const [darkMode, setDarkMode] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [newsletters, setNewsletters] = useState<NewsletterCard[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSender, setSelectedSender] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalNewsletters: 0,
+    todayCount: 0,
+    uniqueSenders: 0,
+    total: 0,
+    withCleanContent: 0,
+    needsProcessing: 0,
+    avgWordCount: 0
+  });
+
+  // Calculate stats from newsletters
+  const calculateStats = (newsletters: NewsletterCard[]) => {
+    const today = new Date().toDateString();
+    const senders = new Set<string>();
+    
+    const todayCount = newsletters.filter(n => {
+      try {
+        const date = new Date(n.date);
+        return date.toDateString() === today;
+      } catch (e) {
+        return false;
+      }
+    }).length;
+
+    newsletters.forEach(n => senders.add(n.sender));
+
+    const totalWordCount = newsletters.reduce((sum, n) => {
+      const content = n.cleanContent || n.content || '';
+      const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+      return sum + wordCount;
+    }, 0);
+
+    const avgWordCount = newsletters.length > 0 ? Math.round(totalWordCount / newsletters.length) : 0;
+
+    return {
+      totalNewsletters: newsletters.length,
+      todayCount,
+      uniqueSenders: senders.size,
+      total: newsletters.length,
+      withCleanContent: newsletters.filter(n => n.cleanContent).length,
+      needsProcessing: 0, // This would come from the API in production
+      avgWordCount
+    };
+  };
 
   // Load test data in development, or fetch from API in production
   useEffect(() => {
@@ -381,16 +447,20 @@ export default function TestGrid() {
       if (process.env.NODE_ENV === 'development') {
         // Use test data in development
         setNewsletters(TEST_NEWSLETTERS);
+        setStats(calculateStats(TEST_NEWSLETTERS));
       } else {
         try {
           // In production, fetch from API
           const response = await fetch('/api/newsletters');
           const data = await response.json();
-          setNewsletters(data.newsletters || []);
+          const newsletters = data.newsletters || [];
+          setNewsletters(newsletters);
+          setStats(calculateStats(newsletters));
         } catch (error) {
           console.error('Failed to load newsletters:', error);
           // Fallback to test data if API fails
           setNewsletters(TEST_NEWSLETTERS);
+          setStats(calculateStats(TEST_NEWSLETTERS));
         }
       }
       setLoading(false);
@@ -399,6 +469,21 @@ export default function TestGrid() {
     loadNewsletters();
     setIsClient(true);
   }, []);
+
+  // Filter newsletters based on search term, sender, and archive status
+  const filteredNewsletters = newsletters.filter(newsletter => {
+    const matchesSearch = !searchTerm || 
+      newsletter.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      newsletter.sender.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesSender = !selectedSender || newsletter.sender === selectedSender;
+    const matchesArchiveFilter = showArchived ? true : !newsletter.metadata?.archived;
+    
+    return matchesSearch && matchesSender && matchesArchiveFilter;
+  });
+
+  // Get unique senders for filter dropdown
+  const uniqueSenders = Array.from(new Set(newsletters.map(n => n.sender))).sort();
 
   if (!isClient) {
     return (
@@ -424,17 +509,82 @@ export default function TestGrid() {
   }
 
   return (
-    <div className={`min-h-screen transition-colors duration-200 ${darkMode ? 'dark bg-gray-900' : 'bg-gray-200'}`}>
+    <div className={`min-h-screen ${darkMode ? 'dark bg-gray-900' : 'bg-gray-100'}`}>
       <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-12">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Newsletter Grid</h1>
-          <button 
-            onClick={() => setDarkMode(!darkMode)}
-            className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-          >
-            {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
-          </button>
-        </div>
+        {/* Header */}
+        <header className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                {darkMode ? '🐠' : '🐠'} Nemo
+              </h1>
+              <p className="text-gray-600 dark:text-gray-300">
+                Finding your newsletters in the vast ocean of email
+              </p>
+              {stats && (
+                <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                  <span>{stats.totalNewsletters} total</span>
+                  <span>•</span>
+                  <span>{stats.todayCount} today</span>
+                  <span>•</span>
+                  <span>{stats.uniqueSenders} sources</span>
+                </div>
+              )}
+            </div>
+            <div className="mt-4 md:mt-0">
+              <button 
+                onClick={() => setDarkMode(!darkMode)}
+                className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                {darkMode ? '☀️ Light Mode' : '🌙 Dark Mode'}
+              </button>
+            </div>
+          </div>
+          
+          {/* Search and Filters */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="flex-1">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search newsletters..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 pr-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex gap-2">
+              <select
+                value={selectedSender}
+                onChange={(e) => setSelectedSender(e.target.value)}
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="">All Senders</option>
+                {uniqueSenders.map(sender => (
+                  <option key={sender} value={sender}>{sender}</option>
+                ))}
+              </select>
+              
+              <button
+                onClick={() => setShowArchived(!showArchived)}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  showArchived 
+                    ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:hover:bg-yellow-900/50' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                }`}
+              >
+                {showArchived ? 'Hide Archived' : 'Show Archived'}
+              </button>
+            </div>
+          </div>
+        </header>
         
         <BentoGrid>
           {loading ? (
@@ -445,15 +595,43 @@ export default function TestGrid() {
               </BentoItem>
             ))
           ) : (
-            // Show newsletters
-            newsletters.map((newsletter) => (
-              <BentoItem key={newsletter.id}>
-                <Card 
-                  newsletter={newsletter}
-                  className="h-full"
-                />
-              </BentoItem>
-            ))
+            // Show newsletters or empty state
+            filteredNewsletters.length === 0 ? (
+              <div className="col-span-full text-center py-12">
+                <div className="text-gray-500 dark:text-gray-400">
+                  <svg className="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="text-lg font-medium">
+                    {showArchived 
+                      ? "You don't have any archived newsletters yet"
+                      : searchTerm || selectedSender
+                        ? "No matching newsletters found"
+                        : "No newsletters found. Check back later!"}
+                  </p>
+                  {(searchTerm || selectedSender) && (
+                    <button 
+                      onClick={() => {
+                        setSearchTerm('');
+                        setSelectedSender('');
+                      }}
+                      className="mt-2 text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      Clear filters
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              filteredNewsletters.map((newsletter) => (
+                <BentoItem key={newsletter.id}>
+                  <Card 
+                    newsletter={newsletter}
+                    className="h-full"
+                  />
+                </BentoItem>
+              ))
+            )
           )}
         </BentoGrid>
       </div>
