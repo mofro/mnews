@@ -3,29 +3,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { BentoGrid, BentoItem } from '@/components/layout/BentoGrid';
 
-interface NewsletterCard {
-  id: string;
-  subject: string;
-  sender: string;
-  date: string;
-  isNew: boolean;
-  rawContent: string;
-  cleanContent: string;
-  content: string;
-  metadata: {
-    processingVersion: string;
-    processedAt: string;
-    isRead: boolean;
-    readAt?: string;
-    archived: boolean;
-    archivedAt?: string;
-    sections?: string[];
-    links?: Array<{url: string, text: string}>;
-    wordCount?: number;
-    redisIndex?: string;
+import { Newsletter } from '@/lib/types';
+
+interface NewsletterCard extends Omit<Newsletter, 'metadata'> {
+  metadata: Newsletter['metadata'] & {
+    imageUrl?: string;
+    tags?: string[];
   };
-  image?: string;
-  tags?: string[];
 }
 
 interface CardProps {
@@ -85,6 +69,7 @@ const Card = ({ newsletter, className = '' }: CardProps) => {
   
   // Use cleanContent if available, otherwise fall back to content
   const displayContent = newsletter.cleanContent || newsletter.content;
+  const imageUrl = newsletter.metadata.imageUrl;
 
   const toggleExpand = (e: React.MouseEvent) => {
     // Don't toggle if clicking on buttons or links
@@ -165,10 +150,10 @@ const Card = ({ newsletter, className = '' }: CardProps) => {
       </div>
 
       <div className="px-4 pb-4">
-        {newsletter.image && (
+        {imageUrl && (
           <div className="relative aspect-video w-full overflow-hidden rounded-[0.5rem] mb-4">
             <img 
-              src={newsletter.image} 
+              src={imageUrl}
               alt="" 
               className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
               loading="lazy"
@@ -204,10 +189,10 @@ const Card = ({ newsletter, className = '' }: CardProps) => {
           )}
         </div>
 
-        {newsletter.tags && newsletter.tags.length > 0 && (
+        {newsletter.metadata.tags && newsletter.metadata.tags.length > 0 && (
           <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
             <div className="flex flex-wrap gap-2">
-              {newsletter.tags.map((tag) => (
+              {newsletter.metadata.tags?.map((tag) => (
                 <span 
                   key={tag} 
                   className="inline-flex items-center rounded-full bg-gray-100 dark:bg-gray-700 px-3 py-1 text-xs font-medium text-gray-800 dark:text-gray-200"
@@ -251,8 +236,6 @@ const TEST_NEWSLETTERS: NewsletterCard[] = [
     <p>Key trends include the rise of generative AI, the increasing importance of ethical AI practices, and the growing role of AI in creative fields.</p>`,
     content: `<p>Artificial intelligence continues to evolve at a rapid pace, with new breakthroughs in machine learning, natural language processing, and computer vision. In this issue, we explore how these technologies are transforming industries from healthcare to finance.</p>
     <p>Key trends include the rise of generative AI, the increasing importance of ethical AI practices, and the growing role of AI in creative fields.</p>`,
-    image: 'https://images.unsplash.com/photo-1677442135136-760c50d66689?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1771&q=80',
-    tags: ['AI', 'Technology', 'Future'],
     metadata: {
       processingVersion: '1.0',
       processedAt: new Date().toISOString(),
@@ -260,31 +243,32 @@ const TEST_NEWSLETTERS: NewsletterCard[] = [
       archived: false,
       sections: [],
       links: [],
-      wordCount: 75
+      wordCount: 75,
+      imageUrl: 'https://images.unsplash.com/photo-1677442135136-760c50d66689?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1771&q=80',
+      tags: ['AI', 'Technology', 'Future']
     }
   },
   {
     id: 'test-2',
     subject: 'Sustainable Living',
-    sender: 'Eco Living',
+    sender: 'Green Life',
     date: new Date(Date.now() - 86400000).toISOString(),
-    isNew: false,
-    rawContent: `Simple ways to reduce your carbon footprint and live a more sustainable lifestyle in the modern world.`,
-    cleanContent: `<p>Living sustainably doesn't have to be complicated. In this issue, we share practical tips for reducing waste, conserving energy, and making eco-friendly choices in your daily life.</p>
-    <p>From zero-waste shopping to sustainable fashion, small changes can make a big difference for our planet.</p>`,
-    content: `<p>Living sustainably doesn't have to be complicated. In this issue, we share practical tips for reducing waste, conserving energy, and making eco-friendly choices in your daily life.</p>
-    <p>From zero-waste shopping to sustainable fashion, small changes can make a big difference for our planet.</p>`,
-    image: 'https://images.unsplash.com/photo-1466611653911-95081537e5b7?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1770&q=80',
-    tags: ['Sustainability', 'Lifestyle', 'Environment'],
+    isNew: true,
+    rawContent: `Simple ways to reduce your carbon footprint and live more sustainably.`,
+    cleanContent: `<p>Living sustainably has never been more important. This issue is packed with practical tips to reduce waste, conserve energy, and make eco-friendly choices in your daily life.</p>
+    <p>Learn how small changes in your routine can have a big impact on the planet.</p>`,
+    content: `<p>Living sustainably has never been more important. This issue is packed with practical tips to reduce waste, conserve energy, and make eco-friendly choices in your daily life.</p>
+    <p>Learn how small changes in your routine can have a big impact on the planet.</p>`,
     metadata: {
       processingVersion: '1.0',
       processedAt: new Date(Date.now() - 86400000).toISOString(),
-      isRead: true,
-      readAt: new Date(Date.now() - 86400000).toISOString(),
+      isRead: false,
       archived: false,
       sections: [],
       links: [],
-      wordCount: 50
+      wordCount: 52,
+      imageUrl: 'https://images.unsplash.com/photo-1466611653911-95081537e5b7?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1770&q=80',
+      tags: ['Sustainability', 'Eco-friendly', 'Lifestyle']
     }
   },
   {
@@ -298,8 +282,6 @@ const TEST_NEWSLETTERS: NewsletterCard[] = [
     <p>Learn how just a few minutes of mindfulness each day can transform your mental and emotional well-being.</p>`,
     content: `<p>In our fast-paced world, mindfulness offers a way to find peace and clarity. This issue explores various meditation techniques, breathing exercises, and daily practices to help you stay present and reduce stress.</p>
     <p>Learn how just a few minutes of mindfulness each day can transform your mental and emotional well-being.</p>`,
-    image: 'https://images.unsplash.com/photo-1530092285049-1c85085f02b9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1770&q=80',
-    tags: ['Mindfulness', 'Health', 'Wellness'],
     metadata: {
       processingVersion: '1.0',
       processedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
@@ -307,7 +289,9 @@ const TEST_NEWSLETTERS: NewsletterCard[] = [
       archived: false,
       sections: [],
       links: [],
-      wordCount: 60
+      wordCount: 60,
+      imageUrl: 'https://images.unsplash.com/photo-1530092285049-1c85085f02b9?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1770&q=80',
+      tags: ['Mindfulness', 'Health', 'Wellness']
     }
   },
   {
@@ -321,8 +305,6 @@ const TEST_NEWSLETTERS: NewsletterCard[] = [
     <p>Discover tools, tips, and strategies for staying productive and maintaining work-life balance in a remote-first world.</p>`,
     content: `<p>The remote work revolution is here to stay. In this issue, we examine the latest trends in remote work, from hybrid models to digital nomadism.</p>
     <p>Discover tools, tips, and strategies for staying productive and maintaining work-life balance in a remote-first world.</p>`,
-    image: 'https://images.unsplash.com/photo-1522071820081-009c5fdc863d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1770&q=80',
-    tags: ['Work', 'Remote', 'Productivity'],
     metadata: {
       processingVersion: '1.0',
       processedAt: new Date(Date.now() - 3 * 86400000).toISOString(),
@@ -332,7 +314,9 @@ const TEST_NEWSLETTERS: NewsletterCard[] = [
       archivedAt: new Date(Date.now() - 3 * 86400000).toISOString(),
       sections: [],
       links: [],
-      wordCount: 55
+      wordCount: 55,
+      imageUrl: 'https://images.unsplash.com/photo-1522071820081-009c5fdc863d?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1770&q=80',
+      tags: ['Work', 'Remote', 'Productivity']
     }
   },
   {
@@ -346,8 +330,6 @@ const TEST_NEWSLETTERS: NewsletterCard[] = [
     <p>Learn about the international collaborations and private sector innovations driving the new space race.</p>`,
     content: `<p>Humanity's journey to the stars continues with ambitious new missions to the Moon, Mars, and beyond. This issue covers the latest developments in space exploration, from new rocket technologies to the search for extraterrestrial life.</p>
     <p>Learn about the international collaborations and private sector innovations driving the new space race.</p>`,
-    image: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1772&q=80',
-    tags: ['Space', 'Science', 'Exploration'],
     metadata: {
       processingVersion: '1.0',
       processedAt: new Date(Date.now() - 4 * 86400000).toISOString(),
@@ -355,30 +337,34 @@ const TEST_NEWSLETTERS: NewsletterCard[] = [
       archived: false,
       sections: [],
       links: [],
-      wordCount: 65
+      wordCount: 65,
+      imageUrl: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1772&q=80',
+      tags: ['Space', 'Science', 'Exploration']
     }
   },
   {
     id: 'test-6',
-    subject: 'Culinary Adventures',
-    sender: 'Food & Travel',
+    subject: 'Financial Freedom',
+    sender: 'Wealth Builders',
     date: new Date(Date.now() - 5 * 86400000).toISOString(),
     isNew: false,
-    rawContent: `Exploring unique cuisines and cooking techniques from around the world to spice up your kitchen.`,
-    cleanContent: `<p>Take your taste buds on a global journey with our guide to international cuisines. This issue features authentic recipes, cooking techniques, and cultural insights from top chefs around the world.</p>
-    <p>From street food to fine dining, discover the stories and flavors that make each cuisine unique.</p>`,
-    content: `<p>Take your taste buds on a global journey with our guide to international cuisines. This issue features authentic recipes, cooking techniques, and cultural insights from top chefs around the world.</p>
-    <p>From street food to fine dining, discover the stories and flavors that make each cuisine unique.</p>`,
-    image: 'https://images.unsplash.com/photo-1504674900247-087703934569?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1770&q=80',
-    tags: ['Food', 'Cooking', 'Travel'],
+    rawContent: `Strategies for building wealth, reducing debt, and achieving financial independence.`,
+    cleanContent: `<p>Take control of your financial future with expert advice on investing, saving, and smart money management. This issue breaks down complex financial concepts into actionable steps for building long-term wealth.</p>
+    <p>Whether you're just starting or looking to optimize your portfolio, these insights will help you make informed decisions.</p>`,
+    content: `<p>Take control of your financial future with expert advice on investing, saving, and smart money management. This issue breaks down complex financial concepts into actionable steps for building long-term wealth.</p>
+    <p>Whether you're just starting or looking to optimize your portfolio, these insights will help you make informed decisions.</p>`,
     metadata: {
       processingVersion: '1.0',
       processedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
-      isRead: false,
-      archived: false,
+      isRead: true,
+      readAt: new Date(Date.now() - 5 * 86400000 + 3600000).toISOString(),
+      archived: true,
+      archivedAt: new Date(Date.now() - 4 * 86400000).toISOString(),
       sections: [],
       links: [],
-      wordCount: 45
+      wordCount: 72,
+      imageUrl: 'https://images.unsplash.com/photo-1554224155-3a58922a22c3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1765&q=80',
+      tags: ['Finance', 'Investing', 'Wealth']
     }
   }
 ];
