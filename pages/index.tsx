@@ -1,491 +1,447 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { format } from 'date-fns'
-import DOMPurify from 'dompurify'
-import { parseDate, formatDateSafely } from '../utils/dateService'
-import { ThemeToggle } from '../components/ThemeToggle'
-import MarkAsReadButton from '../components/MarkAsReadButton'
-import ArchiveButton from '../components/ArchiveButton'
-import type { NewsletterEmail, DashboardStats } from '../lib/types'
+// pages/test-article-grid.tsx
+'use client';
 
-// Test data for development
-const TEST_NEWSLETTERS: NewsletterEmail[] = [
-  {
-    id: 'test-1',
-    subject: 'Test Newsletter 1 - Check out our latest updates!',
-    sender: 'Test Company',
-    date: new Date().toISOString(),
-    rawContent: '<p>This is a test newsletter content. It contains some sample text to demonstrate the layout and styling of the newsletter viewer.</p>',
-    cleanContent: '<p>This is a test newsletter content. It contains some sample text to demonstrate the layout and styling of the newsletter viewer.</p>',
-    content: '<p>This is a test newsletter content. It contains some sample text to demonstrate the layout and styling of the newsletter viewer.</p>',
-    isNew: true,
-    metadata: {
-      processingVersion: '1.0',
-      processedAt: new Date().toISOString(),
-      isRead: false,
-      archived: false,
-      sections: [],
-      links: []
-    }
-  },
-  {
-    id: 'test-2',
-    subject: 'Test Newsletter 2 - Important Announcement',
-    sender: 'Test Company',
-    date: new Date(Date.now() - 86400000).toISOString(),
-    rawContent: '<p>This is another test newsletter with important information about our services and updates.</p>',
-    cleanContent: '<p>This is another test newsletter with important information about our services and updates.</p>',
-    content: '<p>This is another test newsletter with important information about our services and updates.</p>',
-    isNew: false,
-    metadata: {
-      processingVersion: '1.0',
-      processedAt: new Date(Date.now() - 86400000).toISOString(),
-      isRead: true,
-      readAt: new Date(Date.now() - 86400000).toISOString(),
-      archived: false,
-      sections: [],
-      links: []
-    }
-  },
-  {
-    id: 'test-3',
-    subject: 'Test Archived Newsletter',
-    sender: 'Archive Test',
-    date: new Date(Date.now() - 172800000).toISOString(),
-    rawContent: '<p>This newsletter has been archived for testing purposes.</p>',
-    cleanContent: '<p>This newsletter has been archived for testing purposes.</p>',
-    content: '<p>This newsletter has been archived for testing purposes.</p>',
-    isNew: false,
-    metadata: {
-      processingVersion: '1.0',
-      processedAt: new Date(Date.now() - 172800000).toISOString(),
-      isRead: true,
-      readAt: new Date(Date.now() - 172800000).toISOString(),
-      archived: true,
-      archivedAt: new Date(Date.now() - 172800000).toISOString(),
-      sections: [],
-      links: []
-    }
-  }
-];
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTheme } from '@/context/ThemeContext';
+import { ArticleGridCard } from '@/components/newsletter/ArticleGridCard';
+import { BentoGrid } from '@/components/layout/BentoGrid';
+import { FullViewArticle } from '@/components/article/FullViewArticle';
+import { format } from 'date-fns';
+import newslettersData from '@/data/newsletters.json';
+import { cn } from '@/lib/utils';
 
-const TEST_STATS: DashboardStats = {
-  totalNewsletters: 3,
-  todayCount: 1, // Assuming one newsletter is from today
-  uniqueSenders: 2, // Test Company and Archive Test
-  total: 3,
-  withCleanContent: 3,
-  needsProcessing: 0,
-  avgWordCount: 25 // Approximate word count for test content
+// Extend the NewsletterData interface to include metadata fields at the top level
+interface NewsletterData {
+  id: string;
+  sender: string;
+  subject: string;
+  date: string;
+  content: string;
+  cleanContent?: string;
+  rawContent?: string;
+  metadata?: {
+    redisIndex?: string;
+    isRead?: boolean;
+    archived?: boolean;
+    imageUrl?: string;
+    tags?: string[];
+  };
+  // Add metadata fields at the top level for easier access
+  redisIndex?: string;
+  isRead?: boolean;
+  archived?: boolean;
+  imageUrl?: string;
+  tags?: string[];
+}
+
+// StatCard component for displaying statistics
+const StatCard = ({ title, value, icon, className = '', titleFull }: { title: string; value: number | string; icon: string; className?: string; titleFull?: string }) => (
+  <div className={cn('p-4 rounded-lg', className)}>
+    <div className="flex items-center">
+      <span className="text-2xl mr-3">{icon}</span>
+      <div>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          <span className="sm:hidden">{title}</span>
+          {titleFull && <span className="hidden sm:inline">{titleFull}</span>}
+          {!titleFull && <span className="hidden sm:inline">{title}</span>}
+        </p>
+        <p className="text-xl font-semibold">{value}</p>
+      </div>
+    </div>
+  </div>
+);
+
+// Interface for transformed article data
+interface TransformedArticle {
+  id: string;
+  redisId: string;
+  sender: string;
+  subject: string;
+  date: string;
+  content: string;
+  isNew: boolean;
+  isRead: boolean;
+  isArchived: boolean;
+  tags: string[];
+  imageUrl?: string;
+}
+
+// Transform the newsletter data to match the expected article format
+const transformNewsletterToArticle = (newsletter: NewsletterData, index: number): TransformedArticle => {
+  // Extract Redis ID from metadata or use the provided ID
+  const redisId = newsletter.metadata?.redisIndex || newsletter.redisIndex || newsletter.id || `newsletter-${index}`;
+  
+  return {
+    id: redisId, // Use Redis ID as the primary ID
+    redisId,     // Also include it as a separate field for reference
+    sender: newsletter.sender || 'Unknown Sender',
+    subject: newsletter.subject || 'No Subject',
+    date: newsletter.date || new Date().toISOString(),
+    content: newsletter.cleanContent || newsletter.content || '',
+    isNew: index === 0, // First item is new
+    isRead: newsletter.metadata?.isRead ?? newsletter.isRead ?? index > 0,
+    isArchived: newsletter.metadata?.archived ?? newsletter.archived ?? false,
+    tags: newsletter.metadata?.tags || newsletter.tags || [],
+    imageUrl: newsletter.metadata?.imageUrl || newsletter.imageUrl
+  };
 };
 
-export default function Dashboard() {
-  const [newsletters, setNewsletters] = useState<NewsletterEmail[]>([])
-  const [stats, setStats] = useState<DashboardStats | null>(null)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [selectedSender, setSelectedSender] = useState<string>('')
-  const [showArchived, setShowArchived] = useState(false)
-  const [loading, setLoading] = useState(true)
+// Development test data
+const TEST_ARTICLES = newslettersData.map(transformNewsletterToArticle);
 
-  const useTestData = () => {
-    setNewsletters(TEST_NEWSLETTERS)
-    setStats(TEST_STATS)
-    setLoading(false)
-  }
+interface DashboardStats {
+  totalNewsletters: number;
+  todayCount: number;
+  uniqueSenders: number;
+  total: number;
+  withCleanContent: number;
+  needsProcessing: number;
+  avgWordCount: number;
+}
 
+export default function TestArticleGrid() {
+  const { theme, toggleTheme } = useTheme();
+  const [isClient, setIsClient] = useState(false);
+  const [articles, setArticles] = useState<TransformedArticle[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showArchived, setShowArchived] = useState(false);
+  const [fullViewArticle, setFullViewArticle] = useState<TransformedArticle | null>(null);
+  const [expandedArticleId, setExpandedArticleId] = useState<string | null>(null);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalNewsletters: 0,
+    todayCount: 0,
+    uniqueSenders: 0,
+    total: 0,
+    withCleanContent: 0,
+    needsProcessing: 0,
+    avgWordCount: 0
+  });
+
+  // Calculate stats from articles
+  const calculateStats = (articles: typeof TEST_ARTICLES) => {
+    const today = new Date().toDateString();
+    const senders = new Set<string>();
+    
+    const todayCount = articles.filter(article => {
+      try {
+        const date = new Date(article.date);
+        return date.toDateString() === today;
+      } catch (e) {
+        return false;
+      }
+    }).length;
+
+    articles.forEach(article => senders.add(article.sender));
+
+    const totalWordCount = articles.reduce((sum, article) => {
+      const content = article.content || '';
+      const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+      return sum + wordCount;
+    }, 0);
+
+    const avgWordCount = articles.length > 0 ? Math.round(totalWordCount / articles.length) : 0;
+
+    return {
+      totalNewsletters: articles.length,
+      todayCount,
+      uniqueSenders: senders.size,
+      total: articles.length,
+      withCleanContent: articles.filter(a => a.content).length,
+      needsProcessing: 0, // This would come from the API in production
+      avgWordCount
+    };
+  };
+
+  // Load articles from API or local data
   useEffect(() => {
-    loadNewsletters()
-  }, [])
-
-  const loadNewsletters = async () => {
-    // In development, use test data if API call fails or returns empty
-    if (process.env.NODE_ENV === 'development') {
-      try {
-        const response = await fetch('/api/newsletters')
-        const data = await response.json()
-        
-        if (data.newsletters && data.newsletters.length > 0) {
-          setNewsletters(data.newsletters)
-          setStats(data.stats)
-        } else {
-          // Fallback to test data if API returns empty
-          useTestData()
+    const loadArticles = async () => {
+      if (process.env.NODE_ENV === 'development') {
+        // Use test data in development
+        setArticles(TEST_ARTICLES);
+        setStats(calculateStats(TEST_ARTICLES));
+      } else {
+        try {
+          // In production, fetch from API
+          const response = await fetch('/api/newsletters');
+          const data = await response.json();
+          const newsletters = (data.newsletters || []).map(transformNewsletterToArticle);
+          setArticles(newsletters);
+          setStats(calculateStats(newsletters));
+        } catch (error) {
+          console.error('Failed to load newsletters:', error);
+          // Fallback to test data if API fails
+          setArticles(TEST_ARTICLES);
+          setStats(calculateStats(TEST_ARTICLES));
         }
-      } catch (error) {
-        console.warn('Using test data due to API error:', error)
-        useTestData()
-      } finally {
-        setLoading(false)
       }
-    } else {
-      // Production: Use real API
-      try {
-        const response = await fetch('/api/newsletters')
-        const data = await response.json()
-        setNewsletters(data.newsletters || [])
-        setStats(data.stats)
-      } catch (error) {
-        console.error('Failed to load newsletters:', error)
-      } finally {
-        setLoading(false)
-      }
-    }
-  }
+      setLoading(false);
+    };
 
-  const filteredNewsletters = newsletters.filter(newsletter => {
-    const matchesSearch = !searchTerm || 
-      newsletter.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      newsletter.sender.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    const matchesSender = !selectedSender || newsletter.sender === selectedSender
-    const matchesArchiveFilter = showArchived ? true : !newsletter.metadata?.archived
-    
-    return matchesSearch && matchesSender && matchesArchiveFilter
-  })
+    loadArticles();
+    setIsClient(true);
+  }, []);
 
-  const handleMarkAsRead = useCallback((id: string) => {
-    setNewsletters(prevNewsletters => 
-      prevNewsletters.map(newsletter => 
-        newsletter.id === id 
-          ? { 
-              ...newsletter, 
-              metadata: { 
-                ...newsletter.metadata,
-                isRead: !newsletter.metadata?.isRead, // Toggle the read status
-                readAt: newsletter.metadata?.isRead ? undefined : new Date().toISOString()
-              } 
-            } 
-          : newsletter
+  // Toggle article read status
+  const handleToggleRead = useCallback((id: string) => {
+    setArticles(prev => 
+      prev.map(article => 
+        article.id === id 
+          ? { ...article, isRead: !article.isRead } 
+          : article
       )
     );
   }, []);
 
-  const uniqueSenders = Array.from(new Set(newsletters.map(n => n.sender)))
+  // Handle article expansion
+  const handleExpandArticle = useCallback((article: TransformedArticle) => {
+    // If clicking the same article, collapse it
+    if (expandedArticleId === article.id) {
+      setExpandedArticleId(null);
+      setFullViewArticle(null);
+    } else {
+      // Expand the clicked article and collapse any others
+      setExpandedArticleId(article.id);
+      setFullViewArticle(article);
+    }
+  }, [expandedArticleId]);
 
-  if (loading) {
+  // Close full view modal
+  const handleCloseFullView = useCallback(() => {
+    setExpandedArticleId(null);
+    setFullViewArticle(null);
+  }, []);
+
+  // Toggle archive status
+  const handleToggleArchive = useCallback(async (id: string) => {
+    try {
+      const updatedArticles = articles.map(article => 
+        article.id === id 
+          ? { ...article, isArchived: !article.isArchived }
+          : article
+      );
+      setArticles(updatedArticles);
+      
+      if (process.env.NODE_ENV !== 'development') {
+        await fetch(`/api/newsletters/${id}/archive`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archived: !articles.find(a => a.id === id)?.isArchived })
+        });
+      }
+    } catch (error) {
+      console.error('Failed to update archive status:', error);
+    }
+  }, [articles]);
+
+  // Share article
+  const handleShare = useCallback(async (id: string) => {
+    try {
+      const article = articles.find(a => a.id === id);
+      if (article && navigator.share) {
+        await navigator.share({
+          title: article.subject,
+          text: article.content.substring(0, 100) + '...',
+          url: `${window.location.origin}/newsletter/${id}`
+        });
+      }
+    } catch (error) {
+      console.error('Failed to share:', error);
+    }
+  }, [articles]);
+
+  // Get unique senders for filter dropdown
+  const uniqueSenders = Array.from(new Set(articles.map(a => a.sender))).sort();
+
+  // Filter and sort articles based on archive status and date
+  const filteredArticles = useMemo(() => {
+    return articles
+      .filter(article => showArchived ? article.isArchived : !article.isArchived)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [articles, showArchived]);
+  
+  // Calculate size for each article based on content length
+  const getArticleSize = (content: string) => {
+    const length = content?.length || 0;
+    if (length > 2000) return 4; // 2x2
+    if (length > 1000) return 2; // 2x1
+    return 1; // 1x1
+  };
+
+  // Show loading state
+  if (!isClient || loading) {
     return (
-      <div className="container">
-        <div className="loading">🐠 Loading your news...</div>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="container mx-auto px-4 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="rounded-md border bg-white dark:bg-gray-800 shadow-lg h-80 animate-pulse">
+                <div className="h-48 bg-gray-200 dark:bg-gray-700"></div>
+                <div className="p-4">
+                  <div className="h-6 w-3/4 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+                  <div className="space-y-2">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="h-4 w-5/6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-    )
+    );
   }
 
   return (
-    <div className="container">
-      <header className="header">
-        <div className="header-content">
-          <div className="header-titles">
-            <h1>🐠 Nemo</h1>
-            <p>Finding your newsletters in the vast ocean of email</p>
-            {stats && (
-              <div className="stats">
-                <span>{stats.totalNewsletters} total</span>
-                <span>{stats.todayCount} today</span>
-                <span>{stats.uniqueSenders} sources</span>
-              </div>
-            )}
-          </div>
-          <div className="header-actions">
-            <ThemeToggle />
-          </div>
-        </div>
-      </header>
-
-      <div className="filters">
-        <div className="flex items-center space-x-4">
-          <input
-            type="text"
-            placeholder="Search newsletters..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="search-input"
-          />
-          
-          <select
-            value={selectedSender}
-            onChange={(e) => setSelectedSender(e.target.value)}
-            className="sender-filter"
-          >
-            <option value="">All Senders</option>
-            {uniqueSenders.map(sender => (
-              <option key={sender} value={sender}>{sender}</option>
-            ))}
-          </select>
-          
-          <button
-            onClick={() => setShowArchived(!showArchived)}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
-              showArchived 
-                ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200' 
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {showArchived ? 'Hide Archived' : 'Show Archived'}
-          </button>
-        </div>
-      </div>
-
-      <div className="newsletters">
-        {filteredNewsletters.length === 0 ? (
-          <div className="empty-state text-center py-12">
-            <p className="text-lg text-gray-600">
-              {showArchived 
-                ? "You don't have any archived newsletters yet"
-                : searchTerm || selectedSender
-                  ? "No matching newsletters found"
-                  : "No newsletters found. Check back later!"}
+    <div className={cn('min-h-screen', theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900')}>
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        {/* Header */}
+        <header className="flex justify-between items-center mb-4 sm:mb-6">
+          <div className="flex items-center space-x-2">
+            <h1 className="text-2xl sm:text-3xl font-bold">
+              🐠<span className="hidden sm:inline"> Nemo</span>
+            </h1>
+            <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 ml-2">
+              Finding your newsletters in an ocean of email
             </p>
           </div>
-        ) : (
-          filteredNewsletters.map((newsletter, index) => (
-            <NewsletterItem 
-              key={newsletter.id} 
-              newsletter={newsletter} 
-              index={index}
-              onMarkAsRead={handleMarkAsRead}
+          
+          <div className="flex items-center space-x-2 sm:space-x-3">
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className={cn(
+                'p-2 sm:px-3 sm:py-1.5 rounded-md text-sm transition-colors',
+                'flex items-center justify-center',
+                showArchived 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600',
+                'min-w-[40px] sm:min-w-[120px]'
+              )}
+              aria-label={showArchived ? 'Hide archived' : 'Show archived'}
+            >
+              <span className="sm:hidden">
+                {showArchived ? '🗑️' : '📥'}
+              </span>
+              <span className="hidden sm:inline">
+                {showArchived ? 'Hide Archived' : 'Show Archived'}
+              </span>
+            </button>
+            
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+          </div>
+        </header>
+
+        {/* Stats Bar - Single Row with Equal Width */}
+        <div className="flex overflow-x-auto pb-2 -mx-1 mb-6 scrollbar-hide">
+          <div className="flex flex-nowrap min-w-full space-x-2 sm:space-x-3 px-1">
+            <StatCard
+              title="Total"
+              value={stats.totalNewsletters}
+              icon="📊"
+              titleFull="Total Newsletters"
+              className="flex-shrink-0 w-1/4 min-w-0 bg-blue-100 dark:bg-blue-900/30"
             />
-          ))
+            <StatCard
+              title="Today"
+              value={stats.todayCount}
+              icon="📅"
+              titleFull="Today"
+              className="flex-shrink-0 w-1/4 min-w-0 bg-green-100 dark:bg-green-900/30"
+            />
+            <StatCard
+              title="Senders"
+              value={stats.uniqueSenders}
+              icon="👤"
+              titleFull="Unique Senders"
+              className="flex-shrink-0 w-1/4 min-w-0 bg-purple-100 dark:bg-purple-900/30"
+            />
+            <StatCard
+              title="Avg"
+              value={stats.avgWordCount}
+              icon="📝"
+              titleFull="Avg Words"
+              className="flex-shrink-0 w-1/4 min-w-0 bg-yellow-100 dark:bg-yellow-900/30"
+            />
+          </div>
+        </div>
+
+        {/* Articles Grid */}
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+          </div>
+        ) : (
+          <div className="w-full">
+            {filteredArticles.length === 0 ? (
+              <div className="col-span-full text-center py-12">
+                <div className="text-gray-500 dark:text-gray-400">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                  <h3 className="mt-2 text-lg font-medium">
+                    {showArchived 
+                      ? "You don't have any archived newsletters yet"
+                      : "No newsletters found. Check back later!"}
+                  </h3>
+                  {showArchived && (
+                    <button 
+                      onClick={() => setShowArchived(false)}
+                      className="mt-2 text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      Show unarchived newsletters
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <BentoGrid columns={[1, 2, 2, 3]} gap={1.5} className="mx-auto px-4">
+                {filteredArticles.map((article) => (
+                  <div 
+                    key={article.id}
+                    className="h-full"
+                    onClick={() => handleExpandArticle(article)}
+                  >
+                    <ArticleGridCard
+                      id={article.id}
+                      sender={article.sender}
+                      subject={article.subject}
+                      date={article.date}
+                      content={article.content}
+                      imageUrl={article.imageUrl}
+                      isNew={article.isNew}
+                      isRead={article.isRead}
+                      isArchived={article.isArchived}
+                      tags={article.tags}
+                      onToggleRead={() => handleToggleRead(article.id)}
+                      onToggleArchive={() => handleToggleArchive(article.id)}
+                      onShare={() => handleShare(article.id)}
+                    />
+                  </div>
+                ))}
+              </BentoGrid>
+            )}
+          </div>
+        )}
+
+        {/* Full View Article Modal */}
+        {fullViewArticle && (
+          <FullViewArticle
+            article={{
+              id: fullViewArticle.id,
+              title: fullViewArticle.subject,
+              content: fullViewArticle.content || 'No content available',
+              publishDate: fullViewArticle.date
+            }}
+            onClose={handleCloseFullView}
+            className={theme === 'dark' ? 'dark' : ''}
+          />
         )}
       </div>
     </div>
-  )
-}
-
-interface NewsletterItemProps {
-  newsletter: NewsletterEmail;
-  index: number;
-  onMarkAsRead?: (id: string) => void;
-}
-
-function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps) {
-  const [expanded, setExpanded] = useState(false)
-  const [isRead, setIsRead] = useState(!!newsletter.metadata?.isRead)
-  const [isArchived, setIsArchived] = useState(!!newsletter.metadata?.archived)
-  const itemRef = useRef<HTMLDivElement>(null)
-
-  // Sync the read and archive status when the newsletter prop changes
-  useEffect(() => {
-    setIsRead(!!newsletter.metadata?.isRead);
-    setIsArchived(!!newsletter.metadata?.archived);
-  }, [newsletter.metadata?.isRead, newsletter.metadata?.archived]);
-
-  // Enhanced debug logging for Redis index
-  useEffect(() => {
-    console.log('Newsletter item data:', {
-      id: newsletter.id,
-      metadata: newsletter.metadata,
-      hasRedisIndex: !!newsletter.metadata?.redisIndex,
-      redisIndex: newsletter.metadata?.redisIndex || 'Not found'
-    })
-  }, [newsletter])
-
-  // Scroll into view on mobile when expanded
-  useEffect(() => {
-    if (expanded && itemRef.current && window.innerWidth <= 768) {
-      itemRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-  }, [expanded])
-  
-  // In NewsletterItem component, before parseISO
-  console.log('Newsletter date:', newsletter.date);
-  console.log('Date type:', typeof newsletter.date);
-
-  // if (process.env.NODE_ENV === 'development') {
-
-  //   try {
-  //     const date = parseISO(newsletter.date);
-  //     console.log('Parsed date:', date);
-  //   } catch (error) {
-  //     console.error('Date parsing error:', error);
-  //   }
-  // }
-
-  // Using the centralized date service instead of local implementation
-  
-  // Get the parsed date and check if it's today
-  const date = parseDate(newsletter.date);
-  
-  // Determine if the newsletter is from today
-  let isNew = false;
-  if (date) {
-    const today = new Date();
-    isNew = date.getDate() === today.getDate() && 
-            date.getMonth() === today.getMonth() && 
-            date.getFullYear() === today.getFullYear();
-  }
-
-  // Generate preview text for first two items when collapsed
-  const preview = !expanded && index < 3 ? (() => {
-    const plain = newsletter.content.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
-    const words = plain.split(' ').slice(0, 40).join(' ')
-    return words + (plain.split(' ').length > 40 ? '…' : '')
-  })() : null;
-
-  const handleMarkAsRead = async (newReadStatus = true) => {
-    try {
-      // Optimistically update the UI
-      setIsRead(newReadStatus);
-      
-      // Call the API to update the read status
-      const response = await fetch(`/api/newsletters/${newsletter.id}/read`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ isRead: newReadStatus }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update read status');
-      }
-
-      // Notify parent component if provided
-      if (onMarkAsRead) {
-        onMarkAsRead(newsletter.id);
-      }
-    } catch (error) {
-      console.error('Error updating read status:', error);
-      // Revert the UI if the API call fails
-      setIsRead(!newReadStatus);
-    }
-  };
-
-  const handleArchive = async (id: string, newArchivedStatus: boolean) => {
-    try {
-      // Optimistically update the UI
-      setIsArchived(newArchivedStatus);
-      
-      // Call the API to update the archive status
-      const response = await fetch(`/api/newsletters/${id}/archive`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ isArchived: newArchivedStatus }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to update archive status');
-      }
-
-      // Update the local state with the new metadata
-      const updatedNewsletter = await response.json();
-      if (updatedNewsletter.success) {
-        // The parent component will handle the state update
-        if (onMarkAsRead) {
-          onMarkAsRead(id);
-        }
-      }
-    } catch (error) {
-      console.error('Error updating archive status:', error);
-      // Revert the UI if the API call fails
-      setIsArchived(!newArchivedStatus);
-    }
-  };
-
-  // Auto-mark as read when expanded
-  useEffect(() => {
-    if (expanded && !isRead) {
-      handleMarkAsRead(true);
-    }
-  }, [expanded, isRead]);
-
-  return (
-    <div 
-      ref={itemRef} 
-      className={`newsletter-item 
-        ${isRead ? 'read' : ''} 
-        ${isNew ? 'new' : ''}
-        ${expanded ? 'expanded' : ''}
-        ${isArchived ? 'archived' : ''}
-      `}
-      aria-expanded={expanded}
-    >
-      <div className="flex items-start justify-between gap-4">
-        <div 
-          className="flex-1 cursor-pointer" 
-          onClick={() => setExpanded(!expanded)}
-        >
-          <div className="newsletter-header">
-            <div className="newsletter-meta">
-              <span className="sender">{newsletter.sender}</span>
-              <span className="date">{formatDateSafely(newsletter.date, (d) => format(d, 'MMM d, h:mm a'), 'Unknown date')}</span>
-            </div>
-            <h3 className="subject">{newsletter.subject}</h3>
-            <div className="expand-icon">{expanded ? '📖' : '📄'}</div>
-          </div>
-        </div>
-        
-        <div className="flex items-center flex-shrink-0">
-          {isNew && (
-            <span 
-              className="px-2.5 py-1 text-xs font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 rounded whitespace-nowrap mr-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              NEW
-            </span>
-          )}
-          <div className="flex items-center">
-            <MarkAsReadButton 
-              id={newsletter.id}
-              isRead={isRead}
-              onMarkRead={() => handleMarkAsRead(!isRead)}
-              variant="default"
-              className="mr-6"
-            />
-            <ArchiveButton
-              id={newsletter.id}
-              isArchived={isArchived}
-              onArchive={(id: string, newArchivedStatus: boolean) => handleArchive(id, newArchivedStatus)}
-              variant="default"
-            />
-          </div>
-        </div>
-      </div>
-      
-      {!expanded && preview && (
-        <p className="preview">{preview}</p>
-      )}
-      {expanded && (
-        <div 
-          className="newsletter-content-html"
-          dangerouslySetInnerHTML={{ 
-            __html: DOMPurify.sanitize(newsletter.content, {
-              ALLOWED_TAGS: [
-                'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-                'p', 'br', 'strong', 'em', 'b', 'i',
-                'ul', 'ol', 'li', 'a', 'img',
-                'blockquote', 'div', 'span'
-              ],
-              ALLOWED_ATTR: [
-                'href', 'src', 'alt', 'title', 'target'
-              ],
-              ALLOWED_URI_REGEXP: /^(?:(?:https?|mailto):|[^a-z]|[a-z+.-]+(?:[^a-z+.-:]|$))/i,
-              FORBID_TAGS: ['script', 'object', 'embed', 'form', 'input', 'iframe'],
-              FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover', 'style']
-            })
-          }} 
-        />
-      )}
-      <div className="redis-index" style={{
-        display: 'flex',
-        justifyContent: 'flex-end',
-        padding: '0.5rem 1rem',
-        backgroundColor: 'rgba(0,0,0,0.03)',
-        borderTop: '1px solid #e2e8f0',
-        fontSize: '0.75rem',
-        color: '#4a5568'
-      }}>
-        <span style={{
-          backgroundColor: 'rgba(0,0,0,0.05)',
-          padding: '0.25rem 0.5rem',
-          borderRadius: '4px',
-          fontFamily: 'monospace',
-          fontWeight: 500
-        }}>
-          ID: {newsletter.id || 'N/A'}
-          {newsletter.metadata?.redisIndex && ` (Redis: ${newsletter.metadata.redisIndex})`}
-        </span>
-      </div>
-    </div>
-  )
+  );
 }
