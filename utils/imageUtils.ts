@@ -98,23 +98,36 @@ interface UnsplashImageOptions {
   }
   
   function isIcon(img: ImageInfo): boolean {
-    const isSmallImage = (img.width > 0 && img.width < 50) || 
-                        (img.height > 0 && img.height < 50);
+    const isSmallWidth = img.width ? (img.width > 0 && img.width < 50) : false;
+    const isSmallHeight = img.height ? (img.height > 0 && img.height < 50) : false;
+    const isSmallImage = isSmallWidth || isSmallHeight;
+    
     const hasIconClass = img.classList ? 
       img.classList.some(c => c.includes('icon') || c.includes('logo')) : 
       false;
+      
     return isSmallImage || hasIconClass;
   }
   
   function isTrackingPixel(img: ImageInfo): boolean {
-    return (img.width === 1 && img.height === 1) || 
-           img.src.includes('pixel') ||
-           img.src.includes('track') ||
-           img.src.includes('beacon') ||
-           img.src.includes('spacer');
+    const is1x1Pixel = (img.width === 1 && img.height === 1) ||
+                      (img.width === 1 && img.height === undefined) ||
+                      (img.width === undefined && img.height === 1);
+    
+    const hasTrackingTerm = [
+      'pixel',
+      'track',
+      'beacon',
+      'spacer'
+    ].some(term => img.src.toLowerCase().includes(term));
+    
+    return is1x1Pixel || hasTrackingTerm;
   }
   
   function isBrokenImage(img: ImageInfo): boolean {
+    // If src is empty, consider it broken
+    if (!img.src) return true;
+    
     const brokenPatterns = [
       'placeholder',
       'blank',
