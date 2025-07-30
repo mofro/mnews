@@ -152,17 +152,45 @@ export function ArticleGridCard({
 
   // Handle click on the card to toggle expansion
   const handleCardClick = useCallback(() => {
-    setIsExpanded(!isExpanded);
-  }, [isExpanded]);
+    const wasExpanded = isExpanded;
+    setIsExpanded(!wasExpanded);
+    
+    // Scroll to top on mobile when expanding
+    if (!wasExpanded && window.innerWidth <= 768) {
+      // Use setTimeout to ensure the DOM has updated with the expanded content
+      setTimeout(() => {
+        const cardElement = document.getElementById(`card-${id}`);
+        if (cardElement) {
+          cardElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }
+      }, 50);
+    }
+  }, [isExpanded, id]);
+  
+  // Add scroll behavior for title click as well
+  const handleTitleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const wasExpanded = isExpanded;
+    setIsExpanded(!wasExpanded);
+    
+    if (!wasExpanded && window.innerWidth <= 768) {
+      setTimeout(() => {
+        const cardElement = document.getElementById(`card-${id}`);
+        if (cardElement) {
+          cardElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }
+      }, 50);
+    }
+  }, [isExpanded, id]);
 
   // Handle click on the image to toggle expansion
   const handleImageClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsExpanded(!isExpanded);
-  }, [isExpanded]);
-
-  // Handle click on the title to toggle expansion
-  const handleTitleClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     setIsExpanded(!isExpanded);
   }, [isExpanded]);
@@ -198,6 +226,7 @@ export function ArticleGridCard({
 
   return (
     <article
+      id={`card-${id}`}
       className={`group relative overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md ${isArchived ? 'bg-yellow-50/50 dark:bg-yellow-900/20' : ''} ${className}`}
       aria-expanded={isExpanded}
     >
