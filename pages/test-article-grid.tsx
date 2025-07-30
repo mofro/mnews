@@ -16,6 +16,7 @@ interface NewsletterData {
   cleanContent?: string;
   rawContent?: string;
   metadata?: {
+    redisIndex?: string;
     isRead?: boolean;
     archived?: boolean;
     imageUrl?: string;
@@ -24,18 +25,24 @@ interface NewsletterData {
 }
 
 // Transform the newsletter data to match the expected article format
-const transformNewsletterToArticle = (newsletter: NewsletterData, index: number) => ({
-  id: newsletter.id || `newsletter-${index}`,
-  sender: newsletter.sender || 'Unknown Sender',
-  subject: newsletter.subject || 'No Subject',
-  date: newsletter.date || new Date().toISOString(),
-  content: newsletter.cleanContent || newsletter.content || '',
-  isNew: index === 0, // First item is new
-  isRead: newsletter.metadata?.isRead ?? index > 0,  // Use metadata if available, otherwise first item is unread
-  isArchived: newsletter.metadata?.archived ?? false,  // Use metadata if available
-  tags: newsletter.metadata?.tags || [],
-  imageUrl: newsletter.metadata?.imageUrl || undefined
-});
+const transformNewsletterToArticle = (newsletter: NewsletterData, index: number) => {
+  // Extract Redis ID from metadata or use the provided ID
+  const redisId = newsletter.metadata?.redisIndex || newsletter.id || `newsletter-${index}`;
+  
+  return {
+    id: redisId, // Use Redis ID as the primary ID
+    redisId,     // Also include it as a separate field for reference
+    sender: newsletter.sender || 'Unknown Sender',
+    subject: newsletter.subject || 'No Subject',
+    date: newsletter.date || new Date().toISOString(),
+    content: newsletter.cleanContent || newsletter.content || '',
+    isNew: index === 0, // First item is new
+    isRead: newsletter.metadata?.isRead ?? index > 0,
+    isArchived: newsletter.metadata?.archived ?? false,
+    tags: newsletter.metadata?.tags || [],
+    imageUrl: newsletter.metadata?.imageUrl || undefined
+  };
+};
 
 // Development test data
 const TEST_ARTICLES = newslettersData.map(transformNewsletterToArticle);
