@@ -88,16 +88,22 @@ interface UnsplashImageOptions {
       'facebook', 'twitter', 'linkedin', 'instagram', 
       'pinterest', 'youtube', 'tiktok', 'social'
     ];
-    return socialDomains.some(domain => 
-      img.src.toLowerCase().includes(domain) ||
-      img.classList.some(c => c.includes('social'))
+    const hasSocialDomain = socialDomains.some(domain => 
+      img.src.toLowerCase().includes(domain)
     );
+    const hasSocialClass = img.classList ? 
+      img.classList.some(c => c.includes('social')) : 
+      false;
+    return hasSocialDomain || hasSocialClass;
   }
   
   function isIcon(img: ImageInfo): boolean {
-    return (img.width > 0 && img.width < 50) || 
-           (img.height > 0 && img.height < 50) ||
-           img.classList.some(c => c.includes('icon') || c.includes('logo'));
+    const isSmallImage = (img.width > 0 && img.width < 50) || 
+                        (img.height > 0 && img.height < 50);
+    const hasIconClass = img.classList ? 
+      img.classList.some(c => c.includes('icon') || c.includes('logo')) : 
+      false;
+    return isSmallImage || hasIconClass;
   }
   
   function isTrackingPixel(img: ImageInfo): boolean {
