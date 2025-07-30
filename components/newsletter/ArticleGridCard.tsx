@@ -1,7 +1,7 @@
 // components/newsletter/ArticleGridCard.tsx
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { extractFeaturedImage, getArticleImage } from '@/utils/imageUtils';
@@ -44,6 +44,33 @@ export function ArticleGridCard({
   const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl || null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
+  
+  // Update content height when expanded state or content changes
+  useEffect(() => {
+    if (contentRef.current) {
+      // Set height to auto to measure the natural height
+      contentRef.current.style.height = 'auto';
+      const height = contentRef.current.scrollHeight;
+      
+      // If collapsing, set the height to 0
+      if (!isExpanded) {
+        // Force a reflow
+        void contentRef.current.offsetHeight;
+        contentRef.current.style.height = '0';
+      } else {
+        // If expanding, set the height to the natural height
+        contentRef.current.style.height = '0';
+        // Force a reflow
+        void contentRef.current.offsetHeight;
+        contentRef.current.style.height = `${height}px`;
+      }
+      
+      // Store the height for later use
+      setContentHeight(height);
+    }
+  }, [isExpanded, content]);
 
   // Extract featured image from content
   const featuredImageUrl = useMemo(() => {
@@ -192,8 +219,22 @@ export function ArticleGridCard({
   // Handle click on the image to toggle expansion
   const handleImageClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsExpanded(!isExpanded);
-  }, [isExpanded]);
+    const wasExpanded = isExpanded;
+    setIsExpanded(!wasExpanded);
+    
+    // Scroll to top on mobile when expanding
+    if (!wasExpanded && window.innerWidth <= 768) {
+      setTimeout(() => {
+        const cardElement = document.getElementById(`card-${id}`);
+        if (cardElement) {
+          cardElement.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'start' 
+          });
+        }
+      }, 50);
+    }
+  }, [isExpanded, id]);
 
   const handleMouseEnter = useCallback(() => {
     setIsHovered(true);
@@ -310,22 +351,35 @@ export function ArticleGridCard({
         </h3>
         <time className="text-xs text-muted-foreground">{formattedDate}</time>
 
-        <div 
-          className="mt-2 space-y-2"
-          onClick={handleCardClick}
-        >
-          {!isExpanded ? (
-            <p className={`text-sm text-gray-600 dark:text-gray-400 ${isArchived ? 'dark:text-gray-300/80' : ''} line-clamp-3`}>
-              {summary}
-            </p>
-          ) : (
+        <div className="mt-2">
+          <div 
+            className="overflow-hidden transition-all duration-300 ease-in-out"
+            ref={contentRef}
+            style={{
+              height: isExpanded ? contentHeight : '0',
+              opacity: isExpanded ? 1 : 0.8,
+              transition: 'height 300ms ease-in-out, opacity 300ms ease-in-out'
+            }}
+          >
             <div 
               className={`prose prose-sm max-w-none text-gray-700 dark:text-gray-200 ${isArchived ? 'dark:text-gray-300/80' : ''}`}
               dangerouslySetInnerHTML={{ __html: sanitizedContent }}
             />
+          </div>
+          
+          {/* Show summary when collapsed */}
+          {!isExpanded && (
+            <div 
+              className="cursor-pointer"
+              onClick={handleCardClick}
+            >
+              <p className={`text-sm text-gray-600 dark:text-gray-400 ${isArchived ? 'dark:text-gray-300/80' : ''} line-clamp-3`}>
+                {summary}
+              </p>
+            </div>
           )}
         </div>
-
+        
         {tags.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1">
             {tags.map((tag) => (
