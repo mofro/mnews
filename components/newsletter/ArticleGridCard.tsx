@@ -198,7 +198,7 @@ export function ArticleGridCard({
 
   return (
     <article
-      className={`group relative overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md ${className}`}
+      className={`group relative overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md ${isArchived ? 'bg-yellow-50/50 dark:bg-yellow-900/20' : ''} ${className}`}
       aria-expanded={isExpanded}
     >
       <div 
@@ -286,12 +286,12 @@ export function ArticleGridCard({
           onClick={handleCardClick}
         >
           {!isExpanded ? (
-            <p className="text-sm text-gray-600 line-clamp-3">
+            <p className={`text-sm text-gray-600 dark:text-gray-400 ${isArchived ? 'dark:text-gray-300/80' : ''} line-clamp-3`}>
               {summary}
             </p>
           ) : (
             <div 
-              className="prose prose-sm max-w-none text-gray-700"
+              className={`prose prose-sm max-w-none text-gray-700 dark:text-gray-200 ${isArchived ? 'dark:text-gray-300/80' : ''}`}
               dangerouslySetInnerHTML={{ __html: sanitizedContent }}
             />
           )}

@@ -6,37 +6,68 @@ import { useTheme } from '@/context/ThemeContext';
 import { ArticleGridCard } from '@/components/newsletter/ArticleGridCard';
 import newslettersData from '@/data/newsletters.json';
 
+// Interface for newsletter data
+interface NewsletterData {
+  id: string;
+  sender: string;
+  subject: string;
+  date: string;
+  content: string;
+  cleanContent?: string;
+  rawContent?: string;
+  metadata?: {
+    isRead?: boolean;
+    archived?: boolean;
+    imageUrl?: string;
+    tags?: string[];
+  };
+}
+
 // Transform the newsletter data to match the expected article format
-const initialArticles = newslettersData.map((newsletter, index) => ({
+const transformNewsletterToArticle = (newsletter: NewsletterData, index: number) => ({
   id: newsletter.id || `newsletter-${index}`,
   sender: newsletter.sender || 'Unknown Sender',
   subject: newsletter.subject || 'No Subject',
   date: newsletter.date || new Date().toISOString(),
-  content: newsletter.content || '',
+  content: newsletter.cleanContent || newsletter.content || '',
   isNew: index === 0, // First item is new
-  isRead: index > 0,  // First item is unread, others are read
-  isArchived: false,  // None are archived by default
-  tags: []            // No tags by default
-}));
+  isRead: newsletter.metadata?.isRead ?? index > 0,  // Use metadata if available, otherwise first item is unread
+  isArchived: newsletter.metadata?.archived ?? false,  // Use metadata if available
+  tags: newsletter.metadata?.tags || [],
+  imageUrl: newsletter.metadata?.imageUrl || undefined
+});
+
+// Development test data
+const TEST_ARTICLES = newslettersData.map(transformNewsletterToArticle);
 
 interface DashboardStats {
   totalNewsletters: number;
   todayCount: number;
   uniqueSenders: number;
+  total: number;
+  withCleanContent: number;
+  needsProcessing: number;
+  avgWordCount: number;
 }
 
 export default function TestArticleGrid() {
   const { theme, toggleTheme } = useTheme();
-  const [articles, setArticles] = useState(initialArticles);
+  const [isClient, setIsClient] = useState(false);
+  const [articles, setArticles] = useState<typeof TEST_ARTICLES>([]);
+  const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
     totalNewsletters: 0,
     todayCount: 0,
-    uniqueSenders: 0
+    uniqueSenders: 0,
+    total: 0,
+    withCleanContent: 0,
+    needsProcessing: 0,
+    avgWordCount: 0
   });
 
   // Calculate stats from articles
-  useEffect(() => {
+  const calculateStats = (articles: typeof TEST_ARTICLES) => {
     const today = new Date().toDateString();
     const senders = new Set<string>();
     
@@ -51,81 +82,185 @@ export default function TestArticleGrid() {
 
     articles.forEach(article => senders.add(article.sender));
 
-    setStats({
+    const totalWordCount = articles.reduce((sum, article) => {
+      const content = article.content || '';
+      const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
+      return sum + wordCount;
+    }, 0);
+
+    const avgWordCount = articles.length > 0 ? Math.round(totalWordCount / articles.length) : 0;
+
+    return {
       totalNewsletters: articles.length,
       todayCount,
-      uniqueSenders: senders.size
-    });
-  }, [articles]);
+      uniqueSenders: senders.size,
+      total: articles.length,
+      withCleanContent: articles.filter(a => a.content).length,
+      needsProcessing: 0, // This would come from the API in production
+      avgWordCount
+    };
+  };
+
+  // Load articles from API or local data
+  useEffect(() => {
+    const loadArticles = async () => {
+      if (process.env.NODE_ENV === 'development') {
+        // Use test data in development
+        setArticles(TEST_ARTICLES);
+        setStats(calculateStats(TEST_ARTICLES));
+      } else {
+        try {
+          // In production, fetch from API
+          const response = await fetch('/api/newsletters');
+          const data = await response.json();
+          const newsletters = (data.newsletters || []).map(transformNewsletterToArticle);
+          setArticles(newsletters);
+          setStats(calculateStats(newsletters));
+        } catch (error) {
+          console.error('Failed to load newsletters:', error);
+          // Fallback to test data if API fails
+          setArticles(TEST_ARTICLES);
+          setStats(calculateStats(TEST_ARTICLES));
+        }
+      }
+      setLoading(false);
+    };
+
+    loadArticles();
+    setIsClient(true);
+  }, []);
+
+  // Toggle read status
+  const handleToggleRead = async (id: string) => {
+    try {
+      const updatedArticles = articles.map(article => 
+        article.id === id 
+          ? { ...article, isRead: !article.isRead }
+          : article
+      );
+      setArticles(updatedArticles);
+      
+      if (process.env.NODE_ENV !== 'development') {
+        await fetch(`/api/newsletters/${id}/read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ read: !articles.find(a => a.id === id)?.isRead })
+        });
+      }
+    } catch (error) {
+      console.error('Failed to update read status:', error);
+    }
+  };
+
+  // Toggle archive status
+  const handleToggleArchive = async (id: string) => {
+    try {
+      const updatedArticles = articles.map(article => 
+        article.id === id 
+          ? { ...article, isArchived: !article.isArchived }
+          : article
+      );
+      setArticles(updatedArticles);
+      
+      if (process.env.NODE_ENV !== 'development') {
+        await fetch(`/api/newsletters/${id}/archive`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ archived: !articles.find(a => a.id === id)?.isArchived })
+        });
+      }
+    } catch (error) {
+      console.error('Failed to update archive status:', error);
+    }
+  };
+
+  // Share article
+  const handleShare = async (id: string) => {
+    try {
+      const article = articles.find(a => a.id === id);
+      if (article && navigator.share) {
+        await navigator.share({
+          title: article.subject,
+          text: article.content.substring(0, 100) + '...',
+          url: `${window.location.origin}/newsletter/${id}`
+        });
+      }
+    } catch (error) {
+      console.error('Failed to share:', error);
+    }
+  };
 
   // Get unique senders for filter dropdown
   const uniqueSenders = Array.from(new Set(articles.map(a => a.sender))).sort();
-  
+
   // Filter articles based on archive status
   const filteredArticles = articles.filter(article => 
-    showArchived ? true : !article.isArchived
+    showArchived ? article.isArchived : !article.isArchived
   );
 
-  const handleToggleRead = (id: string) => {
-    setArticles(articles.map(article => 
-      article.id === id 
-        ? { ...article, isRead: !article.isRead } 
-        : article
-    ));
-  };
-
-  const handleToggleArchive = (id: string) => {
-    setArticles(articles.map(article => 
-      article.id === id 
-        ? { ...article, isArchived: !article.isArchived } 
-        : article
-    ));
-  };
-
-  const handleShare = (id: string) => {
-    const article = articles.find(a => a.id === id);
-    if (article) {
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(article.subject);
-        alert('Link copied to clipboard!');
-      } else {
-        alert('Sharing not supported on this device');
-      }
-    }
-  };
+  // Show loading state
+  if (!isClient || loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="container mx-auto px-4 py-12">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="rounded-md border bg-white dark:bg-gray-800 shadow-lg h-80 animate-pulse">
+                <div className="h-48 bg-gray-200 dark:bg-gray-700"></div>
+                <div className="p-4">
+                  <div className="h-6 w-3/4 bg-gray-200 dark:bg-gray-700 rounded mb-4"></div>
+                  <div className="space-y-2">
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                    <div className="h-4 w-5/6 bg-gray-200 dark:bg-gray-700 rounded"></div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={`min-h-screen ${theme === 'dark' ? 'dark bg-gray-900' : 'bg-gray-100'}`}>
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
         <header className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+          <div className="flex justify-between items-center mb-6">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                {theme === 'dark' ? '🐠' : '🐠'} Nemo
-              </h1>
-              <p className="text-gray-600 dark:text-gray-300">
-                Finding your newsletters in the vast ocean of email
-              </p>
-              <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
-                <span>{stats.totalNewsletters} total</span>
-                <span>•</span>
-                <span>{stats.todayCount} today</span>
-                <span>•</span>
-                <span>{stats.uniqueSenders} sources</span>
-              </div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Nemo</h1>
+              <p className="text-gray-600 dark:text-gray-400">Your personal newsletter archive</p>
             </div>
-            <div className="mt-4 md:mt-0">
-              <button 
-                onClick={toggleTheme}
-                className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-              >
-                {theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}
-              </button>
+            <button
+              onClick={toggleTheme}
+              className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark' ? '☀️' : '🌙'}
+            </button>
+          </div>
+          
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
+                <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalNewsletters}</p>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
+                <p className="text-sm text-gray-500 dark:text-gray-400">Today</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.todayCount}</p>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
+                <p className="text-sm text-gray-500 dark:text-gray-400">Senders</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.uniqueSenders}</p>
+              </div>
+              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
+                <p className="text-sm text-gray-500 dark:text-gray-400">Avg. Words</p>
+                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.avgWordCount}</p>
+              </div>
             </div>
           </div>
           
-          {/* Archive Toggle */}
           <div className="flex justify-end mb-6">
             <button
               onClick={() => setShowArchived(!showArchived)}
@@ -144,20 +279,20 @@ export default function TestArticleGrid() {
           {filteredArticles.length === 0 ? (
             <div className="col-span-full text-center py-12">
               <div className="text-gray-500 dark:text-gray-400">
-                <svg className="mx-auto h-12 w-12 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
                 </svg>
-                <p className="text-lg font-medium">
+                <h3 className="mt-2 text-lg font-medium">
                   {showArchived 
                     ? "You don't have any archived newsletters yet"
                     : "No newsletters found. Check back later!"}
-                </p>
+                </h3>
                 {showArchived && (
                   <button 
                     onClick={() => setShowArchived(false)}
                     className="mt-2 text-blue-600 dark:text-blue-400 hover:underline"
                   >
-                    Clear filters
+                    Show unarchived newsletters
                   </button>
                 )}
               </div>
@@ -166,7 +301,16 @@ export default function TestArticleGrid() {
             filteredArticles.map(article => (
               <ArticleGridCard
                 key={article.id}
-                {...article}
+                id={article.id}
+                sender={article.sender}
+                subject={article.subject}
+                date={article.date}
+                content={article.content}
+                isNew={article.isNew}
+                isRead={article.isRead}
+                isArchived={article.isArchived}
+                tags={article.tags}
+                imageUrl={article.imageUrl}
                 onToggleRead={handleToggleRead}
                 onToggleArchive={handleToggleArchive}
                 onShare={handleShare}
