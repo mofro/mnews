@@ -291,7 +291,8 @@ export default function TestArticleGrid() {
     <div className={cn('min-h-screen', theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900')}>
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">Newsletter Archive</h1>
+          <h1 className="text-3xl font-bold">🐠 Nemo</h1>
+          <p className="text-xs space-x-14">Finding your newsletters<br/>in an ocean of email</p>
           <div className="flex items-center space-x-4">
             <button
               onClick={() => setShowArchived(!showArchived)}
