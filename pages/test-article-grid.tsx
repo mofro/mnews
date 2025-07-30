@@ -35,12 +35,16 @@ interface NewsletterData {
 }
 
 // StatCard component for displaying statistics
-const StatCard = ({ title, value, icon, className = '' }: { title: string; value: number | string; icon: string; className?: string }) => (
+const StatCard = ({ title, value, icon, className = '', titleFull }: { title: string; value: number | string; icon: string; className?: string; titleFull?: string }) => (
   <div className={cn('p-4 rounded-lg', className)}>
     <div className="flex items-center">
       <span className="text-2xl mr-3">{icon}</span>
       <div>
-        <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          <span className="sm:hidden">{title}</span>
+          {titleFull && <span className="hidden sm:inline">{titleFull}</span>}
+          {!titleFull && <span className="hidden sm:inline">{title}</span>}
+        </p>
         <p className="text-xl font-semibold">{value}</p>
       </div>
     </div>
@@ -339,24 +343,28 @@ export default function TestArticleGrid() {
               title="Total"
               value={stats.totalNewsletters}
               icon="📊"
+              titleFull="Total Newsletters"
               className="flex-shrink-0 w-1/4 min-w-0 bg-blue-100 dark:bg-blue-900/30"
             />
             <StatCard
               title="Today"
               value={stats.todayCount}
               icon="📅"
+              titleFull="Today"
               className="flex-shrink-0 w-1/4 min-w-0 bg-green-100 dark:bg-green-900/30"
             />
             <StatCard
               title="Senders"
               value={stats.uniqueSenders}
               icon="👤"
+              titleFull="Unique Senders"
               className="flex-shrink-0 w-1/4 min-w-0 bg-purple-100 dark:bg-purple-900/30"
             />
             <StatCard
-              title="Avg Words"
+              title="Avg"
               value={stats.avgWordCount}
               icon="📝"
+              titleFull="Avg Words"
               className="flex-shrink-0 w-1/4 min-w-0 bg-yellow-100 dark:bg-yellow-900/30"
             />
           </div>
