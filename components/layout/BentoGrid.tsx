@@ -1,65 +1,149 @@
-import { ReactNode } from 'react';
+import React, { ReactNode, useEffect, useMemo } from 'react';
+import { cn } from '@/lib/utils';
 
 interface BentoGridProps {
   children: ReactNode;
   className?: string;
-  columns?: 1 | 2 | 3 | 4 | 5 | 6;
+  columns?: number[]; // [mobile, tablet, desktop, xl]
+  gap?: number; // in rem units
+  maxWidth?: string;
+  centered?: boolean;
 }
 
-export function BentoGrid({ 
-  children, 
-  className = '',
-  columns = 3 
+export function BentoGrid({
+  children,
+  className,
+  columns = [1, 2, 2, 3],
+  gap = 1.5,
+  maxWidth = '100%',
+  centered = true
 }: BentoGridProps) {
-  const gridCols = {
-    1: 'grid-cols-1',
-    2: 'sm:grid-cols-2',
-    3: 'sm:grid-cols-2 lg:grid-cols-3', // 1 column < 640px, 2 columns 640px-959px, 3 columns 960px+
-    4: 'sm:grid-cols-2 lg:grid-cols-4',
-    5: 'sm:grid-cols-2 lg:grid-cols-5',
-    6: 'sm:grid-cols-2 lg:grid-cols-6',
-  };
+  // Generate a unique ID for the style tag
+  const styleId = 'bento-grid-styles';
+  
+  // Memoize the grid styles to prevent unnecessary recalculations
+  const gridStyles = useMemo(() => `
+    .bento-grid {
+      --gap: ${gap}rem;
+      --columns-sm: ${columns[0]};
+      --columns-md: ${columns[1]};
+      --columns-lg: ${columns[2]};
+      --columns-xl: ${columns[3]};
+      display: grid;
+      width: 100%;
+      max-width: ${maxWidth};
+      margin: ${centered ? '0 auto' : '0'};
+      gap: var(--gap);
+      grid-template-columns: repeat(var(--columns-sm), minmax(0, 1fr));
+      grid-auto-rows: auto; /* Let items determine their own height */
+      align-items: start; /* Align items to the top of the grid cell */
+      transition: all 0.3s ease;
+    }
+    
+    /* Ensure grid items don't stretch to match row height */
+    .bento-grid > * {
+      height: auto !important;
+      min-height: 0;
+      margin-bottom: var(--gap);
+    }
+    
+    @media (min-width: 640px) {
+      .bento-grid {
+        grid-template-columns: repeat(var(--columns-md), minmax(0, 1fr));
+      }
+    }
+    
+    @media (min-width: 1024px) {
+      .bento-grid {
+        grid-template-columns: repeat(var(--columns-lg), minmax(0, 1fr));
+      }
+    }
+    
+    @media (min-width: 1280px) {
+      .bento-grid {
+        grid-template-columns: repeat(var(--columns-xl), minmax(0, 1fr));
+      }
+    }
+  `, [gap, columns, maxWidth, centered]);
+
+  // Add styles to the document head using useEffect
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    
+    let styleTag = document.getElementById(styleId);
+    if (!styleTag) {
+      styleTag = document.createElement('style');
+      styleTag.id = styleId;
+      document.head.appendChild(styleTag);
+    }
+    
+    styleTag.textContent = gridStyles;
+    
+    // Clean up the style tag when the component unmounts
+    return () => {
+      if (styleTag && styleTag.parentNode) {
+        styleTag.parentNode.removeChild(styleTag);
+      }
+    };
+  }, [gridStyles, styleId]);
 
   return (
-    <div 
-      className={`grid grid-cols-1 ${gridCols[columns]} gap-6 ${className}`}
-      style={{
-        gridAutoRows: 'min-content',
-        alignItems: 'start'
-      }}
-    >
-      {children}
+    <div className={cn('bento-grid w-full', className)}>
+      {React.Children.map(children, (child, index) => {
+        if (React.isValidElement(child)) {
+          return React.cloneElement(child, { 
+            key: child.key || `bento-item-${index}`,
+            'data-bento-item': '',
+          } as React.HTMLAttributes<HTMLElement>);
+        }
+        return child;
+      })}
     </div>
   );
 }
 
-interface BentoItemProps {
+interface BentoItemProps extends React.HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
   className?: string;
-  span?: number;
 }
 
-export function BentoItem({ 
+const BentoItem = React.forwardRef<HTMLDivElement, BentoItemProps>(({ 
   children, 
-  className = '', 
-  span = 1 
-}: BentoItemProps) {
+  className = '',
+  ...props 
+}, ref) => {
   return (
     <div 
-      className={`
-        bg-white dark:bg-gray-800 
-        transition-all duration-200 overflow-hidden 
-        flex flex-col h-full rounded-[0.5rem] ${className}
-      `}
+      ref={ref}
+      className={cn(
+        'bento-item',
+        'bg-white dark:bg-gray-800',
+        'rounded-lg shadow-sm border border-gray-100 dark:border-gray-700',
+        'hover:shadow-md hover:z-10 hover:border-gray-200 dark:hover:border-gray-600',
+        'transition-all duration-300',
+        'overflow-hidden', // Prevent content from spilling
+        'h-auto', // Let content determine height
+        'w-full', // Ensure full width within grid cell
+        className
+      )}
       style={{
-        gridRow: `span ${span} / span ${span}`,
-        ...(span > 1 ? { 
-          gridColumn: `span ${span}`,
-          height: 'fit-content'
-        } : { height: 'auto' })
+        // Ensure smooth height transitions
+        transition: 'all 0.3s ease, height 0.3s ease, transform 0.3s ease',
+        // Prevent collapsing when empty
+        minHeight: '1px',
+        // Ensure proper flex behavior if needed
+        display: 'flex',
+        flexDirection: 'column'
       }}
+      {...props}
     >
-      {children}
+      <div className="w-full h-auto flex-1">
+        {children}
+      </div>
     </div>
   );
-}
+});
+
+BentoItem.displayName = 'BentoItem';
+
+export { BentoItem };

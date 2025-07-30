@@ -1,9 +1,10 @@
 // pages/test-article-grid.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { ArticleGridCard } from '@/components/newsletter/ArticleGridCard';
+import { BentoGrid, BentoItem } from '@/components/layout/BentoGrid';
 import newslettersData from '@/data/newsletters.json';
 
 // Interface for newsletter data
@@ -200,10 +201,20 @@ export default function TestArticleGrid() {
   // Get unique senders for filter dropdown
   const uniqueSenders = Array.from(new Set(articles.map(a => a.sender))).sort();
 
-  // Filter articles based on archive status
-  const filteredArticles = articles.filter(article => 
-    showArchived ? article.isArchived : !article.isArchived
-  );
+  // Filter and sort articles based on archive status and date
+  const filteredArticles = useMemo(() => {
+    return articles
+      .filter(article => showArchived ? article.isArchived : !article.isArchived)
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [articles, showArchived]);
+  
+  // Calculate size for each article based on content length
+  const getArticleSize = (content: string) => {
+    const length = content?.length || 0;
+    if (length > 2000) return 4; // 2x2
+    if (length > 1000) return 2; // 2x1
+    return 1; // 1x1
+  };
 
   // Show loading state
   if (!isClient || loading) {
@@ -282,49 +293,61 @@ export default function TestArticleGrid() {
           </div>
         </header>
         
-        <div className="grid gap-6 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-          {filteredArticles.length === 0 ? (
-            <div className="col-span-full text-center py-12">
-              <div className="text-gray-500 dark:text-gray-400">
-                <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-                </svg>
-                <h3 className="mt-2 text-lg font-medium">
-                  {showArchived 
-                    ? "You don't have any archived newsletters yet"
-                    : "No newsletters found. Check back later!"}
-                </h3>
-                {showArchived && (
-                  <button 
-                    onClick={() => setShowArchived(false)}
-                    className="mt-2 text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    Show unarchived newsletters
-                  </button>
-                )}
-              </div>
+        <div className="w-full">
+        {filteredArticles.length === 0 ? (
+          <div className="col-span-full text-center py-12">
+            <div className="text-gray-500 dark:text-gray-400">
+              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+              </svg>
+              <h3 className="mt-2 text-lg font-medium">
+                {showArchived 
+                  ? "You don't have any archived newsletters yet"
+                  : "No newsletters found. Check back later!"}
+              </h3>
+              {showArchived && (
+                <button 
+                  onClick={() => setShowArchived(false)}
+                  className="mt-2 text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Show unarchived newsletters
+                </button>
+              )}
             </div>
-          ) : (
-            filteredArticles.map(article => (
-              <ArticleGridCard
+          </div>
+        ) : (
+          <BentoGrid 
+            columns={[1, 2, 3, 4]} // [mobile, tablet, desktop, xl]
+            gap={1.5}
+            maxWidth="100%"
+            className="mx-auto px-4"
+          >
+            {filteredArticles.map((article) => (
+              <BentoItem 
                 key={article.id}
-                id={article.id}
-                sender={article.sender}
-                subject={article.subject}
-                date={article.date}
-                content={article.content}
-                isNew={article.isNew}
-                isRead={article.isRead}
-                isArchived={article.isArchived}
-                tags={article.tags}
-                imageUrl={article.imageUrl}
-                onToggleRead={handleToggleRead}
-                onToggleArchive={handleToggleArchive}
-                onShare={handleShare}
-              />
-            ))
-          )}
-        </div>
+                className="h-full"
+              >
+                <ArticleGridCard
+                  id={article.id}
+                  sender={article.sender}
+                  subject={article.subject}
+                  date={article.date}
+                  content={article.content}
+                  isNew={article.isNew}
+                  isRead={article.isRead}
+                  isArchived={article.isArchived}
+                  tags={article.tags}
+                  imageUrl={article.imageUrl}
+                  onToggleRead={handleToggleRead}
+                  onToggleArchive={handleToggleArchive}
+                  onShare={handleShare}
+                  className="h-full"
+                />
+              </BentoItem>
+            ))}
+          </BentoGrid>
+        )}
+      </div>
       </div>
     </div>
   );

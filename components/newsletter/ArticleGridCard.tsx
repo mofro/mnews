@@ -49,27 +49,24 @@ export function ArticleGridCard({
   
   // Update content height when expanded state or content changes
   useEffect(() => {
-    if (contentRef.current) {
-      // Set height to auto to measure the natural height
-      contentRef.current.style.height = 'auto';
-      const height = contentRef.current.scrollHeight;
-      
-      // If collapsing, set the height to 0
-      if (!isExpanded) {
-        // Force a reflow
-        void contentRef.current.offsetHeight;
-        contentRef.current.style.height = '0';
-      } else {
-        // If expanding, set the height to the natural height
-        contentRef.current.style.height = '0';
-        // Force a reflow
-        void contentRef.current.offsetHeight;
-        contentRef.current.style.height = `${height}px`;
+    if (!contentRef.current) return;
+    
+    // Reset height to auto to measure natural height
+    contentRef.current.style.height = 'auto';
+    const height = contentRef.current.scrollHeight;
+    
+    // Set initial height (0 if collapsed)
+    contentRef.current.style.height = isExpanded ? `${height}px` : '0';
+    
+    // Store the height for reference
+    setContentHeight(height);
+    
+    // Cleanup function
+    return () => {
+      if (contentRef.current) {
+        contentRef.current.style.height = 'auto';
       }
-      
-      // Store the height for later use
-      setContentHeight(height);
-    }
+    };
   }, [isExpanded, content]);
 
   // Extract featured image from content
@@ -265,14 +262,24 @@ export function ArticleGridCard({
     }
   }, [imageUrl, featuredImageUrl, subject]);
 
+  // Calculate size class based on content length
+  const getSizeClass = () => {
+    const contentLength = content?.length || 0;
+    if (contentLength > 2000) return 'md:col-span-2 lg:col-span-2';
+    if (contentLength > 1000) return 'md:col-span-2';
+    return '';
+  };
+
   return (
     <article
       id={`card-${id}`}
-      className={`group relative overflow-hidden rounded-lg border bg-card text-card-foreground shadow-sm transition-all hover:shadow-md ${isArchived ? 'bg-yellow-50/50 dark:bg-yellow-900/20' : ''} ${className}`}
+      className={`group relative flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-sm transition-all hover:shadow-md dark:bg-gray-800 ${
+        isArchived ? 'bg-yellow-50/50 dark:bg-yellow-900/20' : ''
+      } ${getSizeClass()} ${className}`}
       aria-expanded={isExpanded}
     >
       <div 
-        className={`relative h-48 w-full cursor-pointer overflow-hidden rounded-t-lg ${!imageSource ? 'bg-muted' : ''}`}
+        className={`relative h-48 w-full cursor-pointer overflow-hidden ${!imageSource ? 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800' : ''}`}
         onClick={handleImageClick}
       >
         {imageSource ? (
@@ -294,19 +301,19 @@ export function ArticleGridCard({
             }}
           />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-muted/30 to-muted/60">
-            <span className="text-muted-foreground/50 text-sm">Loading image...</span>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <span className="text-muted-foreground/50 text-sm">No image available</span>
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
       </div>
 
-      <div className="p-4">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">{sender}</span>
-          <div className="flex items-center space-x-1">
+      <div className="flex h-full flex-col p-5">
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{sender}</span>
+          <div className="flex items-center space-x-2">
             {isNew && (
-              <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+              <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                 New
               </span>
             )}
@@ -344,14 +351,14 @@ export function ArticleGridCard({
         </div>
 
         <h3 
-          className="mt-2 cursor-pointer text-lg font-semibold leading-tight hover:text-primary"
+          className="mb-1 cursor-pointer text-lg font-semibold leading-tight text-gray-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
           onClick={handleTitleClick}
         >
           {subject}
         </h3>
-        <time className="text-xs text-muted-foreground">{formattedDate}</time>
+        <time className="mb-3 text-xs text-gray-500 dark:text-gray-400">{formattedDate}</time>
 
-        <div className="mt-2">
+        <div className="flex-1">
           <div 
             className="overflow-hidden transition-all duration-300 ease-in-out"
             ref={contentRef}
@@ -373,36 +380,92 @@ export function ArticleGridCard({
               className="cursor-pointer"
               onClick={handleCardClick}
             >
-              <p className={`text-sm text-gray-600 dark:text-gray-400 ${isArchived ? 'dark:text-gray-300/80' : ''} line-clamp-3`}>
+              <p className={`text-sm text-gray-600 dark:text-gray-400 ${isArchived ? 'dark:text-gray-300/80' : ''} line-clamp-4`}>
                 {summary}
               </p>
             </div>
           )}
         </div>
         
-        {tags.length > 0 && (
-          <div className="mt-3 flex flex-wrap gap-1">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
-              >
-                {tag}
-              </span>
-            ))}
-          </div>
-        )}
+        <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+          {tags.length > 0 && (
+            <div className="mb-3 flex flex-wrap gap-2">
+              {tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
 
-        <div className="mt-3 flex justify-between text-xs text-muted-foreground">
-          <button 
-            className="text-primary hover:underline"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsExpanded(!isExpanded);
-            }}
-          >
-            {isExpanded ? 'Show less' : 'Read more'}
-          </button>
+          <div className="flex items-center justify-between text-sm">
+            <button 
+              className="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsExpanded(!isExpanded);
+              }}
+            >
+              {isExpanded ? (
+                <>
+                  <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                  </svg>
+                  Show less
+                </>
+              ) : (
+                <>
+                  <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                  Read more
+                </>
+              )}
+            </button>
+            
+            <div className="flex items-center space-x-3">
+              <button 
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleRead();
+                }}
+                aria-label={isRead ? 'Mark as unread' : 'Mark as read'}
+              >
+                {isRead ? (
+                  <EyeOff className="h-4 w-4" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+              </button>
+              
+              <button 
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleArchive();
+                }}
+                aria-label={isArchived ? 'Unarchive' : 'Archive'}
+              >
+                {isArchived ? (
+                  <ArchiveRestore className="h-4 w-4" />
+                ) : (
+                  <Archive className="h-4 w-4" />
+                )}
+              </button>
+              
+              <button 
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                onClick={handleShare}
+                aria-label="Share"
+              >
+                <Share2 className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </article>
