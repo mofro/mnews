@@ -1,13 +1,16 @@
 // pages/test-article-grid.tsx
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTheme } from '@/context/ThemeContext';
 import { ArticleGridCard } from '@/components/newsletter/ArticleGridCard';
-import { BentoGrid, BentoItem } from '@/components/layout/BentoGrid';
+import { BentoGrid } from '@/components/layout/BentoGrid';
+import { FullViewArticle } from '@/components/article/FullViewArticle';
+import { format } from 'date-fns';
 import newslettersData from '@/data/newsletters.json';
+import { cn } from '@/lib/utils';
 
-// Interface for newsletter data
+// Extend the NewsletterData interface to include metadata fields at the top level
 interface NewsletterData {
   id: string;
   sender: string;
@@ -23,12 +26,46 @@ interface NewsletterData {
     imageUrl?: string;
     tags?: string[];
   };
+  // Add metadata fields at the top level for easier access
+  redisIndex?: string;
+  isRead?: boolean;
+  archived?: boolean;
+  imageUrl?: string;
+  tags?: string[];
+}
+
+// StatCard component for displaying statistics
+const StatCard = ({ title, value, icon, className = '' }: { title: string; value: number | string; icon: string; className?: string }) => (
+  <div className={cn('p-4 rounded-lg', className)}>
+    <div className="flex items-center">
+      <span className="text-2xl mr-3">{icon}</span>
+      <div>
+        <p className="text-sm text-gray-500 dark:text-gray-400">{title}</p>
+        <p className="text-xl font-semibold">{value}</p>
+      </div>
+    </div>
+  </div>
+);
+
+// Interface for transformed article data
+interface TransformedArticle {
+  id: string;
+  redisId: string;
+  sender: string;
+  subject: string;
+  date: string;
+  content: string;
+  isNew: boolean;
+  isRead: boolean;
+  isArchived: boolean;
+  tags: string[];
+  imageUrl?: string;
 }
 
 // Transform the newsletter data to match the expected article format
-const transformNewsletterToArticle = (newsletter: NewsletterData, index: number) => {
+const transformNewsletterToArticle = (newsletter: NewsletterData, index: number): TransformedArticle => {
   // Extract Redis ID from metadata or use the provided ID
-  const redisId = newsletter.metadata?.redisIndex || newsletter.id || `newsletter-${index}`;
+  const redisId = newsletter.metadata?.redisIndex || newsletter.redisIndex || newsletter.id || `newsletter-${index}`;
   
   return {
     id: redisId, // Use Redis ID as the primary ID
@@ -38,10 +75,10 @@ const transformNewsletterToArticle = (newsletter: NewsletterData, index: number)
     date: newsletter.date || new Date().toISOString(),
     content: newsletter.cleanContent || newsletter.content || '',
     isNew: index === 0, // First item is new
-    isRead: newsletter.metadata?.isRead ?? index > 0,
-    isArchived: newsletter.metadata?.archived ?? false,
-    tags: newsletter.metadata?.tags || [],
-    imageUrl: newsletter.metadata?.imageUrl || undefined
+    isRead: newsletter.metadata?.isRead ?? newsletter.isRead ?? index > 0,
+    isArchived: newsletter.metadata?.archived ?? newsletter.archived ?? false,
+    tags: newsletter.metadata?.tags || newsletter.tags || [],
+    imageUrl: newsletter.metadata?.imageUrl || newsletter.imageUrl
   };
 };
 
@@ -61,9 +98,11 @@ interface DashboardStats {
 export default function TestArticleGrid() {
   const { theme, toggleTheme } = useTheme();
   const [isClient, setIsClient] = useState(false);
-  const [articles, setArticles] = useState<typeof TEST_ARTICLES>([]);
+  const [articles, setArticles] = useState<TransformedArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [showArchived, setShowArchived] = useState(false);
+  const [fullViewArticle, setFullViewArticle] = useState<TransformedArticle | null>(null);
+  const [expandedArticleId, setExpandedArticleId] = useState<string | null>(null);
   const [stats, setStats] = useState<DashboardStats>({
     totalNewsletters: 0,
     todayCount: 0,
@@ -138,30 +177,38 @@ export default function TestArticleGrid() {
     setIsClient(true);
   }, []);
 
-  // Toggle read status
-  const handleToggleRead = async (id: string) => {
-    try {
-      const updatedArticles = articles.map(article => 
+  // Toggle article read status
+  const handleToggleRead = useCallback((id: string) => {
+    setArticles(prev => 
+      prev.map(article => 
         article.id === id 
-          ? { ...article, isRead: !article.isRead }
+          ? { ...article, isRead: !article.isRead } 
           : article
-      );
-      setArticles(updatedArticles);
-      
-      if (process.env.NODE_ENV !== 'development') {
-        await fetch(`/api/newsletters/${id}/read`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ read: !articles.find(a => a.id === id)?.isRead })
-        });
-      }
-    } catch (error) {
-      console.error('Failed to update read status:', error);
+      )
+    );
+  }, []);
+
+  // Handle article expansion
+  const handleExpandArticle = useCallback((article: TransformedArticle) => {
+    // If clicking the same article, collapse it
+    if (expandedArticleId === article.id) {
+      setExpandedArticleId(null);
+      setFullViewArticle(null);
+    } else {
+      // Expand the clicked article and collapse any others
+      setExpandedArticleId(article.id);
+      setFullViewArticle(article);
     }
-  };
+  }, [expandedArticleId]);
+
+  // Close full view modal
+  const handleCloseFullView = useCallback(() => {
+    setExpandedArticleId(null);
+    setFullViewArticle(null);
+  }, []);
 
   // Toggle archive status
-  const handleToggleArchive = async (id: string) => {
+  const handleToggleArchive = useCallback(async (id: string) => {
     try {
       const updatedArticles = articles.map(article => 
         article.id === id 
@@ -180,10 +227,10 @@ export default function TestArticleGrid() {
     } catch (error) {
       console.error('Failed to update archive status:', error);
     }
-  };
+  }, [articles]);
 
   // Share article
-  const handleShare = async (id: string) => {
+  const handleShare = useCallback(async (id: string) => {
     try {
       const article = articles.find(a => a.id === id);
       if (article && navigator.share) {
@@ -196,7 +243,7 @@ export default function TestArticleGrid() {
     } catch (error) {
       console.error('Failed to share:', error);
     }
-  };
+  }, [articles]);
 
   // Get unique senders for filter dropdown
   const uniqueSenders = Array.from(new Set(articles.map(a => a.sender))).sort();
@@ -241,113 +288,129 @@ export default function TestArticleGrid() {
   }
 
   return (
-    <div className={`min-h-screen ${theme === 'dark' ? 'dark bg-gray-900' : 'bg-gray-100'}`}>
+    <div className={cn('min-h-screen', theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900')}>
       <div className="container mx-auto px-4 py-8">
-        <header className="mb-8">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Nemo</h1>
-              <p className="text-gray-600 dark:text-gray-400">Your personal newsletter archive</p>
-            </div>
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-3xl font-bold">Newsletter Archive</h1>
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className={cn(
+                'px-4 py-2 rounded-md',
+                showArchived ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'
+              )}
+            >
+              {showArchived ? 'Hide Archived' : 'Show Archived'}
+            </button>
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              className="p-2 rounded-full bg-gray-200 dark:bg-gray-700"
               aria-label="Toggle theme"
             >
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
           </div>
-          
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Total</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.totalNewsletters}</p>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Today</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.todayCount}</p>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Senders</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.uniqueSenders}</p>
-              </div>
-              <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded">
-                <p className="text-sm text-gray-500 dark:text-gray-400">Avg. Words</p>
-                <p className="text-2xl font-semibold text-gray-900 dark:text-white">{stats.avgWordCount}</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="flex justify-end mb-6">
-            <button
-              onClick={() => setShowArchived(!showArchived)}
-              className={`px-4 py-2 rounded-lg transition-colors ${
-                showArchived 
-                  ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:hover:bg-yellow-900/50' 
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
-              }`}
-            >
-              {showArchived ? 'Hide Archived' : 'Show Archived'}
-            </button>
-          </div>
-        </header>
-        
-        <div className="w-full">
-        {filteredArticles.length === 0 ? (
-          <div className="col-span-full text-center py-12">
-            <div className="text-gray-500 dark:text-gray-400">
-              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-              </svg>
-              <h3 className="mt-2 text-lg font-medium">
-                {showArchived 
-                  ? "You don't have any archived newsletters yet"
-                  : "No newsletters found. Check back later!"}
-              </h3>
-              {showArchived && (
-                <button 
-                  onClick={() => setShowArchived(false)}
-                  className="mt-2 text-blue-600 dark:text-blue-400 hover:underline"
-                >
-                  Show unarchived newsletters
-                </button>
-              )}
-            </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <StatCard
+            title="Total Newsletters"
+            value={stats.totalNewsletters}
+            icon="📊"
+            className="bg-blue-100 dark:bg-blue-900/30"
+          />
+          <StatCard
+            title="Today"
+            value={stats.todayCount}
+            icon="📅"
+            className="bg-green-100 dark:bg-green-900/30"
+          />
+          <StatCard
+            title="Unique Senders"
+            value={stats.uniqueSenders}
+            icon="👤"
+            className="bg-purple-100 dark:bg-purple-900/30"
+          />
+          <StatCard
+            title="Avg Words"
+            value={stats.avgWordCount}
+            icon="📝"
+            className="bg-yellow-100 dark:bg-yellow-900/30"
+          />
+        </div>
+
+        {/* Articles Grid */}
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
           </div>
         ) : (
-          <BentoGrid 
-            columns={[1, 2, 3, 4]} // [mobile, tablet, desktop, xl]
-            gap={1.5}
-            maxWidth="100%"
-            className="mx-auto px-4"
-          >
-            {filteredArticles.map((article) => (
-              <BentoItem 
-                key={article.id}
-                className="h-full"
-              >
-                <ArticleGridCard
-                  id={article.id}
-                  sender={article.sender}
-                  subject={article.subject}
-                  date={article.date}
-                  content={article.content}
-                  isNew={article.isNew}
-                  isRead={article.isRead}
-                  isArchived={article.isArchived}
-                  tags={article.tags}
-                  imageUrl={article.imageUrl}
-                  onToggleRead={handleToggleRead}
-                  onToggleArchive={handleToggleArchive}
-                  onShare={handleShare}
-                  className="h-full"
-                />
-              </BentoItem>
-            ))}
-          </BentoGrid>
+          <div className="w-full">
+            {filteredArticles.length === 0 ? (
+              <div className="col-span-full text-center py-12">
+                <div className="text-gray-500 dark:text-gray-400">
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                  </svg>
+                  <h3 className="mt-2 text-lg font-medium">
+                    {showArchived 
+                      ? "You don't have any archived newsletters yet"
+                      : "No newsletters found. Check back later!"}
+                  </h3>
+                  {showArchived && (
+                    <button 
+                      onClick={() => setShowArchived(false)}
+                      className="mt-2 text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      Show unarchived newsletters
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <BentoGrid columns={[1, 2, 2, 3]} gap={1.5} className="mx-auto px-4">
+                {filteredArticles.map((article) => (
+                  <div 
+                    key={article.id}
+                    className="h-full"
+                    onClick={() => handleExpandArticle(article)}
+                  >
+                    <ArticleGridCard
+                      id={article.id}
+                      sender={article.sender}
+                      subject={article.subject}
+                      date={article.date}
+                      content={article.content}
+                      imageUrl={article.imageUrl}
+                      isNew={article.isNew}
+                      isRead={article.isRead}
+                      isArchived={article.isArchived}
+                      tags={article.tags}
+                      onToggleRead={() => {}}
+                      onToggleArchive={() => {}}
+                      onShare={() => {}}
+                    />
+                  </div>
+                ))}
+              </BentoGrid>
+            )}
+          </div>
         )}
-      </div>
+
+        {/* Full View Article Modal */}
+        {fullViewArticle && (
+          <FullViewArticle
+            article={{
+              id: fullViewArticle.id,
+              title: fullViewArticle.subject,
+              content: fullViewArticle.content || 'No content available',
+              publishDate: fullViewArticle.date
+            }}
+            onClose={handleCloseFullView}
+            className={theme === 'dark' ? 'dark' : ''}
+          />
+        )}
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ interface BentoGridProps {
   gap?: number; // in rem units
   maxWidth?: string;
   centered?: boolean;
+  fullView?: boolean; // New prop for full-view article functionality
 }
 
 export function BentoGrid({
@@ -16,7 +17,8 @@ export function BentoGrid({
   columns = [1, 2, 2, 3],
   gap = 1.5,
   maxWidth = '100%',
-  centered = true
+  centered = true,
+  fullView = false, // Default to false
 }: BentoGridProps) {
   // Generate a unique ID for the style tag
   const styleId = 'bento-grid-styles';
@@ -35,12 +37,12 @@ export function BentoGrid({
       margin: ${centered ? '0 auto' : '0'};
       gap: var(--gap);
       grid-template-columns: repeat(var(--columns-sm), minmax(0, 1fr));
-      grid-auto-rows: auto; /* Let items determine their own height */
-      align-items: start; /* Align items to the top of the grid cell */
+      grid-auto-rows: auto;
+      align-items: start;
       transition: all 0.3s ease;
+      ${fullView ? 'grid-template-columns: 1fr; grid-auto-rows: 1fr;' : ''}
     }
     
-    /* Ensure grid items don't stretch to match row height */
     .bento-grid > * {
       height: auto !important;
       min-height: 0;
@@ -64,9 +66,9 @@ export function BentoGrid({
         grid-template-columns: repeat(var(--columns-xl), minmax(0, 1fr));
       }
     }
-  `, [gap, columns, maxWidth, centered]);
+  `, [gap, columns, maxWidth, centered, fullView]);
 
-  // Add styles to the document head using useEffect
+  // Add styles to the document head
   useEffect(() => {
     if (typeof document === 'undefined') return;
     
@@ -79,9 +81,8 @@ export function BentoGrid({
     
     styleTag.textContent = gridStyles;
     
-    // Clean up the style tag when the component unmounts
     return () => {
-      if (styleTag && styleTag.parentNode) {
+      if (styleTag?.parentNode) {
         styleTag.parentNode.removeChild(styleTag);
       }
     };
