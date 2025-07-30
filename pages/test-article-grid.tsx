@@ -289,56 +289,77 @@ export default function TestArticleGrid() {
 
   return (
     <div className={cn('min-h-screen', theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900')}>
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">🐠 Nemo</h1>
-          <p className="text-xs space-x-14">Finding your newsletters<br/>in an ocean of email</p>
-          <div className="flex items-center space-x-4">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+        {/* Header */}
+        <header className="flex justify-between items-center mb-4 sm:mb-6">
+          <div className="flex items-center space-x-2">
+            <h1 className="text-2xl sm:text-3xl font-bold">
+              🐠<span className="hidden sm:inline"> Nemo</span>
+            </h1>
+            <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 ml-2">
+              Finding your newsletters in an ocean of email
+            </p>
+          </div>
+          
+          <div className="flex items-center space-x-2 sm:space-x-3">
             <button
               onClick={() => setShowArchived(!showArchived)}
               className={cn(
-                'px-4 py-2 rounded-md',
-                showArchived ? 'bg-blue-600 text-white' : 'bg-gray-200 dark:bg-gray-700'
+                'p-2 sm:px-3 sm:py-1.5 rounded-md text-sm transition-colors',
+                'flex items-center justify-center',
+                showArchived 
+                  ? 'bg-blue-600 text-white' 
+                  : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600',
+                'min-w-[40px] sm:min-w-[120px]'
               )}
+              aria-label={showArchived ? 'Hide archived' : 'Show archived'}
             >
-              {showArchived ? 'Hide Archived' : 'Show Archived'}
+              <span className="sm:hidden">
+                {showArchived ? '🗑️' : '📥'}
+              </span>
+              <span className="hidden sm:inline">
+                {showArchived ? 'Hide Archived' : 'Show Archived'}
+              </span>
             </button>
+            
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-full bg-gray-200 dark:bg-gray-700"
+              className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
               aria-label="Toggle theme"
             >
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
           </div>
-        </div>
+        </header>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatCard
-            title="Total Newsletters"
-            value={stats.totalNewsletters}
-            icon="📊"
-            className="bg-blue-100 dark:bg-blue-900/30"
-          />
-          <StatCard
-            title="Today"
-            value={stats.todayCount}
-            icon="📅"
-            className="bg-green-100 dark:bg-green-900/30"
-          />
-          <StatCard
-            title="Unique Senders"
-            value={stats.uniqueSenders}
-            icon="👤"
-            className="bg-purple-100 dark:bg-purple-900/30"
-          />
-          <StatCard
-            title="Avg Words"
-            value={stats.avgWordCount}
-            icon="📝"
-            className="bg-yellow-100 dark:bg-yellow-900/30"
-          />
+        {/* Stats Bar - Single Row with Equal Width */}
+        <div className="flex overflow-x-auto pb-2 -mx-1 mb-6 scrollbar-hide">
+          <div className="flex flex-nowrap min-w-full space-x-2 sm:space-x-3 px-1">
+            <StatCard
+              title="Total"
+              value={stats.totalNewsletters}
+              icon="📊"
+              className="flex-shrink-0 w-1/4 min-w-0 bg-blue-100 dark:bg-blue-900/30"
+            />
+            <StatCard
+              title="Today"
+              value={stats.todayCount}
+              icon="📅"
+              className="flex-shrink-0 w-1/4 min-w-0 bg-green-100 dark:bg-green-900/30"
+            />
+            <StatCard
+              title="Senders"
+              value={stats.uniqueSenders}
+              icon="👤"
+              className="flex-shrink-0 w-1/4 min-w-0 bg-purple-100 dark:bg-purple-900/30"
+            />
+            <StatCard
+              title="Avg Words"
+              value={stats.avgWordCount}
+              icon="📝"
+              className="flex-shrink-0 w-1/4 min-w-0 bg-yellow-100 dark:bg-yellow-900/30"
+            />
+          </div>
         </div>
 
         {/* Articles Grid */}
@@ -388,9 +409,9 @@ export default function TestArticleGrid() {
                       isRead={article.isRead}
                       isArchived={article.isArchived}
                       tags={article.tags}
-                      onToggleRead={() => {}}
-                      onToggleArchive={() => {}}
-                      onShare={() => {}}
+                      onToggleRead={() => handleToggleRead(article.id)}
+                      onToggleArchive={() => handleToggleArchive(article.id)}
+                      onShare={() => handleShare(article.id)}
                     />
                   </div>
                 ))}

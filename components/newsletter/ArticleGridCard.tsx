@@ -19,6 +19,7 @@ interface ArticleGridCardProps {
   isRead?: boolean;
   isArchived?: boolean;
   tags?: string[];
+  newsletterId?: string;
   className?: string;
   onToggleRead?: (id: string) => void;
   onToggleArchive?: (id: string) => void;
@@ -36,6 +37,7 @@ export function ArticleGridCard({
   isRead = false,
   isArchived = false,
   tags = [],
+  newsletterId,
   className = '',
   onToggleRead,
   onToggleArchive,
@@ -385,15 +387,14 @@ export function ArticleGridCard({
               </p>
             </div>
           )}
-        </div>
-        
-        <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700">
+          
+          {/* Tags */}
           {tags.length > 0 && (
-            <div className="mb-3 flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap gap-1">
               {tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-700 dark:text-gray-200"
+                <span 
+                  key={tag} 
+                  className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
                 >
                   {tag}
                 </span>
@@ -401,7 +402,14 @@ export function ArticleGridCard({
             </div>
           )}
 
-          <div className="flex items-center justify-between text-sm">
+          {/* Article ID - subtle and centered */}
+        <div className="text-center mb-2">
+          <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
+            ID: {id}
+          </span>
+        </div>
+        
+        <div className="flex items-center justify-between text-sm">
             <button 
               className="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
               onClick={(e) => {
