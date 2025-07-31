@@ -35,21 +35,32 @@ interface NewsletterData {
 }
 
 // StatCard component for displaying statistics
-const StatCard = ({ title, value, icon, className = '', titleFull }: { title: string; value: number | string; icon: string; className?: string; titleFull?: string }) => (
-  <div className={cn('p-4 rounded-lg', className)}>
-    <div className="flex items-center">
-      <span className="text-2xl mr-3">{icon}</span>
-      <div>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          <span className="sm:hidden">{title}</span>
-          {titleFull && <span className="hidden sm:inline">{titleFull}</span>}
-          {!titleFull && <span className="hidden sm:inline">{title}</span>}
-        </p>
-        <p className="text-xl font-semibold">{value}</p>
+const StatCard = ({ title, value, icon, className = '', titleFull }: { title: string; value: number | string; icon: string; className?: string; titleFull?: string }) => {
+  // Determine text size based on value length for better mobile display
+  const valueStr = String(value);
+  const isLongValue = valueStr.length > 3;
+  const valueSizeClass = isLongValue ? 'text-base sm:text-lg' : 'text-lg sm:text-xl';
+  
+  return (
+    <div className={cn('p-2 sm:p-3 rounded-lg', className)}>
+      <div className="flex items-center">
+        <span className={`${isLongValue ? 'text-xl sm:text-2xl' : 'text-2xl sm:text-3xl'} mr-2 sm:mr-3`}>
+          {icon}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[11px] xs:text-xs text-gray-500 dark:text-gray-400 leading-tight">
+            <span className="xs:hidden">{title}</span>
+            {titleFull && <span className="hidden xs:inline sm:inline">{titleFull}</span>}
+            {!titleFull && <span className="hidden xs:inline sm:inline">{title}</span>}
+          </p>
+          <p className={`${valueSizeClass} font-semibold leading-none`}>
+            {value}
+          </p>
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Interface for transformed article data
 interface TransformedArticle {
@@ -337,35 +348,35 @@ export default function TestArticleGrid() {
         </header>
 
         {/* Stats Bar - Single Row with Equal Width */}
-        <div className="flex overflow-x-auto pb-2 -mx-1 mb-6 scrollbar-hide">
-          <div className="flex flex-nowrap min-w-full space-x-2 sm:space-x-3 px-1">
+        <div className="flex overflow-x-auto pb-3 -mx-1 mb-6 scrollbar-hide snap-x snap-mandatory">
+          <div className="flex flex-nowrap min-w-full gap-1.5 sm:gap-3 px-1">
             <StatCard
               title="Total"
               value={stats.totalNewsletters}
               icon="📊"
               titleFull="Total Newsletters"
-              className="flex-shrink-0 w-1/4 min-w-0 bg-blue-100 dark:bg-blue-900/30"
+              className="flex-shrink-0 w-[calc(33.333%_-_0.5rem)] sm:w-1/4 min-w-0 bg-blue-100 dark:bg-blue-900/30 snap-start"
             />
             <StatCard
               title="Today"
               value={stats.todayCount}
               icon="📅"
               titleFull="Today"
-              className="flex-shrink-0 w-1/4 min-w-0 bg-green-100 dark:bg-green-900/30"
+              className="flex-shrink-0 w-[calc(33.333%_-_0.5rem)] sm:w-1/4 min-w-0 bg-green-100 dark:bg-green-900/30 snap-start"
             />
             <StatCard
               title="Senders"
               value={stats.uniqueSenders}
               icon="👤"
               titleFull="Unique Senders"
-              className="flex-shrink-0 w-1/4 min-w-0 bg-purple-100 dark:bg-purple-900/30"
+              className="flex-shrink-0 w-[calc(33.333%_-_0.5rem)] sm:w-1/4 min-w-0 bg-purple-100 dark:bg-purple-900/30 snap-start"
             />
             <StatCard
               title="Avg"
               value={stats.avgWordCount}
               icon="📝"
               titleFull="Avg Words"
-              className="flex-shrink-0 w-1/4 min-w-0 bg-yellow-100 dark:bg-yellow-900/30"
+              className="flex-shrink-0 w-[calc(33.333%_-_0.5rem)] sm:w-1/4 min-w-0 bg-yellow-100 dark:bg-yellow-900/30 snap-start"
             />
           </div>
         </div>
