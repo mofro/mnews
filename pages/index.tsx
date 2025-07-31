@@ -3,11 +3,11 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTheme } from '@/context/ThemeContext';
+import { format, isToday } from 'date-fns';
 import Link from 'next/link';
 import { ArticleGridCard } from '@/components/newsletter/ArticleGridCard';
 import { BentoGrid } from '@/components/layout/BentoGrid';
 import { FullViewArticle } from '@/components/article/FullViewArticle';
-import { format } from 'date-fns';
 import newslettersData from '@/data/newsletters.json';
 import { cn } from '@/lib/utils';
 
@@ -116,6 +116,8 @@ export default function TestArticleGrid() {
   const [isClient, setIsClient] = useState(false);
   const [articles, setArticles] = useState<TransformedArticle[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedSender, setSelectedSender] = useState('');
   const [showArchived, setShowArchived] = useState(false);
   const [fullViewArticle, setFullViewArticle] = useState<TransformedArticle | null>(null);
   const [expandedArticleId, setExpandedArticleId] = useState<string | null>(null);
@@ -262,15 +264,24 @@ export default function TestArticleGrid() {
   }, [articles]);
 
   // Get unique senders for filter dropdown
-  const uniqueSenders = Array.from(new Set(articles.map(a => a.sender))).sort();
+  const uniqueSenders = useMemo(() => 
+    Array.from(new Set(articles.map(a => a.sender))).sort()
+  , [articles]);
 
-  // Filter and sort articles based on archive status and date
+  // Filter articles based on search term, sender, and archive status
   const filteredArticles = useMemo(() => {
-    return articles
-      .filter(article => showArchived ? article.isArchived : !article.isArchived)
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [articles, showArchived]);
-  
+    return articles.filter(article => {
+      const matchesSearch = !searchTerm || 
+        article.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        article.sender.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const matchesSender = !selectedSender || article.sender === selectedSender;
+      const matchesArchiveFilter = showArchived ? true : !article.isArchived;
+      
+      return matchesSearch && matchesSender && matchesArchiveFilter;
+    });
+  }, [articles, searchTerm, selectedSender, showArchived]);
+
   // Calculate size for each article based on content length
   const getArticleSize = (content: string) => {
     const length = content?.length || 0;
@@ -304,60 +315,83 @@ export default function TestArticleGrid() {
   }
 
   return (
-    <div className={cn('min-h-screen', theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900')}>
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+    <div className={`min-h-screen ${theme === 'dark' ? 'dark bg-gray-900' : 'bg-gray-100'}`}>
+      <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <header className="sticky top-0 z-50 flex justify-between items-center py-2 px-4 mb-4 sm:mb-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-2">
-            <Link 
-              href="/" 
-              className="hover:opacity-80 transition-opacity no-underline"
-              aria-label="Nemo - Return to home"
-              title="Return to home"
-            >
-              <h1 className="text-2xl sm:text-3xl font-bold">
-                <span role="img" aria-hidden="true">🐠</span>
-                <span> Nemo</span>
+        <header className="mb-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                🐠 Nemo
               </h1>
-            </Link>
-            <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 ml-2">
-              Finding your newsletters in an ocean of email
-            </p>
+              <p className="text-gray-600 dark:text-gray-300">
+                Finding your newsletters in the vast ocean of email
+              </p>
+              <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
+                <span>{articles.length} total</span>
+                <span>•</span>
+                <span>{articles.filter(a => isToday(new Date(a.date))).length} today</span>
+                <span>•</span>
+                <span>{new Set(articles.map(a => a.sender)).size} sources</span>
+                <span>•</span>
+                <span>Avg {stats.avgWordCount} words</span>
+              </div>
+            </div>
+            <div className="mt-4 md:mt-0">
+              <div className="flex flex-wrap gap-2">
+                <select
+                  value={selectedSender}
+                  onChange={(e) => setSelectedSender(e.target.value)}
+                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="">All Senders</option>
+                  {uniqueSenders.map(sender => (
+                    <option key={sender} value={sender}>{sender}</option>
+                  ))}
+                </select>
+                
+                <button
+                  onClick={() => setShowArchived(!showArchived)}
+                  className={`px-4 py-2 rounded-lg transition-colors ${
+                    showArchived 
+                      ? 'bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:hover:bg-yellow-900/50' 
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
+                  }`}
+                >
+                  {showArchived ? 'Hide Archived' : 'Show Archived'}
+                </button>
+                
+                <button 
+                  onClick={toggleTheme}
+                  className="px-4 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+                </button>
+              </div>
+            </div>
           </div>
           
-          <div className="flex items-center space-x-2 sm:space-x-3">
-            <button
-              onClick={() => setShowArchived(!showArchived)}
-              className={cn(
-                'p-2 sm:px-3 sm:py-1.5 rounded-md text-sm transition-colors',
-                'flex items-center justify-center',
-                showArchived 
-                  ? 'bg-blue-600 text-white' 
-                  : 'bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600',
-                'min-w-[40px] sm:min-w-[120px]'
-              )}
-              aria-label={showArchived ? 'Hide archived' : 'Show archived'}
-            >
-              <span className="sm:hidden">
-                {showArchived ? '🗑️' : '📥'}
-              </span>
-              <span className="hidden sm:inline">
-                {showArchived ? 'Hide Archived' : 'Show Archived'}
-              </span>
-            </button>
-            
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-full bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors"
-              aria-label="Toggle theme"
-            >
-              {theme === 'dark' ? '☀️' : '🌙'}
-            </button>
+          {/* Search Bar */}
+          <div className="mb-6">
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search newsletters..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full px-4 py-2 pr-10 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
           </div>
         </header>
 
-        {/* Stats Bar - Single Row with Equal Width */}
-        <div className="flex overflow-x-auto pb-3 -mx-1 mb-6 scrollbar-hide snap-x snap-mandatory">
+        {/* Stats Bar - Hidden but kept in code */}
+        <div className="hidden flex overflow-x-auto pb-3 -mx-1 mb-6 scrollbar-hide snap-x snap-mandatory">
           <div className="flex flex-nowrap min-w-full gap-1.5 sm:gap-3 px-1">
             <StatCard
               title="Total"
