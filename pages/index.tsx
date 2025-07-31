@@ -325,7 +325,7 @@ export default function TestArticleGrid() {
                 🐠 Nemo
               </h1>
               <p className="text-gray-600 dark:text-gray-300">
-                Finding your newsletters in the vast ocean of email
+                Finding your news in the vast ocean of email
               </p>
               <div className="flex flex-wrap gap-4 mt-2 text-sm text-gray-600 dark:text-gray-400">
                 <span>{articles.length} total</span>
