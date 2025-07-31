@@ -319,8 +319,8 @@ export default function TestArticleGrid() {
     <div className={`min-h-screen ${theme === 'dark' ? 'dark bg-gray-900' : 'bg-gray-100'}`}>
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
-        <header className="mb-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+        <header className="sticky top-0 z-10 mb-8 pt-4 pb-2 -mx-4 px-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
                 🐠 Nemo
@@ -387,8 +387,8 @@ export default function TestArticleGrid() {
             </div>
           </div>
           
-          {/* Search Bar */}
-          <div className="mb-6">
+          {/* Search Bar - Hidden */}
+          <div className="hidden">
             <div className="relative">
               <input
                 type="text"
