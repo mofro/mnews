@@ -42,6 +42,9 @@ pids
 *.tsbuildinfo
 next-env.d.ts
 
+# Development notes and documentation
+.devnotes/
+
 # IDEs
 .vscode/
 .idea/

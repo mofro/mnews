@@ -1,6 +1,6 @@
 # 🐠 Nemo (mnews)
 
-**Personal newsletter aggregation and digest system**
+Personal newsletter aggregation and digest system
 
 Nemo helps you find your newsletters in the vast ocean of email by aggregating forwarded newsletters into a single, searchable dashboard!
 
@@ -12,6 +12,18 @@ Nemo helps you find your newsletters in the vast ocean of email by aggregating f
 - 🕐 **Recency indicators** - See what's new today
 - 📄 **Expandable content** - Read full newsletters in-place
 - 🏷️ **Source filtering** - Focus on specific newsletter sources
+
+## Project Structure
+
+```text
+├── .devnotes/         # Local development notes and documentation (not version controlled)
+├── components/        # React components
+├── pages/            # Next.js pages and API routes
+├── public/           # Static files
+├── styles/           # Global styles
+├── types/            # TypeScript type definitions
+└── utils/            # Utility functions
+```
 
 ## Quick Start
 
@@ -59,21 +71,45 @@ The webhook expects POST requests with email data:
 
 ## Project Structure
 
-```
+```text
 mnews/
-├── pages/
-│   ├── api/
-│   │   ├── webhook.ts          # Email receiver
-│   │   └── newsletters.ts      # Newsletter data API
-│   ├── index.tsx               # Main dashboard
-│   └── _app.tsx                # Next.js app wrapper
-├── lib/
-│   └── types.ts                # TypeScript types
-├── data/
-│   └── newsletters.json        # Newsletter storage
-├── styles/
-│   └── globals.css             # Styling
-└── components/                 # React components (future)
+├── .devnotes/                 # Local development notes and documentation (not version controlled)
+│
+├── components/                # React components
+│   ├── ui/                    # Reusable UI components (buttons, cards, etc.)
+│   ├── newsletter/            # Newsletter-specific components
+│   ├── article/               # Article display components
+│   └── layout/                # Layout components (headers, grids, etc.)
+│
+├── pages/                     # Next.js pages and API routes
+│   ├── api/                   # API routes
+│   │   ├── webhook.ts         # Email receiver webhook
+│   │   ├── newsletters.ts     # Newsletter data API
+│   │   └── debug/             # Debug and development endpoints
+│   ├── _app.tsx               # Next.js app wrapper
+│   └── index.tsx              # Main dashboard
+│
+├── public/                    # Static files
+│   └── ...
+│
+├── styles/                    # Global styles
+│   └── globals.css
+│
+├── types/                     # TypeScript type definitions
+│   └── index.ts
+│
+├── utils/                     # Utility functions
+│   └── ...
+│
+├── lib/                       # Core application logic
+│   ├── api/                   # API client utilities
+│   └── storage/               # Data storage utilities
+│
+├── hooks/                     # Custom React hooks
+│   └── ...
+│
+└── context/                   # React context providers
+    └── ...
 ```
 
 ## Configuration
