@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTheme } from '@/context/ThemeContext';
+import Link from 'next/link';
 import { ArticleGridCard } from '@/components/newsletter/ArticleGridCard';
 import { BentoGrid } from '@/components/layout/BentoGrid';
 import { FullViewArticle } from '@/components/article/FullViewArticle';
@@ -308,9 +309,17 @@ export default function TestArticleGrid() {
         {/* Header */}
         <header className="sticky top-0 z-50 flex justify-between items-center py-2 px-4 mb-4 sm:mb-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-2">
-            <h1 className="text-2xl sm:text-3xl font-bold">
-              🐠<span className="hidden sm:inline"> Nemo</span>
-            </h1>
+            <Link 
+              href="/" 
+              className="hover:opacity-80 transition-opacity no-underline"
+              aria-label="Nemo - Return to home"
+              title="Return to home"
+            >
+              <h1 className="text-2xl sm:text-3xl font-bold">
+                <span role="img" aria-hidden="true">🐠</span>
+                <span> Nemo</span>
+              </h1>
+            </Link>
             <p className="hidden md:block text-xs text-gray-500 dark:text-gray-400 ml-2">
               Finding your newsletters in an ocean of email
             </p>
