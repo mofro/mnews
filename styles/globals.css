@@ -58,6 +58,16 @@
   }
 }
 
+/* Remove underlines from header links */
+header a,
+header a:link,
+header a:visited,
+header a:hover,
+header a:active,
+header a:focus {
+  text-decoration: none !important;
+}
+
 /* Custom styles */
 .container {
   @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
