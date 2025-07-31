@@ -306,7 +306,7 @@ export default function TestArticleGrid() {
     <div className={cn('min-h-screen', theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900')}>
       <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
         {/* Header */}
-        <header className="flex justify-between items-center mb-4 sm:mb-6">
+        <header className="sticky top-0 z-50 flex justify-between items-center py-2 px-4 mb-4 sm:mb-6 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-2">
             <h1 className="text-2xl sm:text-3xl font-bold">
               🐠<span className="hidden sm:inline"> Nemo</span>
