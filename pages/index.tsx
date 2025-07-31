@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useTheme } from '@/context/ThemeContext';
+import { truncateText } from '@/utils/string';
 import { format, isToday } from 'date-fns';
 import Link from 'next/link';
 import { ArticleGridCard } from '@/components/newsletter/ArticleGridCard';
@@ -339,16 +340,31 @@ export default function TestArticleGrid() {
             </div>
             <div className="mt-4 md:mt-0">
               <div className="flex flex-wrap gap-2">
-                <select
-                  value={selectedSender}
-                  onChange={(e) => setSelectedSender(e.target.value)}
-                  className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">All Senders</option>
-                  {uniqueSenders.map(sender => (
-                    <option key={sender} value={sender}>{sender}</option>
-                  ))}
-                </select>
+                <div className="relative min-w-[180px]">
+                  <select
+                    value={selectedSender}
+                    onChange={(e) => setSelectedSender(e.target.value)}
+                    className="w-full px-4 py-2 pr-8 rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none truncate"
+                    title={selectedSender || 'All Senders'}
+                  >
+                    <option value="">All Senders</option>
+                    {uniqueSenders.map(sender => (
+                      <option 
+                        key={sender} 
+                        value={sender}
+                        title={sender}
+                        className="truncate"
+                      >
+                        {truncateText(sender, 20)}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700 dark:text-gray-300">
+                    <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                      <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z"/>
+                    </svg>
+                  </div>
+                </div>
                 
                 <button
                   onClick={() => setShowArchived(!showArchived)}
