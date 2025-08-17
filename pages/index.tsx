@@ -167,29 +167,38 @@ export default function TestArticleGrid() {
     };
   };
 
-  // Load articles from API or local data
+  // Load articles from API
   useEffect(() => {
     const loadArticles = async () => {
-      if (process.env.NODE_ENV === 'development') {
-        // Use test data in development
-        setArticles(TEST_ARTICLES);
-        setStats(calculateStats(TEST_ARTICLES));
-      } else {
-        try {
-          // In production, fetch from API
-          const response = await fetch('/api/newsletters');
-          const data = await response.json();
-          const newsletters = (data.newsletters || []).map(transformNewsletterToArticle);
+      try {
+        // Always fetch from API, regardless of environment
+        console.log('Fetching newsletters from API...');
+        const response = await fetch('/api/newsletters');
+        if (!response.ok) {
+          throw new Error(`API request failed with status ${response.status}`);
+        }
+        const data = await response.json();
+        console.log('API response:', data);
+        
+        if (data.newsletters && Array.isArray(data.newsletters)) {
+          const newsletters = data.newsletters.map(transformNewsletterToArticle);
+          console.log(`Fetched ${newsletters.length} newsletters from API`);
           setArticles(newsletters);
           setStats(calculateStats(newsletters));
-        } catch (error) {
-          console.error('Failed to load newsletters:', error);
-          // Fallback to test data if API fails
+        } else {
+          console.warn('Unexpected API response format:', data);
+          // Fallback to test data if API response is unexpected
           setArticles(TEST_ARTICLES);
           setStats(calculateStats(TEST_ARTICLES));
         }
+      } catch (error) {
+        console.error('Failed to load newsletters:', error);
+        // Fallback to test data if API fails
+        setArticles(TEST_ARTICLES);
+        setStats(calculateStats(TEST_ARTICLES));
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     loadArticles();
@@ -237,11 +246,18 @@ export default function TestArticleGrid() {
       setArticles(updatedArticles);
       
       if (process.env.NODE_ENV !== 'development') {
-        await fetch(`/api/newsletters/${id}/archive`, {
-          method: 'POST',
+        const response = await fetch(`/api/newsletter/${id}/archive`, {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ archived: !articles.find(a => a.id === id)?.isArchived })
+          body: JSON.stringify({ 
+            isArchived: !articles.find(a => a.id === id)?.isArchived 
+          })
         });
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+        }
       }
     } catch (error) {
       console.error('Failed to update archive status:', error);

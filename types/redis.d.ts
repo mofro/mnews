@@ -11,6 +11,9 @@ declare module '@/lib/redis' {
     type(key: string): Promise<string>;
     set(key: string, value: string): Promise<void>;
     getRaw(key: string): Promise<{type: string, value: any}>;
+    testConnection(): Promise<boolean>;
+    testConnectionDetailed(): Promise<{ success: boolean; error?: string; pingTime?: number }>;
+    lrange(key: string, start: number, end: number): Promise<string[]>;
   }
 
   // Export the client factory function
