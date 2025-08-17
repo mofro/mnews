@@ -3,16 +3,72 @@ import { Redis } from '@upstash/redis';
 // Simple Redis client wrapper
 class RedisClientWrapper {
   private client: Redis;
+  private connectionUrl: string;
   
   constructor() {
-    if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
-      throw new Error('Missing Redis connection environment variables');
+    // Clean and validate environment variables
+    const url = process.env.KV_REST_API_URL?.trim();
+    const token = process.env.KV_REST_API_TOKEN?.trim();
+    
+    if (!url || !token) {
+      const missingVars = [];
+      if (!url) missingVars.push('KV_REST_API_URL');
+      if (!token) missingVars.push('KV_REST_API_TOKEN');
+      throw new Error(`Missing required Redis environment variables: ${missingVars.join(', ')}`);
     }
     
+    // Store cleaned URL for logging (without token)
+    this.connectionUrl = new URL(url).origin;
+    
     this.client = new Redis({
-      url: process.env.KV_REST_API_URL,
-      token: process.env.KV_REST_API_TOKEN,
+      url,
+      token,
     });
+  }
+  
+  /**
+   * Tests the Redis connection by sending a PING command
+   * @returns Promise that resolves to true if connection is successful, false otherwise
+   */
+  async testConnection(): Promise<boolean> {
+    try {
+      console.log('[REDIS] Testing connection...');
+      const result = await this.client.ping();
+      const isConnected = result === 'PONG';
+      console.log(`[REDIS] Connection test ${isConnected ? 'succeeded' : 'failed'}`);
+      return isConnected;
+    } catch (error) {
+      console.error('[REDIS] Connection test failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Tests the Redis connection by sending a PING command
+   * @returns Promise with connection test results
+   */
+  async testConnectionDetailed(): Promise<{ success: boolean; error?: string; pingTime?: number }> {
+    try {
+      console.log(`[REDIS] Testing connection to ${this.connectionUrl}...`);
+      const startTime = Date.now();
+      const pong = await this.client.ping();
+      const pingTime = Date.now() - startTime;
+      
+      if (pong !== 'PONG') {
+        console.error('[REDIS] Unexpected PING response:', pong);
+        return { success: false, error: 'Unexpected PING response' };
+      }
+      
+      console.log(`[REDIS] Connection successful! Ping: ${pingTime}ms`);
+      return { success: true, pingTime };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error('[REDIS] Connection test failed:', errorMessage);
+      return { 
+        success: false, 
+        error: `Connection failed: ${errorMessage}` 
+      };
+    }
   }
   
   async hgetall(key: string): Promise<Record<string, any> | null> {
@@ -98,6 +154,52 @@ class RedisClientWrapper {
       throw error;
     }
   }
+  
+  /**
+   * Get elements in a list by range
+   * @param key The key of the list
+   * @param start The start index (0-based)
+   * @param stop The end index (-1 for all elements)
+   * @returns Array of elements in the specified range
+   */
+  /**
+   * Get elements in a list by range
+   * @param key The key of the list
+   * @param start The start index (0-based)
+   * @param stop The end index (-1 for all elements)
+   * @returns Array of elements in the specified range
+   */
+  async lrange(key: string, start: number, stop: number): Promise<string[]> {
+    try {
+      console.log(`[REDIS] Getting list range ${start} to ${stop} for key: ${key}`);
+      // Using the lrange method from @upstash/redis
+      const result = await (this.client as any).lrange(key, start, stop);
+      console.log(`[REDIS] LRANGE result for ${key}:`, result);
+      return Array.isArray(result) ? result.map(String) : [];
+    } catch (error) {
+      console.error(`[REDIS] Error in lrange for key ${key}:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Insert all the specified values at the head of the list stored at key
+   * @param key The key of the list
+   * @param elements Elements to insert
+   * @returns The length of the list after the push operations
+   */
+  async lpush(key: string, ...elements: (string | number)[]): Promise<number> {
+    try {
+      console.log(`[REDIS] Pushing ${elements.length} elements to list: ${key}`);
+      // Using the lpush method from @upstash/redis
+      const result = await (this.client as any).lpush(key, ...elements);
+      console.log(`[REDIS] LPUSH result for ${key}:`, result);
+      return typeof result === 'number' ? result : 0;
+    } catch (error) {
+      console.error(`[REDIS] Error in lpush for key ${key}:`, error);
+      throw error;
+    }
+  }
 
   async get(key: string): Promise<string | null> {
     try {
@@ -179,6 +281,25 @@ class RedisClientWrapper {
 // Singleton instance
 let redisInstance: RedisClientWrapper | null = null;
 
+/**
+ * Tests the Redis connection
+ * @returns Promise with connection test results
+ */
+export async function testRedisConnection() {
+  try {
+    const client = getRedisClient();
+    const result = await client.testConnectionDetailed();
+    return result;
+  } catch (error) {
+    console.error('Error in testRedisConnection:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      pingTime: -1
+    };
+  }
+}
+
 export function getRedisClient(): RedisClientWrapper {
   if (!redisInstance) {
     redisInstance = new RedisClientWrapper();
@@ -202,237 +323,205 @@ interface ArchiveUpdateResult {
   timestamp: string;
 }
 
+interface ContentUpdateResult {
+  contentUpdated: boolean;
+  previewText?: string;
+  timestamp: string;
+}
+
 export async function updateNewsletterArchiveStatus(id: string, isArchived: boolean): Promise<UpdateResult<ArchiveUpdateResult>> {
   const client = getRedisClient();
+  const timestamp = new Date().toISOString();
   const key = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
   
   try {
-    // Get the key type first
+    // First, check if the key exists and get its type
     const keyType = await client.type(key);
     console.log(`[DEBUG] Key type for ${key}: ${keyType}`);
-    
+
     if (keyType === 'none') {
       console.error(`[ERROR] Key not found: ${key}`);
       return {
         success: false,
         error: 'Newsletter not found',
-        details: { key, keyType }
+        details: { key, keyType: 'none' }
       };
     }
 
-    // Prepare the metadata update
-    const updatedAt = new Date().toISOString();
-    const archivedAt = isArchived ? updatedAt : null;
-    
     // Create the updated metadata
-    const updatedMetadata = {
-      archived: isArchived,
-      archivedAt,
-      updatedAt
+    const metadata = {
+      isArchived: isArchived ? 'true' : 'false',
+      updatedAt: timestamp,
+      ...(isArchived ? { archivedAt: timestamp } : { archivedAt: null })
     };
 
-    console.log(`[DEBUG] Updating archive status for ${key} (${keyType}) with:`, updatedMetadata);
+    console.log(`[DEBUG] Updating ${key} (${keyType}) with:`, metadata);
     
     if (keyType === 'hash') {
       // For hash type, update the metadata field
+      console.log(`[DEBUG] Updating hash key: ${key} with metadata:`, metadata);
+      
+      // First, get the current hash to understand its structure
       const currentHash = await client.hgetall(key);
+      if (!currentHash) {
+        throw new Error('Failed to get current hash data');
+      }
+      
       console.log(`[DEBUG] Current hash for ${key}:`, JSON.stringify(currentHash, null, 2));
       
-      if (!currentHash) {
-        return {
-          success: false,
-          error: 'Failed to retrieve newsletter data',
-          details: { key, keyType }
-        };
-      }
+      // Update the hash with the new metadata
+      await client.hset(key, { 
+        ...currentHash,
+        ...metadata
+      });
       
-      // Get existing metadata
-      let metadata = {};
-      const hashMetadata = currentHash.metadata;
-      if (hashMetadata) {
-        try {
-          metadata = typeof hashMetadata === 'string' 
-            ? JSON.parse(hashMetadata) 
-            : hashMetadata;
-        } catch (e) {
-          console.error(`[ERROR] Failed to parse metadata for ${key}:`, e);
+      console.log(`[SUCCESS] Updated archive status for ${key}: isArchived=${isArchived}`);
+      
+      return {
+        success: true,
+        data: {
+          isArchived,
+          timestamp: timestamp
         }
-      }
-      
-      // Merge with updated metadata
-      const newMetadata = { ...metadata, ...updatedMetadata };
-      
-      // Update the hash
-      await client.hset(key, { metadata: JSON.stringify(newMetadata) });
+      };
     } else if (keyType === 'string') {
       // For string type, update the entire value
       const currentValue = await client.get(key);
-      let data: any = {};
+      console.log(`[DEBUG] Current value type for ${key}:`, typeof currentValue);
+      console.log(`[DEBUG] Current value for ${key}:`, currentValue);
       
+      let data: any = {};
       if (currentValue) {
         try {
-          data = typeof currentValue === 'string' ? JSON.parse(currentValue) : currentValue;
+          // Try to parse if it's a JSON string
+          data = JSON.parse(currentValue);
+          console.log(`[DEBUG] Parsed data:`, data);
         } catch (e) {
           console.error(`[ERROR] Failed to parse current value for ${key}:`, e);
+          // If we can't parse the current value, create a new object with the content
           data = { content: currentValue };
         }
       }
       
-      // Ensure metadata exists
-      if (!data.metadata) {
-        data.metadata = {};
-      }
-      
       // Update the metadata
-      data.metadata = { ...data.metadata, ...updatedMetadata };
+      data.metadata = metadata;
       
-      // Save back
+      console.log(`[DEBUG] Setting new value for ${key}:`, data);
       await client.set(key, JSON.stringify(data));
+      
+      return {
+        success: true,
+        data: {
+          isArchived,
+          timestamp: timestamp
+        }
+      };
     } else {
-      // Unsupported type
-      const error = `Unsupported Redis key type: ${keyType}`;
-      console.error(`[ERROR] ${error}`);
+      // Handle other key types (list, set, zset)
+      const errorMessage = `Unsupported key type: ${keyType}`;
+      console.error(`[ERROR] ${errorMessage} for key: ${key}`);
       return {
         success: false,
-        error,
+        error: errorMessage,
         details: { key, keyType }
       };
     }
-    
-    console.log(`[DEBUG] Successfully updated archive status for ${key}`);
-    return { 
-      success: true as const,
-      data: {
-        isArchived,
-        timestamp: updatedAt
-      }
-    };
   } catch (error) {
     const errorMessage = 'Error updating newsletter archive status';
-    console.error(`[ERROR] ${errorMessage}:`, error);
-    return {
-      success: false,
-      error: errorMessage,
-      details: error instanceof Error ? error.message : String(error)
-    };
-  }
-}
-
-export async function updateNewsletterReadStatus(id: string, isRead: boolean): Promise<UpdateResult | boolean> {
-  const client = getRedisClient();
-  // Handle both prefixed and non-prefixed IDs
-  const key = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
-  
-  console.log(`[DEBUG] === Starting updateNewsletterReadStatus ===`);
-  console.log(`[DEBUG] Input - id: ${id}, isRead: ${isRead}, resolved key: ${key}`);
-  
-  try {
-    // First, check if the key exists and get its type
-    console.log(`[DEBUG] Checking type of key: ${key}`);
-    const keyType = await client.type(key);
-    console.log(`[DEBUG] Key type for ${key}: ${keyType}`);
-
-    if (keyType === 'none') {
-      console.error(`[ERROR] Newsletter not found: ${key}`);
-      return { 
-        success: false, 
-        error: 'Newsletter not found',
-        details: { key, keyType }
-      };
-    }
-
-    // Prepare the metadata update
-    const updatedAt = new Date().toISOString();
-    const readAt = isRead ? updatedAt : null;
-    
-    // Create the updated metadata
-    const updatedMetadata = {
-      isRead,
-      updatedAt,
-      readAt
-    };
-
-    console.log(`[DEBUG] Updating ${key} (${keyType}) with:`, updatedMetadata);
-    
-    try {
-      if (keyType === 'hash') {
-        // For hash type, update the metadata field
-        console.log(`[DEBUG] Updating hash key: ${key} with metadata:`, updatedMetadata);
-        
-        // First, get the current hash to understand its structure
-        const currentHash = await client.hgetall(key);
-        console.log(`[DEBUG] Current hash for ${key}:`, JSON.stringify(currentHash, null, 2));
-        
-        // Update the metadata field
-        const metadataString = JSON.stringify(updatedMetadata);
-        console.log(`[DEBUG] Setting metadata to:`, metadataString);
-        
-        await client.hset(key, { metadata: metadataString });
-      } else if (keyType === 'string') {
-        // For string type, update the entire value
-        const currentValue = await client.get(key);
-        console.log(`[DEBUG] Current value type for ${key}:`, typeof currentValue);
-        console.log(`[DEBUG] Current value for ${key}:`, currentValue);
-        
-        let data: any = {};
-        if (currentValue) {
-          try {
-            // Check if it's already an object
-            if (typeof currentValue === 'object' && currentValue !== null) {
-              data = currentValue;
-            } else if (typeof currentValue === 'string') {
-              // Try to parse only if it's a string
-              data = JSON.parse(currentValue);
-            } else {
-              console.log(`[DEBUG] Current value is not a string, using as is`);
-              data = currentValue;
-            }
-            console.log(`[DEBUG] Parsed data:`, data);
-          } catch (e) {
-            console.error(`[ERROR] Failed to parse current value for ${key}:`, e);
-            // If we can't parse the current value, create a new object with the content
-            data = { content: currentValue };
-          }
-        }
-        
-        // Update the metadata
-        data.metadata = updatedMetadata;
-        
-        console.log(`[DEBUG] Setting new value for ${key}:`, data);
-        await client.set(key, JSON.stringify(data));
-      } else {
-        // Unsupported type
-        const error = `Unsupported Redis key type: ${keyType}`;
-        console.error(`[ERROR] ${error}`);
-        return {
-          success: false,
-          error,
-          details: { key, keyType }
-        };
-      }
-      
-      console.log(`[DEBUG] Successfully updated ${key}`);
-      return { success: true };
-    } catch (error) {
-      console.error(`[ERROR] Error updating Redis key ${key}:`, error);
-      throw error; // Re-throw to be caught by the outer catch
-    }
-  } catch (error) {
-    const errorMessage = 'Error updating newsletter read status';
     console.error(`[ERROR] ${errorMessage}:`, error);
     
     // Simple error details
     const errorDetails = {
       message: error instanceof Error ? error.message : String(error),
-      timestamp: new Date().toISOString(),
-      key,
-      isRead
+      timestamp: new Date().toISOString()
     };
     
     return { 
       success: false, 
       error: errorMessage,
       details: errorDetails
+    };
+  }
+}
+
+export async function updateNewsletterContent(
+  id: string,
+  content: string,
+  previewText?: string
+): Promise<UpdateResult<ContentUpdateResult>> {
+  const client = getRedisClient();
+  const timestamp = new Date().toISOString();
+  
+  try {
+    console.log(`[REDIS] Updating content for newsletter: ${id}`);
+    
+    // Get the existing newsletter data
+    const newsletterKey = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
+    const existingData = await client.hgetall(newsletterKey);
+    
+    if (!existingData) {
+      console.error(`[REDIS] Newsletter not found: ${id}`);
+      return {
+        success: false,
+        error: 'Newsletter not found',
+        details: { key: newsletterKey, keyType: 'none' }
+      };
+    }
+    
+    // Parse metadata if it's a string
+    let metadata: Record<string, any> = {};
+    const existingMetadata = existingData.metadata;
+    if (existingMetadata) {
+      if (typeof existingMetadata === 'string') {
+        try {
+          metadata = JSON.parse(existingMetadata);
+        } catch (e) {
+          console.error(`[REDIS] Error parsing metadata for ${id}:`, e);
+        }
+      } else if (typeof existingMetadata === 'object' && existingMetadata !== null) {
+        metadata = { ...existingMetadata };
+      }
+    }
+    
+    // Update the content and metadata
+    const updateData: Record<string, string | number> = {
+      content: content,
+      cleanContent: content, // Store cleaned content in cleanContent field
+      updatedAt: timestamp,
+      metadata: JSON.stringify({
+        ...metadata,
+        processingVersion: 'v2',
+        processedAt: timestamp,
+        wordCount: content.split(/\s+/).length,
+      })
+    };
+    
+    // Add preview text if provided
+    if (typeof previewText === 'string') {
+      updateData.previewText = previewText;
+    }
+    
+    // Update the newsletter in Redis
+    await client.hset(newsletterKey, updateData);
+    
+    console.log(`[REDIS] Successfully updated content for newsletter: ${id}`);
+    
+    return {
+      success: true,
+      data: {
+        contentUpdated: true,
+        previewText: previewText || '',
+        timestamp: timestamp
+      }
+    };
+    
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`[REDIS] Error updating content for ${id}:`, error);
+    return {
+      success: false,
+      error: `Failed to update content: ${errorMessage}`,
+      details: error instanceof Error ? error.message : String(error)
     };
   }
 }

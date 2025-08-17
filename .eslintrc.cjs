@@ -1,14 +1,11 @@
-import js from "@eslint/js";
-import globals from "globals";
-import tseslint from "typescript-eslint";
-import pluginReact from "eslint-plugin-react";
-import { defineConfig } from "eslint/config";
-import eslintConfigPrettier from "eslint-config-prettier";
+const js = require("@eslint/js");
+const globals = require("globals");
+const tseslint = require("typescript-eslint");
+const pluginReact = require("eslint-plugin-react");
+const { defineConfig } = require("eslint/config");
+const eslintConfigPrettier = require("eslint-config-prettier");
 
-// TypeScript ignores the 'node16' style explicit file extensions in ESM
-const __dirname = new URL('.', import.meta.url).pathname;
-
-export default defineConfig([
+module.exports = defineConfig([
   // Base configuration
   {
     ignores: ['.next/', 'node_modules/', 'out/'],
