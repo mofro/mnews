@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { updateNewsletterArchiveStatus } from '@/lib/redis';
+import { getRedisClient } from '@/lib/redis';
+import { cleanNewsletterContent } from '@/lib/cleaners/contentCleaner';
 
 type ArchiveRequest = NextApiRequest & {
   query: {
@@ -7,8 +8,21 @@ type ArchiveRequest = NextApiRequest & {
   };
   body: {
     isArchived?: boolean;
+    content?: string;
   };
 };
+
+/**
+ * Generate a preview text from HTML content
+ */
+function generatePreviewText(html: string, maxLength = 200): string {
+  return html
+    .replace(/<[^>]*>/g, ' ') // Remove HTML tags
+    .replace(/\s+/g, ' ')      // Collapse whitespace
+    .trim()
+    .substring(0, maxLength)
+    .trim() + (html.length > maxLength ? '...' : '');
+}
 
 export default async function handler(
   req: ArchiveRequest,
@@ -23,36 +37,94 @@ export default async function handler(
     return res.status(400).json({ message: 'Invalid newsletter ID' });
   }
 
+  const redis = getRedisClient();
+  const now = new Date().toISOString();
+  const { isArchived = true, content } = req.body;
+  const newsletterId = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
+
   try {
-    // Default to true for consistency with read/unread behavior
-    const { isArchived = true } = req.body;
+    console.log(`[API] Processing archive update for: ${newsletterId}`, { isArchived });
     
-    // Ensure we're using the correct ID format
-    const newsletterId = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
-    console.log(`[API] Updating archive status for ID: ${id} (normalized to: ${newsletterId})`);
-    
-    const result = await updateNewsletterArchiveStatus(newsletterId, isArchived);
-    
-    if (!result.success) {
-      return res.status(400).json({
+    // 1. Get current newsletter data
+    const currentData = await redis.hgetall(newsletterId);
+    if (!currentData) {
+      console.error(`[API] Newsletter not found: ${newsletterId}`);
+      return res.status(404).json({
         success: false,
-        message: result.error,
-        details: result.details
+        message: 'Newsletter not found',
+        details: { key: newsletterId }
       });
     }
-    
-    return res.status(200).json({
-      success: true,
+
+    // 2. Prepare update data with archive status
+    const updateData: Record<string, any> = {
       isArchived,
-      timestamp: result.data?.timestamp || new Date().toISOString()
-    });
+      updatedAt: now,
+      ...(isArchived && { archivedAt: now }),
+      ...(!isArchived && { archivedAt: null })
+    };
+
+    // 3. Process content if provided
+    if (content) {
+      try {
+        console.log('[API] Cleaning newsletter content');
+        const { cleanedContent, removedItems } = cleanNewsletterContent(content);
+        
+        updateData.content = cleanedContent;
+        updateData.cleanContent = cleanedContent;
+        updateData.previewText = generatePreviewText(cleanedContent);
+        updateData.metadata = {
+          ...(currentData.metadata ? JSON.parse(currentData.metadata as string) : {}),
+          processingVersion: 'v2',
+          processedAt: now,
+          wordCount: cleanedContent.split(/\s+/).length,
+          removedItemsCount: removedItems.length
+        };
+        
+        console.log(`[API] Content cleaned successfully. Removed ${removedItems.length} items.`);
+      } catch (cleanError) {
+        console.error('[API] Error cleaning content:', cleanError);
+        return res.status(400).json({
+          success: false,
+          message: 'Failed to process content',
+          error: cleanError instanceof Error ? cleanError.message : 'Unknown error'
+        });
+      }
+    }
+
+    // 4. Perform atomic update
+    try {
+      console.log('[API] Updating newsletter with data:', Object.keys(updateData));
+      await redis.hset(newsletterId, {
+        ...currentData,  // Preserve existing fields
+        ...updateData,   // Apply updates
+        metadata: typeof updateData.metadata === 'object' 
+          ? JSON.stringify(updateData.metadata) 
+          : updateData.metadata || currentData.metadata
+      });
+      
+      console.log(`[API] Successfully updated newsletter: ${newsletterId}`);
+      
+      return res.status(200).json({ 
+        success: true, 
+        id: newsletterId,
+        isArchived,
+        previewText: updateData.previewText || null,
+        timestamp: now
+      });
+      
+    } catch (updateError) {
+      console.error('[API] Failed to update newsletter:', updateError);
+      throw updateError;
+    }
     
   } catch (error) {
-    console.error('[ERROR] Failed to update archive status:', error);
+    console.error('[ERROR] Failed to process archive update:', error);
     return res.status(500).json({
       success: false,
       message: 'Internal server error',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: error instanceof Error ? error.message : 'Unknown error',
+      ...(process.env.NODE_ENV === 'development' && { stack: error instanceof Error ? error.stack : undefined })
     });
   }
 }
