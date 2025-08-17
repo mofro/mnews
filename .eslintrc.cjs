@@ -1,58 +1,38 @@
-const js = require("@eslint/js");
-const globals = require("globals");
-const tseslint = require("typescript-eslint");
-const pluginReact = require("eslint-plugin-react");
-const { defineConfig } = require("eslint/config");
-const eslintConfigPrettier = require("eslint-config-prettier");
-
-module.exports = defineConfig([
-  // Base configuration
-  {
-    ignores: ['.next/', 'node_modules/', 'out/'],
+module.exports = {
+  root: true,
+  env: {
+    browser: true,
+    es2021: true,
+    node: true,
   },
-  
-  // JavaScript configuration
-  {
-    files: ['**/*.{js,mjs,cjs}'],
-    languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-      },
+  extends: [
+    'eslint:recommended',
+    'plugin:react/recommended',
+    'plugin:@typescript-eslint/recommended',
+    'next/core-web-vitals',
+    'prettier',
+  ],
+  parser: '@typescript-eslint/parser',
+  parserOptions: {
+    ecmaFeatures: {
+      jsx: true,
     },
-    rules: {
-      ...js.configs.recommended.rules,
-      'no-console': 'warn',
-      'no-unused-vars': 'warn',
-    },
+    ecmaVersion: 'latest',
+    sourceType: 'module',
   },
-  
-  // TypeScript configuration
-  ...tseslint.configs.strict,
-  ...tseslint.configs.stylistic,
-  
-  // React configuration
-  {
-    files: ['**/*.{jsx,tsx}'],
-    plugins: {
-      react: pluginReact,
-    },
-    settings: {
-      react: {
-        version: 'detect',
-      },
-    },
-    rules: {
-      ...pluginReact.configs.recommended.rules,
-      'react/react-in-jsx-scope': 'off', // Not needed in Next.js
-      'react/prop-types': 'off', // Not needed with TypeScript
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+  plugins: ['react', '@typescript-eslint', 'react-hooks'],
+  rules: {
+    'no-console': 'warn',
+    'no-unused-vars': 'warn',
+    'react/react-in-jsx-scope': 'off',
+    'react/prop-types': 'off',
+    'react-hooks/rules-of-hooks': 'error',
+    'react-hooks/exhaustive-deps': 'warn',
+  },
+  settings: {
+    react: {
+      version: 'detect',
     },
   },
-  
-  // Prettier integration (must be last)
-  eslintConfigPrettier,
-]);
+  ignorePatterns: ['.next/', 'node_modules/', 'out/'],
+};
