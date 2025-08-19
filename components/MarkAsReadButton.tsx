@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useTheme } from 'next-themes';
+
 import { cn } from '@/lib/utils';
 
 interface MarkAsReadButtonProps {
@@ -7,7 +7,6 @@ interface MarkAsReadButtonProps {
   isRead: boolean;
   onMarkRead: () => Promise<void> | void;
   className?: string;
-  size?: 'sm' | 'md' | 'lg';
   variant?: 'default' | 'ghost';
 }
 
@@ -16,12 +15,9 @@ const MarkAsReadButton: React.FC<MarkAsReadButtonProps> = ({
   isRead, 
   onMarkRead,
   className = '',
-  size = 'md',
   variant = 'default',
 }) => {
   const [isLoading, setIsLoading] = useState(false);
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
   const readStatus = !!isRead;
 
   const handleClick = async (e: React.MouseEvent) => {
@@ -42,14 +38,14 @@ const MarkAsReadButton: React.FC<MarkAsReadButtonProps> = ({
       });
       
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        console.error('Failed to update read status:', error);
+        // Silently handle the error as it's not critical for the user experience
+        await response.json().catch(() => ({}));
         return;
       }
       
       await onMarkRead();
-    } catch (error) {
-      console.error('Error updating read status:', error);
+    } catch (_error) {
+      // Silently handle the error as it's not critical for the user experience
     } finally {
       setIsLoading(false);
     }

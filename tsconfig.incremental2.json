@@ -6,8 +6,6 @@
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
-    "noUnusedParameters": false,
-    "noImplicitReturns": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "node",
@@ -26,13 +24,7 @@
     "baseUrl": "."
   },
   "include": [
-    "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
-    "types/**/*.d.ts",
-    "types/custom.d.ts"
+    "test-button-usage.tsx"
   ],
-  "exclude": [
-    "node_modules"
-  ]
+  "exclude": ["node_modules"]
 }

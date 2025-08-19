@@ -10,6 +10,7 @@ import {
   ProcessingStep 
 } from '../../../lib/parser';
 import { cleanNewsletterContent } from '../../../lib/cleaners/contentCleaner';
+import logger from '../../../utils/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -24,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'Newsletter ID required' });
     }
 
-    console.log(`Reprocessing newsletter ${id} with options:`, options);
+    logger.log(`Reprocessing newsletter ${id} with options:`, options);
 
     // Get the existing newsletter
     const existingNewsletter = await NewsletterStorage.getNewsletter(id);
@@ -40,7 +41,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    console.log('Original newsletter:', {
+    logger.log('Original newsletter:', {
       id: existingNewsletter.id,
       subject: existingNewsletter.subject,
       hasRawContent: !!existingNewsletter.rawContent,
@@ -48,19 +49,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
     // Clean the content first
-    console.log('Running content cleaner...');
+    logger.log('Running content cleaner...');
     const cleaningResult = cleanNewsletterContent(existingNewsletter.rawContent);
     
     // Log cleaning results
-    console.log(`Content cleaner removed ${cleaningResult.removedItems.length} types of elements:`);
+    logger.log(`Content cleaner removed ${cleaningResult.removedItems.length} types of elements:`);
     cleaningResult.removedItems.forEach(item => {
-      console.log(`- ${item.description}: ${item.matches} matches`);
+      logger.log(`- ${item.description}: ${item.matches} matches`);
     });
 
     // Process with incremental parser
     let parseResult: ParseResult;
     try {
-      console.log('Starting incremental parsing with options:', options);
+      logger.log('Starting incremental parsing with options:', options);
       
 // Process with the new parser, preserving HTML structure
       parseResult = IncrementalNewsletterParser.parseNewsletter(cleaningResult.cleanedContent, {
@@ -80,7 +81,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         ...options // Allow overrides if needed
       });
       
-      console.log('Incremental parser success:', {
+      logger.log('Incremental parser success:', {
         originalLength: existingNewsletter.rawContent.length,
         cleanLength: parseResult.finalOutput.length,
         compressionRatio: parseResult.metadata.compressionRatio,
@@ -89,7 +90,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
       
     } catch (parseError) {
-      console.error('Incremental parser failed:', parseError);
+      logger.error('Incremental parser failed:', parseError);
       return res.status(500).json({ 
         error: 'Incremental parser failed during reprocessing',
         details: parseError instanceof Error ? parseError.message : String(parseError)
@@ -99,9 +100,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Update the newsletter with new content
     try {
       await NewsletterStorage.updateCleanContent(id, parseResult.finalOutput);
-      console.log('Successfully updated newsletter content');
+      logger.log('Successfully updated newsletter content');
     } catch (updateError) {
-      console.error('Failed to update newsletter:', updateError);
+      logger.error('Failed to update newsletter:', updateError);
       return res.status(500).json({ 
         error: 'Failed to save reprocessed content',
         details: updateError instanceof Error ? updateError.message : String(updateError)
@@ -119,7 +120,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error) {
-    console.error('Reprocessing error:', error);
+    logger.error('Reprocessing error:', error);
     res.status(500).json({ 
       error: 'Internal server error during reprocessing',
       details: error instanceof Error ? error.message : String(error)

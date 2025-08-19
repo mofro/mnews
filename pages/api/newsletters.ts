@@ -1,48 +1,99 @@
-// FILE: /pages/api/newsletters.ts (REPLACE EXISTING - Match dashboard expectations)
-import type { NextApiRequest, NextApiResponse } from 'next';
+import { NextApiRequest, NextApiResponse } from 'next';
 import { NewsletterStorage } from '../../lib/storage';
-import type { DashboardStats } from '../../lib/types';
-import { isDateToday, parseDate } from '../../utils/dateService';
+import logger from '@/utils/logger';
+import type { DashboardStats, Newsletter } from '../../lib/types';
+import { isDateToday } from '../../utils/dateService';
+
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 100;
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  
+
   try {
-    const newsletters = await NewsletterStorage.getAllNewsletters();
+    // Parse pagination parameters
+    const page = parseInt(req.query.page as string) || 1;
+    const pageSize = Math.min(
+      parseInt(req.query.pageSize as string) || DEFAULT_PAGE_SIZE,
+      MAX_PAGE_SIZE
+    );
+    const skip = (page - 1) * pageSize;
+
+    // Get all newsletters
+    const allNewsletters = await NewsletterStorage.getAllNewsletters();
     
-    // Calculate stats in the format your existing dashboard expects
-    const today = new Date();
-    const todayNewsletters = newsletters.filter(n => isDateToday(n.date));
-    const uniqueSenders = new Set(newsletters.map(n => n.sender)).size;
+    // Filter archived newsletters if needed
+    const includeArchived = req.query.includeArchived === 'true';
+    const filteredNewsletters = includeArchived 
+      ? allNewsletters 
+      : allNewsletters.filter(n => !n.metadata?.archived);
     
+    // Calculate stats from the filtered dataset
+    const todayNewsletters = filteredNewsletters.filter(n => isDateToday(n.date));
+    const uniqueSenders = new Set(filteredNewsletters.map(n => n.sender)).size;
+    
+    // Paginate the results
+    const paginatedNewsletters = filteredNewsletters.slice(skip, skip + pageSize);
+    
+    // Calculate stats for the response
     const stats: DashboardStats = {
-      // Your existing dashboard properties
-      totalNewsletters: newsletters.length,
+      totalNewsletters: filteredNewsletters.length,
       todayCount: todayNewsletters.length,
-      uniqueSenders: uniqueSenders,
-      
-      // NEW stats (for future use)
-      total: newsletters.length,
-      withCleanContent: newsletters.filter(n => n.cleanContent).length,
-      needsProcessing: newsletters.filter(n => 
-        !n.cleanContent || n.metadata.processingVersion === 'legacy-migrated'
+      uniqueSenders,
+      total: filteredNewsletters.length,
+      withCleanContent: filteredNewsletters.filter(n => n.cleanContent).length,
+      needsProcessing: filteredNewsletters.filter(n => 
+        !n.cleanContent || n.metadata?.processingVersion === 'legacy-migrated'
       ).length,
       avgWordCount: Math.round(
-        newsletters
-          .filter(n => n.metadata.wordCount)
-          .reduce((sum, n) => sum + (n.metadata.wordCount || 0), 0) / 
-        (newsletters.filter(n => n.metadata.wordCount).length || 1)
+        filteredNewsletters
+          .filter(n => n.metadata?.wordCount)
+          .reduce((sum, n) => sum + (n.metadata?.wordCount || 0), 0) / 
+        (filteredNewsletters.filter(n => n.metadata?.wordCount).length || 1)
       )
     };
     
+    // Optimize the response by removing unnecessary fields
+    const optimizedNewsletters = paginatedNewsletters.map(({ 
+      id, 
+      subject, 
+      sender, 
+      date, 
+      isNew, 
+      metadata = {},
+      cleanContent 
+    }) => ({
+      id,
+      subject,
+      sender,
+      date,
+      isNew,
+      metadata: {
+        isRead: metadata.isRead ?? false,
+        archived: metadata.archived ?? false,
+        readAt: metadata.readAt,
+        archivedAt: metadata.archivedAt
+      },
+      cleanContent: cleanContent?.substring(0, 200) // Truncate content for the list view
+    }));
+    
     res.status(200).json({
-      newsletters,
-      stats
+      newsletters: optimizedNewsletters,
+      stats,
+      pagination: {
+        page,
+        pageSize,
+        totalPages: Math.ceil(filteredNewsletters.length / pageSize),
+        totalItems: filteredNewsletters.length
+      }
     });
   } catch (error) {
-    console.error('Error fetching newsletters:', error);
-    res.status(500).json({ error: 'Failed to fetch newsletters' });
+    logger.error('Error fetching newsletters:', error);
+    res.status(500).json({ 
+      error: 'Failed to fetch newsletters',
+      details: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 }

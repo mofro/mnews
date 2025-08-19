@@ -47,7 +47,10 @@ export async function loadCurrentPattern(domain: string): Promise<LoadedPattern>
     return { version, config };
   } catch (err) {
     // Log and fall back silently – we must never break parsing.
-    console.error('[pattern] load error', domain, err);
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.error('[pattern] load error', domain, err);
+    }
     return DEFAULT_PATTERN;
   }
 }
@@ -60,6 +63,9 @@ export async function recordPatternUsage(domain: string, version: string) {
   try {
     await redis.incr(`PATTERN_USAGE:${domain}:${version}`);
   } catch (err) {
-    console.error('[pattern] usage error', domain, version, err);
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.error('[pattern] usage error', domain, version, err);
+    }
   }
 }

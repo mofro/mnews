@@ -1,5 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { format } from 'date-fns'
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useRouter } from 'next/router';
+import { format, parseISO, isBefore, subDays } from 'date-fns';
+import logger from '../utils/logger';
 import DOMPurify from 'dompurify'
 import { parseDate, formatDateSafely } from '../utils/dateService'
 import { ThemeToggle } from '../components/ThemeToggle'
@@ -86,7 +88,7 @@ export default function Dashboard() {
   const [showArchived, setShowArchived] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  const useTestData = () => {
+  const loadTestData = () => {
     setNewsletters(TEST_NEWSLETTERS)
     setStats(TEST_STATS)
     setLoading(false)
@@ -108,11 +110,11 @@ export default function Dashboard() {
           setStats(data.stats)
         } else {
           // Fallback to test data if API returns empty
-          useTestData()
+          loadTestData()
         }
       } catch (error) {
-        console.warn('Using test data due to API error:', error)
-        useTestData()
+        logger.warn('Using test data due to API error:', error)
+        loadTestData()
       } finally {
         setLoading(false)
       }
@@ -124,7 +126,7 @@ export default function Dashboard() {
         setNewsletters(data.newsletters || [])
         setStats(data.stats)
       } catch (error) {
-        console.error('Failed to load newsletters:', error)
+        logger.error('Failed to load newsletters:', error)
       } finally {
         setLoading(false)
       }
@@ -270,7 +272,7 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
 
   // Enhanced debug logging for Redis index
   useEffect(() => {
-    console.log('Newsletter item data:', {
+    logger.log('Newsletter item data:', {
       id: newsletter.id,
       metadata: newsletter.metadata,
       hasRedisIndex: !!newsletter.metadata?.redisIndex,
@@ -286,16 +288,16 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
   }, [expanded])
   
   // In NewsletterItem component, before parseISO
-  console.log('Newsletter date:', newsletter.date);
-  console.log('Date type:', typeof newsletter.date);
+  logger.log('Newsletter date:', newsletter.date);
+  logger.log('Date type:', typeof newsletter.date);
 
   // if (process.env.NODE_ENV === 'development') {
 
   //   try {
   //     const date = parseISO(newsletter.date);
-  //     console.log('Parsed date:', date);
+  //     logger.log('Parsed date:', date);
   //   } catch (error) {
-  //     console.error('Date parsing error:', error);
+  //     logger.error('Date parsing error:', error);
   //   }
   // }
 
@@ -343,7 +345,7 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
         onMarkAsRead(newsletter.id);
       }
     } catch (error) {
-      console.error('Error updating read status:', error);
+      logger.error('Error updating read status:', error);
       // Revert the UI if the API call fails
       setIsRead(!newReadStatus);
     }
@@ -376,7 +378,7 @@ function NewsletterItem({ newsletter, index, onMarkAsRead }: NewsletterItemProps
         }
       }
     } catch (error) {
-      console.error('Error updating archive status:', error);
+      logger.error('Error updating archive status:', error);
       // Revert the UI if the API call fails
       setIsArchived(!newArchivedStatus);
     }

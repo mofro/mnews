@@ -1,4 +1,4 @@
-// pages/test-article-grid.tsx
+// pages/index.tsx
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
@@ -8,9 +8,12 @@ import { format, isToday } from 'date-fns';
 import Link from 'next/link';
 import { ArticleGridCard } from '@/components/newsletter/ArticleGridCard';
 import { BentoGrid } from '@/components/layout/BentoGrid';
+import { BentoItem } from '@/components/layout/BentoItem';
 import { FullViewArticle } from '@/components/article/FullViewArticle';
+import { Pagination } from '@/components/common/Pagination';
 import newslettersData from '@/data/newsletters.json';
 import { cn } from '@/lib/utils';
+import logger from '@/utils/logger';
 
 // Extend the NewsletterData interface to include metadata fields at the top level
 interface NewsletterData {
@@ -81,22 +84,48 @@ interface TransformedArticle {
 
 // Transform the newsletter data to match the expected article format
 const transformNewsletterToArticle = (newsletter: NewsletterData, index: number): TransformedArticle => {
-  // Extract Redis ID from metadata or use the provided ID
-  const redisId = newsletter.metadata?.redisIndex || newsletter.redisIndex || newsletter.id || `newsletter-${index}`;
-  
-  return {
-    id: redisId, // Use Redis ID as the primary ID
-    redisId,     // Also include it as a separate field for reference
+  // Extract metadata fields if they exist at the top level or in the metadata object
+  const metadata = newsletter.metadata || {};
+  const isRead = newsletter.isRead || metadata.isRead || false;
+  const isArchived = newsletter.archived || metadata.archived || false;
+  const imageUrl = newsletter.imageUrl || metadata.imageUrl || '';
+  const tags = newsletter.tags || metadata.tags || [];
+  const redisId = newsletter.redisIndex || metadata.redisIndex || '';
+
+  // Use clean content if available, otherwise fall back to raw content or empty string
+  const content = newsletter.cleanContent || newsletter.rawContent || newsletter.content || '';
+
+  // Debug log the transformation
+  logger.debug('Transforming newsletter to article:', {
+    id: newsletter.id,
+    sender: newsletter.sender,
+    subject: newsletter.subject,
+    hasContent: !!newsletter.content,
+    hasRawContent: !!newsletter.rawContent,
+    hasCleanContent: !!newsletter.cleanContent,
+    metadata: newsletter.metadata
+  });
+
+  const result = {
+    id: newsletter.id || `temp-${index}`,
+    redisId,
     sender: newsletter.sender || 'Unknown Sender',
     subject: newsletter.subject || 'No Subject',
     date: newsletter.date || new Date().toISOString(),
-    content: newsletter.cleanContent || newsletter.content || '',
-    isNew: index === 0, // First item is new
-    isRead: newsletter.metadata?.isRead ?? newsletter.isRead ?? index > 0,
-    isArchived: newsletter.metadata?.archived ?? newsletter.archived ?? false,
-    tags: newsletter.metadata?.tags || newsletter.tags || [],
-    imageUrl: newsletter.metadata?.imageUrl || newsletter.imageUrl
+    content,
+    isNew: !isRead,
+    isRead,
+    isArchived,
+    tags,
+    imageUrl
   };
+  
+  logger.debug('Transformed article:', {
+    ...result,
+    contentPreview: truncateText(result.content, 50)
+  });
+  
+  return result;
 };
 
 // Development test data
@@ -114,7 +143,13 @@ interface DashboardStats {
 
 export default function TestArticleGrid() {
   const { theme, toggleTheme } = useTheme();
-  const [isClient, setIsClient] = useState(false);
+  const isClient = typeof window !== 'undefined';
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  
   const [articles, setArticles] = useState<TransformedArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -122,6 +157,16 @@ export default function TestArticleGrid() {
   const [showArchived, setShowArchived] = useState(false);
   const [fullViewArticle, setFullViewArticle] = useState<TransformedArticle | null>(null);
   const [expandedArticleId, setExpandedArticleId] = useState<string | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
+  const [showArticleDebug, setShowArticleDebug] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  
+  // Debug logging function
+  const debugLog = useCallback((...messages: any[]) => {
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug(...messages);
+    }
+  }, []);
   const [stats, setStats] = useState<DashboardStats>({
     totalNewsletters: 0,
     todayCount: 0,
@@ -133,76 +178,244 @@ export default function TestArticleGrid() {
   });
 
   // Calculate stats from articles
-  const calculateStats = (articles: typeof TEST_ARTICLES) => {
+  const calculateStats = useCallback((articles: TransformedArticle[]): DashboardStats => {
     const today = new Date().toDateString();
     const senders = new Set<string>();
+    let totalWordCount = 0;
+    let totalArticlesWithContent = 0;
+    
+    articles.forEach(article => {
+      senders.add(article.sender);
+      if (article.content && article.content.trim().length > 0) {
+        const words = article.content.split(/\s+/).filter(word => word.length > 0);
+        totalWordCount += words.length;
+        totalArticlesWithContent++;
+      }
+    });
     
     const todayCount = articles.filter(article => {
       try {
-        const date = new Date(article.date);
-        return date.toDateString() === today;
+        return new Date(article.date).toDateString() === today;
       } catch (e) {
+        logger.warn('Invalid date encountered:', article.date);
         return false;
       }
     }).length;
-
-    articles.forEach(article => senders.add(article.sender));
-
-    const totalWordCount = articles.reduce((sum, article) => {
-      const content = article.content || '';
-      const wordCount = content.split(/\s+/).filter(word => word.length > 0).length;
-      return sum + wordCount;
-    }, 0);
-
-    const avgWordCount = articles.length > 0 ? Math.round(totalWordCount / articles.length) : 0;
-
+    
     return {
       totalNewsletters: articles.length,
       todayCount,
       uniqueSenders: senders.size,
       total: articles.length,
-      withCleanContent: articles.filter(a => a.content).length,
+      withCleanContent: articles.filter(a => a.content && a.content.trim().length > 0).length,
       needsProcessing: 0, // This would come from the API in production
-      avgWordCount
+      avgWordCount: totalArticlesWithContent > 0 
+        ? Math.round(totalWordCount / totalArticlesWithContent) 
+        : 0
     };
-  };
+  }, []);
 
-  // Load articles from API
-  useEffect(() => {
-    const loadArticles = async () => {
-      try {
-        // Always fetch from API, regardless of environment
-        console.log('Fetching newsletters from API...');
-        const response = await fetch('/api/newsletters');
-        if (!response.ok) {
-          throw new Error(`API request failed with status ${response.status}`);
+  // Fetch newsletters from API with error handling and retry logic
+  const fetchNewsletters = useCallback(async (currentPage: number, currentPageSize: number) => {
+    if (!isClient) {
+      debugLog('Skipping fetch on server side');
+      return;
+    }
+
+    setLoading(true);
+    debugLog(`Fetching newsletters - Page: ${currentPage}, PageSize: ${currentPageSize}`);
+    
+    try {
+      logger.debug(`Fetching newsletters - Page: ${currentPage}, PageSize: ${currentPageSize}`);
+      
+      // Build the URL with query parameters
+      const url = new URL('/api/newsletters', window.location.origin);
+      url.searchParams.append('page', currentPage.toString());
+      url.searchParams.append('pageSize', currentPageSize.toString());
+      
+      // Add filters if they exist
+      if (searchTerm) {
+        url.searchParams.append('search', searchTerm);
+      }
+      if (selectedSender) {
+        url.searchParams.append('sender', selectedSender);
+      }
+      if (showArchived) {
+        url.searchParams.append('includeArchived', 'true');
+      }
+      
+      debugLog('API request URL:', url.toString());
+      
+      // Make the API request
+      const response = await fetch(url.toString());
+      
+      // Check if the response is ok (status in the range 200-299)
+      if (!response.ok) {
+        let errorText = 'Unknown error';
+        try {
+          const errorData = await response.json();
+          errorText = errorData.message || JSON.stringify(errorData);
+        } catch (e) {
+          errorText = await response.text() || 'No error details available';
         }
-        const data = await response.json();
-        console.log('API response:', data);
         
-        if (data.newsletters && Array.isArray(data.newsletters)) {
-          const newsletters = data.newsletters.map(transformNewsletterToArticle);
-          console.log(`Fetched ${newsletters.length} newsletters from API`);
-          setArticles(newsletters);
-          setStats(calculateStats(newsletters));
+        logger.error('API request failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          errorText: errorText
+        });
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      }
+      
+      const responseData = await response.json();
+      debugLog('API response received', {
+        hasNewsletters: Array.isArray(responseData.newsletters),
+        newsletterCount: responseData.newsletters?.length || 0,
+        firstNewsletterId: responseData.newsletters?.[0]?.id || 'none',
+        totalPages: responseData.pagination?.totalPages,
+        totalItems: responseData.pagination?.totalItems
+      });
+      
+      // Check if we have newsletters in the response
+      if (responseData.newsletters && Array.isArray(responseData.newsletters)) {
+        // Transform the newsletters to match the expected article format
+        const transformedNewsletters = responseData.newsletters.map((newsletter: any) => {
+          debugLog(`Transforming newsletter: ${newsletter.id || 'new'}`);
+          // Extract clean content or generate it from raw content
+          let cleanContent = newsletter.cleanContent || '';
+          if (!cleanContent && newsletter.rawContent) {
+            // Simple HTML to text conversion if clean content is not available
+            cleanContent = newsletter.rawContent
+              .replace(/<[^>]*>?/gm, '') // Remove HTML tags
+              .replace(/\s+/g, ' ') // Collapse multiple spaces
+              .trim();
+          }
+          
+          // Safe date parsing with fallback
+          let articleDate = newsletter.date;
+          if (articleDate) {
+            try {
+              // Try to parse the date to validate it
+              new Date(articleDate).toISOString();
+            } catch (e) {
+              logger.warn('Invalid date string, using current date', { date: articleDate, id: newsletter.id });
+              articleDate = new Date().toISOString();
+            }
+          } else {
+            articleDate = new Date().toISOString();
+          }
+          
+          return {
+            id: newsletter.id || `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            redisId: newsletter.id || '',
+            sender: newsletter.sender || 'Unknown Sender',
+            subject: newsletter.subject || 'No Subject',
+            date: articleDate,
+            content: cleanContent || 'No content available',
+            isNew: newsletter.isNew || false,
+            isRead: newsletter.isRead || newsletter.metadata?.isRead || false,
+            isArchived: newsletter.isArchived || newsletter.metadata?.archived || false,
+            tags: newsletter.tags || [],
+            imageUrl: newsletter.imageUrl || '',
+            rawContent: newsletter.rawContent || ''
+          };
+        });
+        
+        debugLog(`Transformed ${transformedNewsletters.length} newsletters`);
+        setArticles(transformedNewsletters);
+        
+        // Update pagination info
+        if (responseData.pagination) {
+          debugLog('Updating pagination:', responseData.pagination);
+          setTotalPages(responseData.pagination.totalPages || 1);
+          setTotalItems(responseData.pagination.totalItems || transformedNewsletters.length);
         } else {
-          console.warn('Unexpected API response format:', data);
-          // Fallback to test data if API response is unexpected
-          setArticles(TEST_ARTICLES);
-          setStats(calculateStats(TEST_ARTICLES));
+          debugLog('No pagination data, using defaults');
+          setTotalPages(1);
+          setTotalItems(transformedNewsletters.length);
         }
-      } catch (error) {
-        console.error('Failed to load newsletters:', error);
-        // Fallback to test data if API fails
+        
+        // Update stats if available, otherwise calculate from current data
+        if (responseData.stats) {
+          debugLog('Updating stats from API');
+          setStats({
+            totalNewsletters: responseData.stats.totalNewsletters || 0,
+            todayCount: responseData.stats.todayCount || 0,
+            uniqueSenders: responseData.stats.uniqueSenders || 0,
+            total: responseData.stats.total || 0,
+            withCleanContent: responseData.stats.withCleanContent || 0,
+            needsProcessing: responseData.stats.needsProcessing || 0,
+            avgWordCount: responseData.stats.avgWordCount || 0
+          });
+        } else {
+          debugLog('No stats data, calculating from articles');
+          // Calculate basic stats from current data
+          const calculatedStats = calculateStats(transformedNewsletters);
+          debugLog('Calculated stats');
+          setStats(calculatedStats);
+        }
+      } else {
+        debugLog('Unexpected API response format');
+        // Fallback to test data if API response is unexpected
         setArticles(TEST_ARTICLES);
         setStats(calculateStats(TEST_ARTICLES));
-      } finally {
-        setLoading(false);
+      }
+    } catch (error) {
+      debugLog('Failed to load newsletters:', error);
+      // Fallback to test data if API fails
+      setArticles(TEST_ARTICLES);
+      setStats(calculateStats(TEST_ARTICLES));
+    } finally {
+      setLoading(false);
+    }
+  }, [searchTerm, selectedSender, showArchived, calculateStats, isClient]);
+
+  // Initial load and when dependencies change
+  useEffect(() => {
+    if (!isClient) return;
+    
+    debugLog('Client-side detected, fetching articles...');
+    
+    // Fetch data from API
+    const fetchData = async () => {
+      try {
+        debugLog('Fetching articles from server...');
+        await fetchNewsletters(page, pageSize);
+      } catch (error) {
+        debugLog('Error fetching articles:', error);
+        setArticles(TEST_ARTICLES);
+        setStats(calculateStats(TEST_ARTICLES));
       }
     };
+    
+    fetchData();
+  }, [isClient, page, pageSize, fetchNewsletters, calculateStats]);
 
-    loadArticles();
-    setIsClient(true);
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    setPage(newPage);
+    window.scrollTo(0, 0);
+  };
+  
+  // Handle page size change
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    setPage(1); // Reset to first page when changing page size
+  };
+
+  // Toggle debug panel
+  const toggleDebug = useCallback(() => {
+    setShowDebug(prev => !prev);
+  }, []);
+
+  // Toggle article debug info
+  const toggleArticleDebug = useCallback(() => {
+    setShowArticleDebug(prev => !prev);
+  }, []);
+
+  // Clear debug logs
+  const clearDebugLogs = useCallback(() => {
+    setDebugLogs([]);
   }, []);
 
   // Toggle article read status
@@ -260,7 +473,7 @@ export default function TestArticleGrid() {
         }
       }
     } catch (error) {
-      console.error('Failed to update archive status:', error);
+      logger.error('Failed to update archive status:', error);
     }
   }, [articles]);
 
@@ -276,7 +489,7 @@ export default function TestArticleGrid() {
         });
       }
     } catch (error) {
-      console.error('Failed to share:', error);
+      logger.error('Failed to share:', error);
     }
   }, [articles]);
 
@@ -287,7 +500,21 @@ export default function TestArticleGrid() {
 
   // Filter articles based on search term, sender, and archive status
   const filteredArticles = useMemo(() => {
-    return articles.filter(article => {
+    logger.debug('Filtering articles:', {
+      totalArticles: articles.length,
+      searchTerm,
+      selectedSender,
+      showArchived,
+      firstArticle: articles[0] ? {
+        id: articles[0].id,
+        subject: articles[0].subject,
+        sender: articles[0].sender,
+        isArchived: articles[0].isArchived,
+        date: articles[0].date
+      } : 'No articles'
+    });
+    
+    const filtered = articles.filter(article => {
       const matchesSearch = !searchTerm || 
         article.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||
         article.sender.toLowerCase().includes(searchTerm.toLowerCase());
@@ -297,6 +524,18 @@ export default function TestArticleGrid() {
       
       return matchesSearch && matchesSender && matchesArchiveFilter;
     });
+    
+    logger.debug(`Filtered articles count: ${filtered.length}`);
+    if (filtered.length > 0) {
+      logger.debug('First filtered article:', {
+        id: filtered[0].id,
+        subject: filtered[0].subject,
+        sender: filtered[0].sender,
+        isArchived: filtered[0].isArchived,
+        date: filtered[0].date
+      });
+    }
+    return filtered;
   }, [articles, searchTerm, selectedSender, showArchived]);
 
   // Calculate size for each article based on content length
@@ -331,8 +570,50 @@ export default function TestArticleGrid() {
     );
   }
 
+  // Debug panel component
+  const DebugPanel = () => (
+    <div className={`fixed bottom-0 right-0 w-full max-w-md max-h-96 overflow-auto bg-gray-800 text-green-100 text-xs p-2 z-50 border-t-2 border-green-500`}>
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="font-mono font-bold">Debug Console</h3>
+        <div className="space-x-2">
+          <button 
+            onClick={clearDebugLogs}
+            className="px-2 py-1 bg-gray-700 rounded hover:bg-gray-600 text-xs"
+          >
+            Clear
+          </button>
+          <button 
+            onClick={toggleDebug}
+            className="px-2 py-1 bg-red-600 rounded hover:bg-red-700 text-xs"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+      <div className="font-mono space-y-1">
+        {debugLogs.map((log, i) => (
+          <div key={i} className="border-b border-gray-700 pb-1">
+            {log.split('\n').map((line, j) => (
+              <div key={`${i}-${j}`} className="whitespace-pre-wrap break-words">{line}</div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   return (
     <div className={`min-h-screen ${theme === 'dark' ? 'dark bg-gray-900' : 'bg-gray-100'}`}>
+      {/* Debug toggle button */}
+      <button 
+        onClick={toggleDebug}
+        className="fixed bottom-4 right-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full w-10 h-10 flex items-center justify-center z-40 shadow-lg"
+        title="Toggle Debug Console"
+      >
+        <span className="text-xl">{showDebug ? '×' : '…'}</span>
+      </button>
+      
+      {showDebug && <DebugPanel />}
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <header className="sticky top-0 z-10 mb-8 pt-4 pb-2 -mx-4 px-4 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700">
@@ -485,31 +766,116 @@ export default function TestArticleGrid() {
                 </div>
               </div>
             ) : (
-              <BentoGrid columns={[1, 2, 2, 3]} gap={1.5} className="mx-auto px-4">
-                {filteredArticles.map((article) => (
-                  <div 
-                    key={article.id}
-                    className="h-full"
-                    onClick={() => handleExpandArticle(article)}
-                  >
-                    <ArticleGridCard
-                      id={article.id}
-                      sender={article.sender}
-                      subject={article.subject}
-                      date={article.date}
-                      content={article.content}
-                      imageUrl={article.imageUrl}
-                      isNew={article.isNew}
-                      isRead={article.isRead}
-                      isArchived={article.isArchived}
-                      tags={article.tags}
-                      onToggleRead={() => handleToggleRead(article.id)}
-                      onToggleArchive={() => handleToggleArchive(article.id)}
-                      onShare={() => handleShare(article.id)}
-                    />
+              <div className="space-y-8">
+                <div className="w-full max-w-7xl mx-auto px-4">
+                  <div className="mb-4 flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">Articles</h3>
+                    <button 
+                      onClick={toggleArticleDebug}
+                      className="text-xs px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600"
+                    >
+                      {showArticleDebug ? 'Hide' : 'Show'} Debug Info
+                    </button>
                   </div>
-                ))}
-              </BentoGrid>
+                  {showArticleDebug && (
+                    <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                      <h3 className="font-bold text-blue-800 dark:text-blue-200">Debug - Articles to Render:</h3>
+                      <div className="text-sm text-blue-700 dark:text-blue-300">
+                        <p>Total articles: {filteredArticles.length}</p>
+                        {filteredArticles.length > 0 && (
+                          <pre className="mt-2 p-2 bg-black/5 dark:bg-white/5 rounded overflow-x-auto text-xs">
+                            {JSON.stringify(filteredArticles.map(a => ({
+                              id: a.id,
+                              subject: a.subject,
+                              sender: a.sender,
+                              date: a.date,
+                              contentLength: a.content?.length,
+                              hasImage: !!a.imageUrl,
+                              isRead: a.isRead,
+                              isArchived: a.isArchived
+                            })), null, 2)}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <BentoGrid columns={[1, 2, 2, 3]} gap={1.5}>
+                    {filteredArticles.map((article) => {
+                      logger.debug('Rendering article in grid:', {
+                        id: article.id,
+                        subject: article.subject,
+                        contentLength: article.content?.length,
+                        hasImage: !!article.imageUrl
+                      });
+                      return (
+                        <BentoItem key={article.id}>
+                          <div onClick={() => handleExpandArticle(article)} className="h-full">
+                            <ArticleGridCard
+                              id={article.id}
+                              sender={article.sender}
+                              subject={article.subject}
+                              date={article.date}
+                              content={article.content}
+                              imageUrl={article.imageUrl}
+                              isNew={article.isNew}
+                              isRead={article.isRead}
+                              isArchived={article.isArchived}
+                              tags={article.tags}
+                              onToggleRead={() => handleToggleRead(article.id)}
+                              onToggleArchive={() => handleToggleArchive(article.id)}
+                              onShare={() => handleShare(article.id)}
+                              className="h-full"
+                            />
+                          </div>
+                        </BentoItem>
+                      );
+                    })}
+                  </BentoGrid>
+                </div>
+                
+                {/* Pagination */}
+                <div className="mt-8 px-4">
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="text-sm text-gray-500 dark:text-gray-400">
+                      Showing{' '}
+                      <span className="font-medium">
+                        {(page - 1) * pageSize + 1}
+                      </span>
+                      {' to '}
+                      <span className="font-medium">
+                        {Math.min(page * pageSize, totalItems)}
+                      </span>
+                      {' of '}
+                      <span className="font-medium">
+                        {totalItems}
+                      </span>
+                      {' results'}
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={pageSize}
+                        onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                        className="text-sm rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value={10}>10 per page</option>
+                        <option value={20}>20 per page</option>
+                        <option value={50}>50 per page</option>
+                      </select>
+                      
+                      <Pagination
+                        currentPage={page}
+                        totalPages={totalPages}
+                        totalItems={totalItems}
+                        pageSize={pageSize}
+                        onPageChange={handlePageChange}
+                        onPageSizeChange={handlePageSizeChange}
+                        className="ml-4"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}

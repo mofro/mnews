@@ -85,3 +85,8 @@ Thumbs.db
 
 # Sentry
 .sentryclirc
+# Ignore Windsurf rules files
+.windsurf/rules/team-intelligence-framework.md
+
+# Ignore all Windsurf rules files
+.windsurf/rules/

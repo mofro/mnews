@@ -1,6 +1,14 @@
 // FILE: /pages/api/migrate.ts (CREATE NEW - Optional testing endpoint)
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { NewsletterStorage } from '../../lib/storage';
+// Inline logger implementation to avoid path resolution issues
+const logger = {
+  log: (...args: any[]) => console.log(...args),
+  error: (...args: any[]) => console.error(...args),
+  warn: (...args: any[]) => console.warn(...args),
+  info: (...args: any[]) => console.info(...args),
+  debug: (...args: any[]) => console.debug(...args)
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -8,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    console.log('Triggering newsletter migration...');
+    logger.info('Triggering newsletter migration...');
     
     // Migration happens automatically when newsletters are fetched
     const newsletters = await NewsletterStorage.getAllNewsletters();
@@ -26,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       stats: migrationStats
     });
   } catch (error) {
-    console.error('Migration error:', error);
+    logger.error('Migration error:', error);
     res.status(500).json({ 
       error: 'Migration failed',
       details: error instanceof Error ? error.message : 'Unknown error'

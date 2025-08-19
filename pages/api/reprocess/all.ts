@@ -3,8 +3,9 @@
 
 import { NextApiRequest, NextApiResponse } from 'next';
 import { NewsletterStorage } from '../../../lib/storage';
-import { NewsletterParser } from '../../../lib/parser';
 import { cleanNewsletterContent } from '../../../lib/cleaners/contentCleaner';
+import { IncrementalNewsletterParser, NewsletterParser } from '../../../lib/parser';
+import logger from '../../../utils/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -25,11 +26,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    console.log('Starting bulk reprocessing with options:', options);
+    logger.log('Starting bulk reprocessing with options:', options);
 
     // Get all newsletters
     const newsletters = await NewsletterStorage.getAllNewsletters();
-    console.log(`Found ${newsletters.length} newsletters`);
+    logger.log(`Found ${newsletters.length} newsletters`);
 
     // Filter to only those with rawContent and limit count
     const processableNewsletters = newsletters
@@ -43,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    console.log(`Reprocessing ${processableNewsletters.length} newsletters with enhanced parser...`);
+    logger.log(`Reprocessing ${processableNewsletters.length} newsletters with enhanced parser...`);
 
     const results = [];
     let successCount = 0;
@@ -51,7 +52,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     for (const newsletter of processableNewsletters) {
       try {
-        console.log(`Processing newsletter ${newsletter.id}: ${newsletter.subject}`);
+        logger.info(`Processing newsletter ${newsletter.id}: ${newsletter.subject}`);
 
         // Clean the content first
         const cleanedResult = cleanNewsletterContent(newsletter.rawContent);
@@ -106,10 +107,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         successCount++;
-        console.log(`✅ Success: ${newsletter.id} (${parseResult.metadata.compressionRatio} compression)`);
+        logger.info(`✅ Success: ${newsletter.id} (${parseResult.metadata.compressionRatio} compression)`);
 
       } catch (error) {
-        console.error(`❌ Error processing ${newsletter.id}:`, error);
+        logger.error(`❌ Error processing ${newsletter.id}:`, error);
         results.push({
           newsletterId: newsletter.id,
           subject: newsletter.subject,
@@ -123,7 +124,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    console.log(`Bulk reprocessing complete: ${successCount} success, ${errorCount} errors`);
+    logger.info(`Bulk reprocessing complete: ${successCount} success, ${errorCount} errors`);
 
     // ENHANCED: Provide detailed summary statistics
     const successfulResults = results.filter(r => r.success);
@@ -156,7 +157,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error) {
-    console.error('Bulk reprocessing error:', error);
+    logger.error('Bulk reprocessing error:', error);
     res.status(500).json({ 
       error: 'Internal server error during bulk reprocessing',
       details: error instanceof Error ? error.message : String(error)

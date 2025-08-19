@@ -111,7 +111,7 @@ export class FootnoteLinkProcessor {
             : link.context;
         return `<div class="footnote-item" id="footnote-${link.id}">
   <a href="#ref-${link.id}" class="footnote-back">[${link.id}]</a>
-  <span class="footnote-context">\"${preview}\"</span>
+  <span class="footnote-context">"${preview}"</span>
   <a href="${link.url}" target="_blank" rel="noopener noreferrer" class="footnote-link">${
           link.linkText
         } (${link.domain})</a>

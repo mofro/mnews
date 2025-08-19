@@ -2,6 +2,7 @@
 import { Newsletter } from './types';
 import { parseDate } from '../utils/dateService';
 import { getRedisClient } from './redis';
+import logger from '../utils/logger';
 
 // Use the Redis client wrapper
 const redis = getRedisClient();
@@ -13,12 +14,12 @@ export class NewsletterStorage {
   
   static async getAllNewsletters(): Promise<Newsletter[]> {
     try {
-      console.log('[STORAGE] Fetching all newsletter IDs from Redis...');
+      logger.debug('Fetching all newsletter IDs from Redis...');
       const ids = await redis.lrange(this.NEWSLETTER_IDS_KEY, 0, -1);
-      console.log(`[STORAGE] Found ${ids.length} newsletter IDs`);
+      logger.debug(`Found ${ids.length} newsletter IDs`);
       
       if (!ids || ids.length === 0) {
-        console.log('[STORAGE] No newsletter IDs found');
+        logger.debug('No newsletter IDs found');
         return [];
       }
       
@@ -27,15 +28,15 @@ export class NewsletterStorage {
       for (const id of ids) {
         try {
           const key = `${this.NEWSLETTER_PREFIX}${id}`;
-          console.log(`[STORAGE] Fetching newsletter with key: ${key}`);
+          logger.debug(`Fetching newsletter with key: ${key}`);
           const data = await redis.get(key);
           
           if (!data) {
-            console.warn(`[STORAGE] No data found for key: ${key}`);
+            logger.warn(`No data found for key: ${key}`);
             continue;
           }
           
-          console.log(`[STORAGE] Data type for ${key}:`, typeof data);
+          logger.debug(`Data type for ${key}:`, typeof data);
           
           try {
             let newsletter: Newsletter;
@@ -44,13 +45,13 @@ export class NewsletterStorage {
             try {
               newsletter = (typeof data === 'string' ? JSON.parse(data) : data) as Newsletter;
             } catch (parseError) {
-              console.error(`[STORAGE] Error parsing newsletter data for key ${key}:`, parseError);
+              logger.error(`Error parsing newsletter data for key ${key}:`, parseError);
               continue; // Skip this newsletter if we can't parse it
             }
             
             // AUTO-MIGRATION: Handle existing newsletters without new fields
             if (!newsletter.rawContent && newsletter.content) {
-              console.log(`[STORAGE] Auto-migrating newsletter ${id}`);
+              logger.info(`Auto-migrating newsletter ${id}`);
               newsletter.rawContent = newsletter.content;
               newsletter.cleanContent = newsletter.content;
               newsletter.metadata = {
@@ -63,9 +64,9 @@ export class NewsletterStorage {
               // Save migrated version back to Redis
               try {
                 await redis.set(key, JSON.stringify(newsletter));
-                console.log(`[STORAGE] Successfully migrated newsletter ${id}`);
+                logger.info(`Successfully migrated newsletter ${id}`);
               } catch (saveError) {
-                console.error(`[STORAGE] Error saving migrated newsletter ${id}:`, saveError);
+                logger.error(`Error saving migrated newsletter ${id}:`, saveError);
                 // Continue with the in-memory version even if save fails
               }
             }
@@ -86,17 +87,17 @@ export class NewsletterStorage {
             
             newsletters.push(newsletter);
           } catch (processError) {
-            console.error(`[STORAGE] Error processing newsletter ${id}:`, processError);
+            logger.error(`Error processing newsletter ${id}:`, processError);
             // Continue with the next newsletter if there's an error processing this one
           }
         } catch (error) {
-          console.error(`[STORAGE] Error loading newsletter ${id}:`, error);
+          logger.error(`Error loading newsletter ${id}:`, error);
           // Continue with the next newsletter if there's an error loading this one
         }
       }
       
       // Sort by date (newest first) - preserve your existing ordering
-      console.log(`[STORAGE] Sorting ${newsletters.length} newsletters by date`);
+      logger.debug(`Sorting ${newsletters.length} newsletters by date`);
       return newsletters.sort((a, b) => {
         try {
           const dateA = parseDate(a.date);
@@ -109,12 +110,12 @@ export class NewsletterStorage {
           
           return dateB.getTime() - dateA.getTime();
         } catch (sortError) {
-          console.error('[STORAGE] Error sorting newsletters:', sortError);
+          logger.error('Error sorting newsletters:', sortError);
           return 0; // Keep original order if there's a sorting error
         }
       });
     } catch (error) {
-      console.error('[STORAGE] Critical error in getAllNewsletters:', error);
+      logger.error('Critical error in getAllNewsletters:', error);
       throw error; // Re-throw to be handled by the API route
     }
     
@@ -150,7 +151,7 @@ export class NewsletterStorage {
       
       return newsletter;
     } catch (error) {
-      console.error(`Error fetching newsletter ${id}:`, error);
+      logger.error(`Error fetching newsletter ${id}:`, error);
       return null;
     }
   }  
