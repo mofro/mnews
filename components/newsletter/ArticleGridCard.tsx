@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { format } from 'date-fns';
 import { extractFeaturedImage, getArticleImage } from '@/utils/imageUtils';
-import { Bookmark, BookmarkCheck, Share2, Eye, EyeOff, Archive, ArchiveRestore } from 'lucide-react';
+import { Share2, Eye, EyeOff, Archive, ArchiveRestore } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
 interface ArticleGridCardProps {
@@ -21,9 +21,9 @@ interface ArticleGridCardProps {
   tags?: string[];
   newsletterId?: string;
   className?: string;
-  onToggleRead?: (id: string) => void;
-  onToggleArchive?: (id: string) => void;
-  onShare?: (id: string) => void;
+  onToggleRead?: (_: string) => void;
+  onToggleArchive?: (_: string) => void;
+  onShare?: (_: string) => void;
 }
 
 export function ArticleGridCard({
@@ -37,7 +37,6 @@ export function ArticleGridCard({
   isRead = false,
   isArchived = false,
   tags = [],
-  newsletterId,
   className = '',
   onToggleRead,
   onToggleArchive,
@@ -45,32 +44,9 @@ export function ArticleGridCard({
 }: ArticleGridCardProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl || null);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
   const contentRef = useRef<HTMLDivElement>(null);
   const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
   
-  // Update content height when expanded state or content changes
-  useEffect(() => {
-    if (!contentRef.current) return;
-    
-    // Reset height to auto to measure natural height
-    contentRef.current.style.height = 'auto';
-    const height = contentRef.current.scrollHeight;
-    
-    // Set initial height (0 if collapsed)
-    contentRef.current.style.height = isExpanded ? `${height}px` : '0';
-    
-    // Store the height for reference
-    setContentHeight(height);
-    
-    // Cleanup function
-    return () => {
-      if (contentRef.current) {
-        contentRef.current.style.height = 'auto';
-      }
-    };
-  }, [isExpanded, content]);
-
   // Extract featured image from content
   const featuredImageUrl = useMemo(() => {
     if (typeof window !== 'undefined' && content) {
@@ -91,7 +67,6 @@ export function ArticleGridCard({
   const sanitizedContent = useMemo(() => {
     if (!content) return '';
     
-    // First, clean the content
     // Only sanitize on client side
     if (typeof window === 'undefined') return '';
     
@@ -113,7 +88,7 @@ export function ArticleGridCard({
 
     // Process images to ensure they load properly
     cleanContent = cleanContent.replace(
-      /<img([^>]*)src=\"([^"]*)\"/g, 
+      /<img([^>]*)src="([^"]*)"/g, 
       (match, attrs, src) => {
         // Convert relative URLs to absolute if needed
         let imageUrl = src;
@@ -129,6 +104,64 @@ export function ArticleGridCard({
 
     return cleanContent;
   }, [content]);
+  
+  // Determine image source on the client side only
+  const [imageSource, setImageSource] = useState<string | null>(null);
+  
+  // Debug logging - after all variable declarations (commented out for production)
+  /*
+  useEffect(() => {
+    console.log('ArticleGridCard mounted/updated:', {
+      id,
+      subject,
+      sender,
+      date,
+      contentLength: content?.length,
+      hasImage: !!initialImageUrl,
+      isNew,
+      isRead,
+      isArchived,
+      tags,
+      hasContent: !!content,
+      hasSanitizedContent: !!sanitizedContent,
+      imageSource,
+      featuredImageUrl
+    });
+    
+    // Log if content is empty
+    if (!content) {
+      console.warn('ArticleGridCard has no content:', { id, subject });
+    }
+    
+    // Log if sanitized content is empty
+    if (!sanitizedContent) {
+      console.warn('ArticleGridCard has no sanitized content:', { id, subject });
+    }
+  }, [id, subject, sender, date, content, initialImageUrl, isNew, isRead, isArchived, tags, sanitizedContent, imageSource, featuredImageUrl]);
+  */
+  
+  // Update content height when expanded state or content changes
+  useEffect(() => {
+    const contentElement = contentRef.current;
+    if (!contentElement) return;
+    
+    // Reset height to auto to measure natural height
+    contentElement.style.height = 'auto';
+    const height = contentElement.scrollHeight;
+    
+    // Set initial height (0 if collapsed)
+    contentElement.style.height = isExpanded ? `${height}px` : '0';
+    
+    // Store the height for reference
+    setContentHeight(height);
+    
+    // Cleanup function
+    return () => {
+      if (contentElement) {
+        contentElement.style.height = 'auto';
+      }
+    };
+  }, [isExpanded, content]);
 
   // Extract featured image if not provided
   useEffect(() => {
@@ -152,10 +185,6 @@ export function ArticleGridCard({
 
   const formattedDate = format(safeDate(date), 'MMM d, yyyy');
 
-  const handleImageError = useCallback(() => {
-    setImageUrl(null);
-  }, []);
-
   const handleToggleRead = useCallback(() => {
     onToggleRead?.(id);
   }, [id, onToggleRead]);
@@ -170,7 +199,16 @@ export function ArticleGridCard({
         title: subject,
         text: `Check out this article: ${subject}`,
         url: window.location.href,
-      }).catch(console.error);
+      }).catch((error) => {
+        // Log the error for debugging purposes
+        if (process.env.NODE_ENV === 'development') {
+          import('@/utils/logger').then((loggerModule) => {
+            const logger = loggerModule.default;
+            logger.error('Error sharing article:', error);
+          });
+        }
+        // Optionally, you could show an error message to the user here
+      });
     } else {
       onShare?.(id);
     }
@@ -235,19 +273,8 @@ export function ArticleGridCard({
     }
   }, [isExpanded, id]);
 
-  const handleMouseEnter = useCallback(() => {
-    setIsHovered(true);
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    setIsHovered(false);
-  }, []);
-
-  // Determine image source on the client side only
-  const [imageSource, setImageSource] = useState<string | null>(null);
-  
+  // Set image source based on available images
   useEffect(() => {
-    // First try explicit imageUrl, then featuredImage, then generate from title
     if (imageUrl) {
       setImageSource(imageUrl);
     } else if (featuredImageUrl) {
@@ -273,17 +300,20 @@ export function ArticleGridCard({
   };
 
   return (
-    <article
-      id={`card-${id}`}
-      className={`group relative flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-sm transition-all hover:shadow-md dark:bg-gray-800 ${
-        isArchived ? 'bg-yellow-50/50 dark:bg-yellow-900/20' : ''
-      } ${getSizeClass()} ${className}`}
-      aria-expanded={isExpanded}
-    >
-      <div 
-        className={`relative h-48 w-full cursor-pointer overflow-hidden ${!imageSource ? 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800' : ''}`}
-        onClick={handleImageClick}
+    <div className={`group relative flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-sm transition-all hover:shadow-md dark:bg-gray-800 ${
+      isArchived ? 'bg-yellow-50/50 dark:bg-yellow-900/20' : ''
+    } ${getSizeClass()} ${className}`}>
+      <article
+        id={`card-${id}`}
+        className="h-full flex flex-col"
       >
+        <div 
+          className={`relative h-48 w-full cursor-pointer overflow-hidden ${!imageSource ? 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800' : ''}`}
+          onClick={handleImageClick}
+          role="button"
+          aria-expanded={isExpanded}
+          aria-controls={`card-${id}-content`}
+        >
         {imageSource ? (
           <Image
             src={imageSource}
@@ -401,81 +431,41 @@ export function ArticleGridCard({
               ))}
             </div>
           )}
+        </div>
 
-          {/* Article ID - subtle and centered */}
-        <div className="text-center mb-2">
+        <div className="text-center mb-2 mt-2">
           <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
             ID: {id}
           </span>
         </div>
         
-        <div className="flex items-center justify-between text-sm">
-            <button 
-              className="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsExpanded(!isExpanded);
-              }}
-            >
-              {isExpanded ? (
-                <>
-                  <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                  </svg>
-                  Show less
-                </>
-              ) : (
-                <>
-                  <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                  Read more
-                </>
-              )}
-            </button>
-            
-            <div className="flex items-center space-x-3">
-              <button 
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleToggleRead();
-                }}
-                aria-label={isRead ? 'Mark as unread' : 'Mark as read'}
-              >
-                {isRead ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </button>
-              
-              <button 
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleToggleArchive();
-                }}
-                aria-label={isArchived ? 'Unarchive' : 'Archive'}
-              >
-                {isArchived ? (
-                  <ArchiveRestore className="h-4 w-4" />
-                ) : (
-                  <Archive className="h-4 w-4" />
-                )}
-              </button>
-              
-              <button 
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                onClick={handleShare}
-                aria-label="Share"
-              >
-                <Share2 className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
+        <div className="flex items-center justify-between text-sm mt-auto">
+          <button 
+            className="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+            onClick={(e) => {
+              e.stopPropagation();
+              setIsExpanded(!isExpanded);
+            }}
+          >
+            {isExpanded ? (
+              <>
+                <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                </svg>
+                Show less
+              </>
+            ) : (
+              <>
+                <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+                Read more
+              </>
+            )}
+          </button>
         </div>
-      </div>
-    </article>
+        </div>
+      </article>
+    </div>
   );
 }

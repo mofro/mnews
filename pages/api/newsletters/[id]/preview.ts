@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { updateNewsletterContent } from '@/lib/redis';
+import logger from '../../../../utils/logger';
 
 type PreviewRequest = NextApiRequest & {
   query: {
@@ -47,7 +48,7 @@ export default async function handler(
     });
     
   } catch (error) {
-    console.error('Error updating newsletter preview:', error);
+    logger.error('Error updating newsletter preview:', error);
     return res.status(500).json({
       success: false,
       message: 'Failed to update newsletter preview',

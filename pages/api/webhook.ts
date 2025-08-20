@@ -1,8 +1,8 @@
-
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Redis } from '@upstash/redis';
 import { NewsletterParser, ParseResult } from '../../lib/parser';
 import { cleanNewsletterContent } from '../../lib/cleaners/contentCleaner';
+import logger from '../../utils/logger';
 
 // Initialize Redis connection using existing KV variables (your existing config)
 if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
@@ -42,7 +42,7 @@ function htmlToText(html: string): string {
   if (!html) return '';
   
   // Remove HTML tags (ES2017 compatible)
-  let text = html
+  const text = html
     .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style blocks
     .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove scripts
     .replace(/<[^>]+>/g, ' ') // Remove all HTML tags
@@ -78,7 +78,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Extract newsletter data from request (your existing field names)
     const { subject, body, from, date } = req.body;
     
-    console.log('Newsletter received:', { subject, from, date });
+    logger.log('Newsletter received:', { subject, from, date });
 
     // UPDATED: Handle both original content and cleaned content
     const originalContent = body || '';
@@ -90,9 +90,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const cleanedResult = cleanNewsletterContent(originalContent);
       
       // Log what was removed during cleaning
-      console.log(`Initial cleaning removed ${cleanedResult.removedItems.length} elements:`);
+      logger.log(`Initial cleaning removed ${cleanedResult.removedItems.length} elements:`);
       cleanedResult.removedItems.forEach(item => {
-        console.log(`- ${item.description}: ${item.matches} matches`);
+        logger.log(`- ${item.description}: ${item.matches} matches`);
       });
       
       // Process with the parser, preserving HTML structure but allowing some cleaning
@@ -128,17 +128,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       
       // Update processing version with our custom version
       processingVersion = `3.0.0-cleaner-${parseResult.metadata.processingVersion}`;
-      console.log('Enhanced parser success:', {
+      logger.log('Enhanced parser success:', {
         originalLength: originalContent.length,
         cleanLength: cleanContent.length,
         compressionRatio: parseResult.metadata.compressionRatio
       });
     } catch (parseError) {
-      console.error('Parser failed, using original HTML:', parseError);
+      logger.error('Parser failed, using original HTML:', parseError);
       cleanContent = originalContent;  // Fall back to original HTML if parsing fails
     }
     
-    console.log('Content cleaned, length:', cleanContent.length);
+    logger.log('Content cleaned, length:', cleanContent.length);
     
     // UPDATED: Create newsletter object with additive content model
     const newsletter: Newsletter = {
@@ -164,24 +164,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     };
 
     // Your existing Redis storage pattern (preserved exactly)
-    console.log('About to save newsletter:', newsletter);
+    logger.log('About to save newsletter:', newsletter);
     
     // Use your existing Redis list pattern
-    console.log('Saving newsletter ID to list...');
+    logger.log('Saving newsletter ID to list...');
     const listResult = await redis.lpush('newsletter_ids', newsletter.id);
-    console.log('List push result:', listResult);
+    logger.log('List push result:', listResult);
     
     // Store the full newsletter data
-    console.log('Saving newsletter data...');
+    logger.log('Saving newsletter data...');
     const setResult = await redis.set(`newsletter:${newsletter.id}`, JSON.stringify(newsletter));
-    console.log('Set result:', setResult);
+    logger.log('Set result:', setResult);
 
     // Verify the data was saved
-    console.log('Verifying saved data...');
+    logger.log('Verifying saved data...');
     const savedData = await redis.get(`newsletter:${newsletter.id}`);
-    console.log('Retrieved data:', savedData);
+    logger.log('Retrieved data:', savedData);
 
-    console.log('Newsletter saved to Redis:', newsletter.id);
+    logger.log('Newsletter saved to Redis:', newsletter.id);
 
     // Your existing response format (preserved)
     res.status(200).json({ 
@@ -190,7 +190,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error) {
-    console.error('Webhook error:', error);
+    logger.error('Webhook error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 }

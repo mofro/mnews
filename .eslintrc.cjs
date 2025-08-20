@@ -8,6 +8,7 @@ module.exports = {
   extends: [
     'eslint:recommended',
     'plugin:react/recommended',
+    'plugin:react-hooks/recommended',
     'plugin:@typescript-eslint/recommended',
     'next/core-web-vitals',
     'prettier',
@@ -22,21 +23,25 @@ module.exports = {
   },
   plugins: ['react', '@typescript-eslint', 'react-hooks'],
   rules: {
-    // Disable all rules that might prevent the build
-    'no-console': 'off',
+    'no-console': 'warn',
     'no-unused-vars': 'off',
+    '@typescript-eslint/no-unused-vars': [
+      'warn',
+      {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+        caughtErrorsIgnorePattern: '^_',
+      },
+    ],
     'react/react-in-jsx-scope': 'off',
     'react/prop-types': 'off',
-    'react-hooks/rules-of-hooks': 'off',
-    'react-hooks/exhaustive-deps': 'off',
     '@typescript-eslint/no-explicit-any': 'off',
-    '@typescript-eslint/ban-ts-comment': 'off',
-    'prefer-const': 'off',
-    '@typescript-eslint/no-unused-vars': 'off',
-    'no-useless-escape': 'off',
-    'jsx-a11y/role-supports-aria-props': 'off',
-    'no-misleading-character-class': 'off',
-    '@next/next/no-img-element': 'off',
+    '@typescript-eslint/no-var-requires': 'off',
+    'react/display-name': 'off',
+    '@typescript-eslint/explicit-function-return-type': 'off',
+    '@typescript-eslint/explicit-module-boundary-types': 'off',
+    '@typescript-eslint/no-empty-function': 'warn',
+    '@typescript-eslint/no-non-null-assertion': 'off',
   },
   settings: {
     react: {

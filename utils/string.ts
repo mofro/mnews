@@ -69,12 +69,24 @@ export const extractPreviewText = (html: string): { cleanedContent: string; prev
 export const removePreviewPadding = (text: string | null | undefined): string => {
   if (!text) return '';
   
-  // Common preview padding patterns (HTML entities and spaces)
-  const previewPatterns = [
-    /(&#847;|&[^;]+;|\s)+/g,  // Common preview padding patterns
-    /^[\s\u200B\u200C\u200D\uFEFF]+/, // Leading whitespace and zero-width spaces
-    /[\s\u200B\u200C\u200D\uFEFF]+$/, // Trailing whitespace and zero-width spaces
-  ];
+  // First, handle the common preview padding patterns
+  let cleanedText = text.replace(/(&#847;|&[^;]+;|\s)+/g, ' ');
   
-  return previewPatterns.reduce((str, pattern) => str.replace(pattern, ' '), text).trim();
+  // Then handle leading and trailing whitespace and zero-width spaces
+  // Using a more explicit approach to avoid misleading character classes
+  const zeroWidthSpaces = ['\u200B', '\u200C', '\u200D', '\uFEFF'];
+  
+  // Remove leading whitespace and zero-width spaces
+  cleanedText = cleanedText.replace(/^\s+/, ' ');
+  zeroWidthSpaces.forEach(char => {
+    cleanedText = cleanedText.startsWith(char) ? cleanedText.substring(1) : cleanedText;
+  });
+  
+  // Remove trailing whitespace and zero-width spaces
+  cleanedText = cleanedText.replace(/\s+$/, ' ');
+  zeroWidthSpaces.forEach(char => {
+    cleanedText = cleanedText.endsWith(char) ? cleanedText.slice(0, -1) : cleanedText;
+  });
+  
+  return cleanedText.trim();
 };

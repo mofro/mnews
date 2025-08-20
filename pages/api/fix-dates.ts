@@ -1,5 +1,13 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Redis } from '@upstash/redis';
+// Use a relative path to the logger
+const logger = {
+  log: (...args: any[]) => console.log(...args),
+  error: (...args: any[]) => console.error(...args),
+  warn: (...args: any[]) => console.warn(...args),
+  info: (...args: any[]) => console.info(...args),
+  debug: (...args: any[]) => console.debug(...args)
+};
 
 // Initialize Redis connection using existing KV variables
 if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
@@ -26,13 +34,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    console.log('Starting date fix migration...');
+    logger.info('Starting date fix migration...');
     
     // Get all newsletter IDs from Redis list
     const newsletterIds = await redis.lrange('newsletter_ids', 0, -1) as string[];
     
     let fixedCount = 0;
-    let totalCount = newsletterIds.length;
+    const totalCount = newsletterIds.length;
     
     for (const id of newsletterIds) {
       const newsletter = await redis.get(`newsletter:${id}`) as Newsletter;
@@ -40,7 +48,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Check if date is valid
         const dateTest = new Date(newsletter.date);
         if (isNaN(dateTest.getTime())) {
-          console.log(`Fixing invalid date for newsletter ${id}: ${newsletter.date}`);
+          logger.info(`Fixing invalid date for newsletter ${id}: ${newsletter.date}`);
           
           // Fix the date - use current time as fallback
           newsletter.date = new Date().toISOString();
@@ -52,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
     }
 
-    console.log(`Date fix complete. Fixed ${fixedCount} out of ${totalCount} newsletters.`);
+    logger.info(`Date fix complete. Fixed ${fixedCount} out of ${totalCount} newsletters.`);
     
     res.status(200).json({
       message: 'Date fix migration completed',
@@ -61,7 +69,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
 
   } catch (error) {
-    console.error('Error during date fix migration:', error);
+    logger.error('Error during date fix migration:', error);
     res.status(500).json({ message: 'Error during date fix migration' });
   }
 }

@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { format } from 'date-fns';
+import { useRouter } from 'next/router';
+import logger from '../utils/logger';
 import { useTheme } from '@/context/ThemeContext';
 import { BentoGrid, BentoItem } from '@/components/layout/BentoGrid';
 
@@ -39,7 +42,6 @@ const Card = ({ newsletter, className = '' }: CardProps) => {
   
   const shareNewsletter = (e: React.MouseEvent) => {
     e.stopPropagation();
-    const shareText = `${newsletter.subject} - ${newsletter.sender}`;
     const shareUrl = `${window.location.origin}/newsletter/${newsletter.id}`;
     
     if (navigator.share) {
@@ -47,11 +49,11 @@ const Card = ({ newsletter, className = '' }: CardProps) => {
         title: newsletter.subject,
         text: newsletter.rawContent || newsletter.subject,
         url: shareUrl,
-      }).catch(console.error);
+      }).catch(logger.error);
     } else {
       // Fallback for browsers that don't support Web Share API
       navigator.clipboard.writeText(shareUrl).then(() => {
-        alert('Link copied to clipboard!');
+        logger.log('Link copied to clipboard!');
       });
     }
   };
@@ -132,7 +134,7 @@ const Card = ({ newsletter, className = '' }: CardProps) => {
               {formattedDate}
             </time>
             {newsletter.isNew && (
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900 dark:text-blue-200">
                 New
               </span>
             )}
@@ -458,7 +460,7 @@ export default function TestGrid() {
           setNewsletters(newsletters);
           setStats(calculateStats(newsletters));
         } catch (error) {
-          console.error('Failed to load newsletters:', error);
+          logger.log('Failed to load newsletters:', error);
           // Fallback to test data if API fails
           setNewsletters(TEST_NEWSLETTERS);
           setStats(calculateStats(TEST_NEWSLETTERS));

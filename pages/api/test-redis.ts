@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { testRedisConnection } from '@/lib/redis';
+import logger from '../../utils/logger';
 
 export default async function handler(
   req: NextApiRequest,
@@ -28,7 +29,7 @@ export default async function handler(
 
     return res.status(connectionTest.success ? 200 : 500).json(response);
   } catch (error) {
-    console.error('Error testing Redis connection:', error);
+    logger.error('Error testing Redis connection:', error);
     return res.status(500).json({
       success: false,
       message: 'Error testing Redis connection',

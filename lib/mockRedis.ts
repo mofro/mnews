@@ -34,7 +34,7 @@ export class MockRedisClient {
     return null;
   }
 
-  async scan(cursor: number, options: any = {}): Promise<[string, string[]]> {
+  async scan(cursor: number, _options: any = {}): Promise<[string, string[]]> {
     return ['0', []];
   }
 }

@@ -98,7 +98,10 @@ export class IncrementalNewsletterParser {
       
     } catch (error) {
       // If ANY step fails, fall back to basic text
-      console.error('Parser pipeline failed:', error);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.error('Parser pipeline failed:', error);
+      }
       const fallbackContent = this.step1_BasicHtmlToText(rawHTML, []);
       
       return {
@@ -127,7 +130,7 @@ export class IncrementalNewsletterParser {
     const input = content;
     
     try {
-      let text = content
+      const text = content
         .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style blocks
         .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // Remove scripts
         .replace(/<[^>]+>/g, ' ') // Remove all HTML tags
@@ -173,11 +176,12 @@ export class IncrementalNewsletterParser {
     const input = content;
     
     try {
-      let cleaned = content
+      const cleaned = content
         // CRITICAL: Remove the massive invisible character sequences
         // Pattern: ͏ ­͏ ­͏ ­͏ ­͏ ­ (repeated hundreds of times)
         .replace(/͏[\s\u00A0\u00AD­]*­͏[\s\u00A0\u00AD­]*/g, ' ')
-        .replace(/[\u00AD\u200B\u200C\u200D\uFEFF]+/g, '') // Additional invisible chars
+        // Match and remove various invisible characters (soft hyphen, zero-width space, etc.)
+        .replace(/(?:\u00AD|\u200B|\u200C|\u200D|\uFEFF)+/g, '')
         .replace(/͏+/g, '') // Remove any remaining invisible separators
         
         // Clean up HTML entities (existing logic)
@@ -246,7 +250,7 @@ export class IncrementalNewsletterParser {
       // Matches: long text paragraphs (50+ chars)
       // Avoids: "• Apple releases...", "- Another item...", "* List item..."
       structured = structured
-        .replace(/\n\s*([^•\-\*\n<>]{50,})\s*\n/g, '\n<p>$1</p>\n');
+        .replace(/\n\s*([^•*\-\n<>]{50,})\s*\n/g, '\n<p>$1</p>\n');
       
       steps.push({
         stepName: 'recover-structure-enhanced',

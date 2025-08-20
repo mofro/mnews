@@ -1,4 +1,5 @@
 import { Redis } from '@upstash/redis';
+import logger from '../utils/logger';
 
 // Simple Redis client wrapper
 class RedisClientWrapper {
@@ -32,13 +33,14 @@ class RedisClientWrapper {
    */
   async testConnection(): Promise<boolean> {
     try {
-      console.log('[REDIS] Testing connection...');
+      logger.debug('Testing connection...');
       const result = await this.client.ping();
       const isConnected = result === 'PONG';
-      console.log(`[REDIS] Connection test ${isConnected ? 'succeeded' : 'failed'}`);
+      const status = isConnected ? 'succeeded' : 'failed';
+      logger.debug(`Connection test ${status}`);
       return isConnected;
     } catch (error) {
-      console.error('[REDIS] Connection test failed:', error);
+      logger.error('Connection test failed:', error);
       return false;
     }
   }
@@ -49,21 +51,24 @@ class RedisClientWrapper {
    */
   async testConnectionDetailed(): Promise<{ success: boolean; error?: string; pingTime?: number }> {
     try {
-      console.log(`[REDIS] Testing connection to ${this.connectionUrl}...`);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Testing connection to ${this.connectionUrl}...`);
+      }
       const startTime = Date.now();
       const pong = await this.client.ping();
       const pingTime = Date.now() - startTime;
       
       if (pong !== 'PONG') {
-        console.error('[REDIS] Unexpected PING response:', pong);
+        logger.warn('Unexpected PING response:', pong);
         return { success: false, error: 'Unexpected PING response' };
       }
       
-      console.log(`[REDIS] Connection successful! Ping: ${pingTime}ms`);
+      logger.debug(`Connection successful! Ping: ${pingTime}ms`);
       return { success: true, pingTime };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error('[REDIS] Connection test failed:', errorMessage);
+      logger.error('Connection test failed:', errorMessage);
       return { 
         success: false, 
         error: `Connection failed: ${errorMessage}` 
@@ -71,42 +76,14 @@ class RedisClientWrapper {
     }
   }
   
-  async hgetall(key: string): Promise<Record<string, any> | null> {
-    try {
-      console.log(`[REDIS] Getting key: ${key}`);
-      const result = await this.client.hgetall(key);
-      console.log(`[REDIS] Raw result for ${key}:`, JSON.stringify(result, null, 2));
-      
-      if (!result) {
-        console.log(`[REDIS] No data found for key: ${key}`);
-        return null;
-      }
-      
-      // Log the type and structure of the result
-      console.log(`[REDIS] Result type:`, typeof result);
-      console.log(`[REDIS] Result keys:`, Object.keys(result));
-      
-      // If metadata exists as a string, try to parse it
-      if (result.metadata && typeof result.metadata === 'string') {
-        try {
-          const parsed = JSON.parse(result.metadata);
-          console.log(`[REDIS] Parsed metadata:`, parsed);
-          result.metadata = parsed;
-        } catch (e) {
-          console.error(`[REDIS] Error parsing metadata for ${key}:`, e);
-        }
-      }
-      
-      return result as Record<string, any>;
-    } catch (error) {
-      console.error(`[REDIS] Error in hgetall for key ${key}:`, error);
-      throw error;
-    }
-  }
+  // hgetall implementation is now at line 351
   
   async hset(key: string, ...args: any[]): Promise<number> {
     try {
-      console.log(`[REDIS] Setting key: ${key} with args:`, args);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Setting key: ${key} with args:`, args);
+      }
       const fields: Record<string, string> = {};
       
       for (let i = 0; i < args.length; i += 2) {
@@ -118,39 +95,67 @@ class RedisClientWrapper {
       }
       
       const result = await this.client.hset(key, fields);
-      console.log(`[REDIS] Set result for ${key}:`, result);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log(`[REDIS] Set result for ${key}:`, result);
+      }
       return result;
     } catch (error) {
-      console.error(`[REDIS] Error in hset for key ${key}:`, error);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.error(`[REDIS] Error in hset for key ${key}:`, error);
+      }
       throw error;
     }
   }
   
   async hdel(key: string, ...fields: string[]): Promise<number> {
     try {
-      console.log(`[REDIS] Deleting fields from ${key}:`, fields);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Deleting fields from ${key}:`, fields);
+      }
       const result = await this.client.hdel(key, ...fields);
-      console.log(`[REDIS] Delete result for ${key}:`, result);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log(`[REDIS] Delete result for ${key}:`, result);
+      }
       return result;
     } catch (error) {
-      console.error(`[REDIS] Error in hdel for key ${key}:`, error);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.error(`[REDIS] Error in hdel for key ${key}:`, error);
+      }
       throw error;
     }
   }
   
-  async scan(cursor: number, options: { match?: string; count?: number } = {}): Promise<[string, string[]]> {
+  async scan(cursor: number, options: { match?: string; count?: number } = {}): Promise<{ cursor: number; keys: string[] }> {
+    // Provide default values for match and count
+    const scanOptions = {
+      match: options.match || '*',
+      count: options.count || 10
+    };
     try {
-      console.log(`[REDIS] Scanning with cursor ${cursor}, match: ${options.match || '*'}`);
-      // Prepare the options object with defaults
-      const scanOptions = {
-        match: options.match || '*',
-        count: options.count || 10 // Default count if not specified
-      };
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log(`[REDIS] Scanning with cursor ${cursor}, match: ${options.match || '*'}`);
+      }
       const result = await this.client.scan(cursor, scanOptions);
-      console.log(`[REDIS] Scan result (cursor: ${cursor}):`, result);
-      return result as [string, string[]];
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Scan result (cursor: ${cursor}):`, result);
+      }
+      // Convert the cursor to a number as expected by the return type
+      return {
+        cursor: Number(result[0]),
+        keys: result[1]
+      };
     } catch (error) {
-      console.error(`[REDIS] Error in scan:`, error);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.error('Error in scan:', error);
+      }
       throw error;
     }
   }
@@ -171,13 +176,21 @@ class RedisClientWrapper {
    */
   async lrange(key: string, start: number, stop: number): Promise<string[]> {
     try {
-      console.log(`[REDIS] Getting list range ${start} to ${stop} for key: ${key}`);
-      // Using the lrange method from @upstash/redis
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Getting list range ${start} to ${stop} for key: ${key}`);
+      }
       const result = await (this.client as any).lrange(key, start, stop);
-      console.log(`[REDIS] LRANGE result for ${key}:`, result);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`LRANGE result for ${key}:`, result);
+      }
       return Array.isArray(result) ? result.map(String) : [];
     } catch (error) {
-      console.error(`[REDIS] Error in lrange for key ${key}:`, error);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.error(`Error in lrange for key ${key}:`, error);
+      }
       throw error;
     }
   }
@@ -190,58 +203,94 @@ class RedisClientWrapper {
    */
   async lpush(key: string, ...elements: (string | number)[]): Promise<number> {
     try {
-      console.log(`[REDIS] Pushing ${elements.length} elements to list: ${key}`);
-      // Using the lpush method from @upstash/redis
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Pushing ${elements.length} elements to list: ${key}`);
+      }
       const result = await (this.client as any).lpush(key, ...elements);
-      console.log(`[REDIS] LPUSH result for ${key}:`, result);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`LPUSH result for ${key}:`, result);
+      }
       return typeof result === 'number' ? result : 0;
     } catch (error) {
-      console.error(`[REDIS] Error in lpush for key ${key}:`, error);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.error(`Error in lpush for key ${key}:`, error);
+      }
       throw error;
     }
   }
 
   async get(key: string): Promise<string | null> {
     try {
-      console.log(`[REDIS] Getting string value for key: ${key}`);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Getting string value for key: ${key}`);
+      }
       // Type assertion to access the underlying Redis client's get method
       const result = await (this.client as any).get(key) as string | null;
-      console.log(`[REDIS] Get result for ${key}:`, result);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Get result for ${key}:`, result);
+      }
       return result;
     } catch (error) {
-      console.error(`[REDIS] Error in get for key ${key}:`, error);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.error(`Error in get for key ${key}:`, error);
+      }
       throw error;
     }
   }
 
   async type(key: string): Promise<string> {
     try {
-      console.log(`[REDIS] Getting type of key: ${key}`);
-      // Use the type method from @upstash/redis
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Getting type of key: ${key}`);
+      }
       const result = await this.client.type(key);
-      console.log(`[REDIS] Type of ${key}:`, result);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Type of ${key}:`, result);
+      }
       return result;
     } catch (error) {
-      console.error(`[REDIS] Error getting type for key ${key}:`, error);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.error(`Error getting type for key ${key}:`, error);
+      }
       throw error;
     }
   }
 
   async set(key: string, value: string): Promise<void> {
     try {
-      console.log(`[REDIS] Setting key: ${key}`);
-      // Use the set method from @upstash/redis
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Setting key: ${key}`);
+      }
       await this.client.set(key, value);
-      console.log(`[REDIS] Successfully set key: ${key}`);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Successfully set key: ${key}`);
+      }
     } catch (error) {
-      console.error(`[REDIS] Error setting key ${key}:`, error);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.error(`Error setting key ${key}:`, error);
+      }
       throw error;
     }
   }
 
   async getRaw(key: string): Promise<{type: string, value: any}> {
     try {
-      console.log(`[REDIS] Getting raw value for key: ${key}`);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Getting raw value for key: ${key}`);
+      }
       // First get the type
       const type = await this.type(key);
       
@@ -254,25 +303,99 @@ class RedisClientWrapper {
       // Get the value based on type
       if (type === 'string') {
         value = await this.get(key);
-      } else if (type === 'hash') {
-        value = await this.hgetall(key);
-      } else if (type === 'list') {
-        // @ts-ignore - Using internal Redis command for LRANGE
-        value = await this.client.sendCommand(['LRANGE', key, '0', '-1']);
-      } else if (type === 'set') {
-        // @ts-ignore - Using internal Redis command for SMEMBERS
-        value = await this.client.sendCommand(['SMEMBERS', key]);
-      } else if (type === 'zset') {
-        // @ts-ignore - Using internal Redis command for ZRANGE
-        value = await this.client.sendCommand(['ZRANGE', key, '0', '-1', 'WITHSCORES']);
-      } else {
-        throw new Error(`Unsupported Redis type: ${type}`);
       }
-      
-      console.log(`[REDIS] Raw value for ${key} (${type}):`, value);
       return { type, value };
     } catch (error) {
-      console.error(`[REDIS] Error getting raw value for key ${key}:`, error);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.error(`Error getting raw value for key ${key}:`, error);
+      }
+      throw error;
+    }
+  }
+
+  async hgetall(key: string): Promise<{ [key: string]: string } | null> {
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Getting hash value for key: ${key}`);
+      }
+      const result = await this.client.hgetall(key);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`HGETALL result for ${key}:`, result);
+      }
+      return result;
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.error(`[REDIS] Error in hgetall for key ${key}:`, error);
+      }
+      throw error;
+    }
+  }
+
+
+  async hget(key: string, field: string): Promise<string | null> {
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Getting hash field value for key: ${key}`);
+      }
+      const result = await this.client.hget(key, field);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`HGET result for ${key}:`, result);
+      }
+      // Ensure the result is either a string or null
+      return typeof result === 'string' ? result : null;
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.error(`Error in hget for key ${key}:`, error);
+      }
+      throw error;
+    }
+  }
+
+  async expire(key: string, seconds: number): Promise<boolean> {
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Setting expiration for key: ${key}`);
+      }
+      const result = await this.client.expire(key, seconds);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`EXPIRE result for ${key}:`, result);
+      }
+      return result === 1;
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.error(`Error in expire for key ${key}:`, error);
+      }
+      throw error;
+    }
+  }
+
+  async ttl(key: string): Promise<number> {
+    try {
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`Getting TTL for key: ${key}`);
+      }
+      const result = await this.client.ttl(key);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.debug(`TTL result for ${key}:`, result);
+      }
+      return result;
+    } catch (error) {
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        logger.error(`Error in ttl for key ${key}:`, error);
+      }
       throw error;
     }
   }
@@ -291,7 +414,10 @@ export async function testRedisConnection() {
     const result = await client.testConnectionDetailed();
     return result;
   } catch (error) {
-    console.error('Error in testRedisConnection:', error);
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      logger.error('Error in testRedisConnection:', error);
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
@@ -308,7 +434,8 @@ export function getRedisClient(): RedisClientWrapper {
 }
 
 // Type for newsletter data from Redis
-interface NewsletterData {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+interface _NewsletterData {
   id: string;
   metadata?: string;
   [key: string]: any;
@@ -337,10 +464,16 @@ export async function updateNewsletterArchiveStatus(id: string, isArchived: bool
   try {
     // First, check if the key exists and get its type
     const keyType = await client.type(key);
-    console.log(`[DEBUG] Key type for ${key}: ${keyType}`);
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.log(`[DEBUG] Key type for ${key}: ${keyType}`);
+    }
 
     if (keyType === 'none') {
-      console.error(`[ERROR] Key not found: ${key}`);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.error(`[ERROR] Key not found: ${key}`);
+      }
       return {
         success: false,
         error: 'Newsletter not found',
@@ -355,11 +488,17 @@ export async function updateNewsletterArchiveStatus(id: string, isArchived: bool
       ...(isArchived ? { archivedAt: timestamp } : { archivedAt: null })
     };
 
-    console.log(`[DEBUG] Updating ${key} (${keyType}) with:`, metadata);
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.log(`[DEBUG] Updating ${key} (${keyType}) with:`, metadata);
+    }
     
     if (keyType === 'hash') {
       // For hash type, update the metadata field
-      console.log(`[DEBUG] Updating hash key: ${key} with metadata:`, metadata);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log(`[DEBUG] Updating hash key: ${key} with metadata:`, metadata);
+      }
       
       // First, get the current hash to understand its structure
       const currentHash = await client.hgetall(key);
@@ -367,7 +506,10 @@ export async function updateNewsletterArchiveStatus(id: string, isArchived: bool
         throw new Error('Failed to get current hash data');
       }
       
-      console.log(`[DEBUG] Current hash for ${key}:`, JSON.stringify(currentHash, null, 2));
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log(`[DEBUG] Current hash for ${key}:`, JSON.stringify(currentHash, null, 2));
+      }
       
       // Update the hash with the new metadata
       await client.hset(key, { 
@@ -375,7 +517,10 @@ export async function updateNewsletterArchiveStatus(id: string, isArchived: bool
         ...metadata
       });
       
-      console.log(`[SUCCESS] Updated archive status for ${key}: isArchived=${isArchived}`);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log(`[SUCCESS] Updated archive status for ${key}: isArchived=${isArchived}`);
+      }
       
       return {
         success: true,
@@ -387,17 +532,27 @@ export async function updateNewsletterArchiveStatus(id: string, isArchived: bool
     } else if (keyType === 'string') {
       // For string type, update the entire value
       const currentValue = await client.get(key);
-      console.log(`[DEBUG] Current value type for ${key}:`, typeof currentValue);
-      console.log(`[DEBUG] Current value for ${key}:`, currentValue);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log(`[DEBUG] Current value type for ${key}:`, typeof currentValue);
+        // eslint-disable-next-line no-console
+        console.log(`[DEBUG] Current value for ${key}:`, currentValue);
+      }
       
       let data: any = {};
       if (currentValue) {
         try {
           // Try to parse if it's a JSON string
           data = JSON.parse(currentValue);
-          console.log(`[DEBUG] Parsed data:`, data);
+          if (process.env.NODE_ENV === 'development') {
+            // eslint-disable-next-line no-console
+            console.log(`[DEBUG] Parsed data:`, data);
+          }
         } catch (e) {
-          console.error(`[ERROR] Failed to parse current value for ${key}:`, e);
+          if (process.env.NODE_ENV === 'development') {
+            // eslint-disable-next-line no-console
+            console.error(`[ERROR] Failed to parse current value for ${key}:`, e);
+          }
           // If we can't parse the current value, create a new object with the content
           data = { content: currentValue };
         }
@@ -406,7 +561,10 @@ export async function updateNewsletterArchiveStatus(id: string, isArchived: bool
       // Update the metadata
       data.metadata = metadata;
       
-      console.log(`[DEBUG] Setting new value for ${key}:`, data);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.log(`[DEBUG] Setting new value for ${key}:`, data);
+      }
       await client.set(key, JSON.stringify(data));
       
       return {
@@ -419,7 +577,10 @@ export async function updateNewsletterArchiveStatus(id: string, isArchived: bool
     } else {
       // Handle other key types (list, set, zset)
       const errorMessage = `Unsupported key type: ${keyType}`;
-      console.error(`[ERROR] ${errorMessage} for key: ${key}`);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.error(`[ERROR] ${errorMessage} for key: ${key}`);
+      }
       return {
         success: false,
         error: errorMessage,
@@ -428,7 +589,10 @@ export async function updateNewsletterArchiveStatus(id: string, isArchived: bool
     }
   } catch (error) {
     const errorMessage = 'Error updating newsletter archive status';
-    console.error(`[ERROR] ${errorMessage}:`, error);
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.error(`[ERROR] ${errorMessage}:`, error);
+    }
     
     // Simple error details
     const errorDetails = {
@@ -453,14 +617,20 @@ export async function updateNewsletterContent(
   const timestamp = new Date().toISOString();
   
   try {
-    console.log(`[REDIS] Updating content for newsletter: ${id}`);
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.log(`[REDIS] Updating content for newsletter: ${id}`);
+    }
     
     // Get the existing newsletter data
     const newsletterKey = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
     const existingData = await client.hgetall(newsletterKey);
     
     if (!existingData) {
-      console.error(`[REDIS] Newsletter not found: ${id}`);
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.error(`[REDIS] Newsletter not found: ${id}`);
+      }
       return {
         success: false,
         error: 'Newsletter not found',
@@ -476,7 +646,10 @@ export async function updateNewsletterContent(
         try {
           metadata = JSON.parse(existingMetadata);
         } catch (e) {
-          console.error(`[REDIS] Error parsing metadata for ${id}:`, e);
+          if (process.env.NODE_ENV === 'development') {
+            // eslint-disable-next-line no-console
+            console.error(`[REDIS] Error parsing metadata for ${id}:`, e);
+          }
         }
       } else if (typeof existingMetadata === 'object' && existingMetadata !== null) {
         metadata = { ...existingMetadata };
@@ -504,7 +677,10 @@ export async function updateNewsletterContent(
     // Update the newsletter in Redis
     await client.hset(newsletterKey, updateData);
     
-    console.log(`[REDIS] Successfully updated content for newsletter: ${id}`);
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.log(`[REDIS] Successfully updated content for newsletter: ${id}`);
+    }
     
     return {
       success: true,
@@ -517,7 +693,10 @@ export async function updateNewsletterContent(
     
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[REDIS] Error updating content for ${id}:`, error);
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.error(`[REDIS] Error updating content for ${id}:`, error);
+    }
     return {
       success: false,
       error: `Failed to update content: ${errorMessage}`,

@@ -114,7 +114,7 @@ const CLEANING_RULES: CleaningRule[] = [
   {
     id: 'remove-ms-conditional-comments',
     description: 'Remove Microsoft conditional comments',
-    pattern: /<!--\s*\[if[^>]*>.*?<\!\[endif\]-->/gis,
+    pattern: /<!--\s*\[if[^>]*>.*?<!\[endif\]-->/gis,
     replacement: '',
     enabled: true
   },
@@ -257,7 +257,6 @@ export function cleanNewsletterContent(html: string): CleaningResult {
   }
   
   // Clean up any leftover empty containers (but be careful with nested structures)
-  let previousLength;
   const emptyElements = ['div', 'p', 'span', 'a', 'strong', 'em', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'];
   
   emptyElements.forEach(tag => {
@@ -292,7 +291,7 @@ export function cleanNewsletterContent(html: string): CleaningResult {
   // Fix any malformed HTML that might have been introduced
   cleaned = cleaned
     // Fix unclosed tags
-    .replace(/<((?!\/|!|area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)[a-z]+)([^>]*[^\/])(?<!\.\.\.)>/gi, '<$1$2></$1>')
+    .replace(/<((?!\/|!|area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)[a-z]+)([^>]*[^/])(?<!\.\.\.)>/gi, '<$1$2></$1>')
     // Fix self-closing tags
     .replace(/<((area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)[^>]*)>/gi, '<$1 />')
     // Fix unquoted attributes
