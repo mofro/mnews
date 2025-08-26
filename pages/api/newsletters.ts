@@ -19,11 +19,35 @@ export default async function handler(
     // Get all newsletters first
     const allNewsletters = await NewsletterStorage.getAllNewsletters();
 
+    // Filter newsletters based on query parameters
+    let filteredNewsletters = allNewsletters;
+
+    // Apply sender filter if provided
+    if (req.query.sender) {
+      const sender = req.query.sender as string;
+      filteredNewsletters = filteredNewsletters.filter(
+        (n) => n.sender === sender,
+      );
+    }
+
+    // Apply search term filter if provided
+    if (req.query.search) {
+      const searchTerm = (req.query.search as string).toLowerCase();
+      filteredNewsletters = filteredNewsletters.filter(
+        (n) =>
+          n.subject.toLowerCase().includes(searchTerm) ||
+          n.sender.toLowerCase().includes(searchTerm) ||
+          (n.cleanContent && n.cleanContent.toLowerCase().includes(searchTerm)),
+      );
+    }
+
     // Filter archived newsletters if needed
     const includeArchived = req.query.includeArchived === "true";
-    const filteredNewsletters = includeArchived
-      ? allNewsletters
-      : allNewsletters.filter((n) => !n.metadata?.archived);
+    if (!includeArchived) {
+      filteredNewsletters = filteredNewsletters.filter(
+        (n) => !n.metadata?.archived,
+      );
+    }
 
     const totalItems = filteredNewsletters.length;
 

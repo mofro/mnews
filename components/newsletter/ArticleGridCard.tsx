@@ -1,14 +1,23 @@
 // components/newsletter/ArticleGridCard.tsx
-'use client';
+"use client";
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import Image from 'next/image';
-import { format } from 'date-fns';
-import { extractFeaturedImage, getArticleImage } from '@/utils/imageUtils';
-import { Share2, Eye, EyeOff, Archive, ArchiveRestore } from 'lucide-react';
-import DOMPurify from 'dompurify';
+import { useMemo, useState } from "react";
+import {
+  Bookmark,
+  BookmarkCheck,
+  Share2,
+  Eye,
+  EyeOff,
+  ImageOff,
+} from "lucide-react";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { formatDate } from "@/lib/utils";
+import DOMPurify from "dompurify";
+import { cn } from "@/lib/utils";
+import Image from "next/image";
 
-interface ArticleGridCardProps {
+export interface ArticleGridCardProps {
   id: string;
   sender: string;
   subject: string;
@@ -19,11 +28,11 @@ interface ArticleGridCardProps {
   isRead?: boolean;
   isArchived?: boolean;
   tags?: string[];
-  newsletterId?: string;
+  onToggleRead: (id: string) => void;
+  onToggleArchive: (id: string) => void;
+  onShare: (id: string) => void;
+  onExpand: (article: any) => void;
   className?: string;
-  onToggleRead?: (_: string) => void;
-  onToggleArchive?: (_: string) => void;
-  onShare?: (_: string) => void;
 }
 
 export function ArticleGridCard({
@@ -31,441 +40,188 @@ export function ArticleGridCard({
   sender,
   subject,
   date,
-  content,
-  imageUrl: initialImageUrl,
+  content = "",
+  imageUrl,
   isNew = false,
   isRead = false,
   isArchived = false,
   tags = [],
-  className = '',
   onToggleRead,
   onToggleArchive,
-  onShare
+  onShare,
+  onExpand,
+  className,
 }: ArticleGridCardProps) {
-  const [imageUrl, setImageUrl] = useState<string | null>(initialImageUrl || null);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const contentRef = useRef<HTMLDivElement>(null);
-  const [contentHeight, setContentHeight] = useState<number | 'auto'>('auto');
-  
-  // Extract featured image from content
-  const featuredImageUrl = useMemo(() => {
-    if (typeof window !== 'undefined' && content) {
-      return extractFeaturedImage(content);
-    }
-    return null;
+  // Sanitize and truncate content for preview
+  const previewContent = useMemo(() => {
+    if (!content) return "";
+
+    // Remove HTML tags and limit length
+    const plainText = DOMPurify.sanitize(content, { ALLOWED_TAGS: [] });
+    return plainText.length > 200
+      ? `${plainText.substring(0, 200)}...`
+      : plainText;
   }, [content]);
 
-  // Generate a text-only summary by stripping HTML and limiting length
-  const summary = useMemo(() => {
-    if (!content) return '';
-    // Remove HTML tags and limit to 200 characters
-    const text = content.replace(/<[^>]*>?/gm, '').trim();
-    return text.length > 200 ? text.substring(0, 200) + '...' : text;
-  }, [content]);
+  const formattedDate = useMemo(() => formatDate(date), [date]);
 
-  // Sanitize HTML content with DOMPurify
-  const sanitizedContent = useMemo(() => {
-    if (!content) return '';
-    
-    // Only sanitize on client side
-    if (typeof window === 'undefined') return '';
-    
-    let cleanContent = DOMPurify.sanitize(content, {
-      ALLOWED_TAGS: [
-        'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'p', 'br', 'strong', 'em', 'b', 'i',
-        'ul', 'ol', 'li', 'a', 'img',
-        'blockquote', 'div', 'span', 'table',
-        'tr', 'td', 'th', 'tbody', 'thead', 'tfoot'
-      ],
-      ALLOWED_ATTR: [
-        'href', 'src', 'alt', 'title', 'target',
-        'class', 'style', 'width', 'height',
-        'cellspacing', 'cellpadding', 'border',
-        'bgcolor', 'align', 'valign'
-      ]
-    });
+  const [imageError, setImageError] = useState(false);
+  const [isImageLoading, setIsImageLoading] = useState(true);
 
-    // Process images to ensure they load properly
-    cleanContent = cleanContent.replace(
-      /<img([^>]*)src="([^"]*)"/g, 
-      (match, attrs, src) => {
-        // Convert relative URLs to absolute if needed
-        let imageUrl = src;
-        if (src.startsWith('//')) {
-          imageUrl = `https:${src}`;
-        } else if (src.startsWith('/') && !src.startsWith('//')) {
-          const url = new URL(window.location.href);
-          imageUrl = `${url.origin}${src}`;
-        }
-        return `<img${attrs} src="${imageUrl}" loading="lazy" style="max-width: 100%; height: auto;"`;
-      }
-    );
+  const handleImageError = () => {
+    setImageError(true);
+    setIsImageLoading(false);
+  };
 
-    return cleanContent;
-  }, [content]);
-  
-  // Determine image source on the client side only
-  const [imageSource, setImageSource] = useState<string | null>(null);
-  
-  // Debug logging - after all variable declarations (commented out for production)
-  /*
-  useEffect(() => {
-    console.log('ArticleGridCard mounted/updated:', {
+  const handleImageLoad = () => {
+    setIsImageLoading(false);
+  };
+
+  // Handle card click - opens the article in a popup
+  const handleCardClick = () => {
+    onExpand({
       id,
-      subject,
       sender,
+      subject,
       date,
-      contentLength: content?.length,
-      hasImage: !!initialImageUrl,
-      isNew,
+      content,
+      imageUrl,
       isRead,
       isArchived,
       tags,
-      hasContent: !!content,
-      hasSanitizedContent: !!sanitizedContent,
-      imageSource,
-      featuredImageUrl
     });
-    
-    // Log if content is empty
-    if (!content) {
-      console.warn('ArticleGridCard has no content:', { id, subject });
+  };
+
+  // Handle keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handleCardClick();
     }
-    
-    // Log if sanitized content is empty
-    if (!sanitizedContent) {
-      console.warn('ArticleGridCard has no sanitized content:', { id, subject });
-    }
-  }, [id, subject, sender, date, content, initialImageUrl, isNew, isRead, isArchived, tags, sanitizedContent, imageSource, featuredImageUrl]);
-  */
-  
-  // Update content height when expanded state or content changes
-  useEffect(() => {
-    const contentElement = contentRef.current;
-    if (!contentElement) return;
-    
-    // Reset height to auto to measure natural height
-    contentElement.style.height = 'auto';
-    const height = contentElement.scrollHeight;
-    
-    // Set initial height (0 if collapsed)
-    contentElement.style.height = isExpanded ? `${height}px` : '0';
-    
-    // Store the height for reference
-    setContentHeight(height);
-    
-    // Cleanup function
-    return () => {
-      if (contentElement) {
-        contentElement.style.height = 'auto';
-      }
-    };
-  }, [isExpanded, content]);
+  };
 
-  // Extract featured image if not provided
-  useEffect(() => {
-    if (!initialImageUrl && content) {
-      const extractedImage = extractFeaturedImage(content);
-      if (extractedImage) {
-        setImageUrl(extractedImage);
-      }
-    }
-  }, [content, initialImageUrl]);
-
-  // Safe date parsing with fallback
-  const safeDate = useCallback((dateString: string): Date => {
-    try {
-      const date = new Date(dateString);
-      return isNaN(date.getTime()) ? new Date() : date;
-    } catch {
-      return new Date();
-    }
-  }, []);
-
-  const formattedDate = format(safeDate(date), 'MMM d, yyyy');
-
-  const handleToggleRead = useCallback(() => {
-    onToggleRead?.(id);
-  }, [id, onToggleRead]);
-
-  const handleToggleArchive = useCallback(() => {
-    onToggleArchive?.(id);
-  }, [id, onToggleArchive]);
-
-  const handleShare = useCallback(() => {
-    if (navigator.share) {
-      navigator.share({
-        title: subject,
-        text: `Check out this article: ${subject}`,
-        url: window.location.href,
-      }).catch((error) => {
-        // Log the error for debugging purposes
-        if (process.env.NODE_ENV === 'development') {
-          import('@/utils/logger').then((loggerModule) => {
-            const logger = loggerModule.default;
-            logger.error('Error sharing article:', error);
-          });
-        }
-        // Optionally, you could show an error message to the user here
-      });
-    } else {
-      onShare?.(id);
-    }
-  }, [id, onShare, subject]);
-
-  // Handle click on the card to toggle expansion
-  const handleCardClick = useCallback(() => {
-    const wasExpanded = isExpanded;
-    setIsExpanded(!wasExpanded);
-    
-    // Scroll to top on mobile when expanding
-    if (!wasExpanded && window.innerWidth <= 768) {
-      // Use setTimeout to ensure the DOM has updated with the expanded content
-      setTimeout(() => {
-        const cardElement = document.getElementById(`card-${id}`);
-        if (cardElement) {
-          cardElement.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-          });
-        }
-      }, 50);
-    }
-  }, [isExpanded, id]);
-  
-  // Add scroll behavior for title click as well
-  const handleTitleClick = useCallback((e: React.MouseEvent) => {
+  // Handle button clicks without triggering card click
+  const handleActionClick = (e: React.MouseEvent, action: () => void) => {
     e.stopPropagation();
-    const wasExpanded = isExpanded;
-    setIsExpanded(!wasExpanded);
-    
-    if (!wasExpanded && window.innerWidth <= 768) {
-      setTimeout(() => {
-        const cardElement = document.getElementById(`card-${id}`);
-        if (cardElement) {
-          cardElement.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-          });
-        }
-      }, 50);
-    }
-  }, [isExpanded, id]);
-
-  // Handle click on the image to toggle expansion
-  const handleImageClick = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    const wasExpanded = isExpanded;
-    setIsExpanded(!wasExpanded);
-    
-    // Scroll to top on mobile when expanding
-    if (!wasExpanded && window.innerWidth <= 768) {
-      setTimeout(() => {
-        const cardElement = document.getElementById(`card-${id}`);
-        if (cardElement) {
-          cardElement.scrollIntoView({ 
-            behavior: 'smooth', 
-            block: 'start' 
-          });
-        }
-      }, 50);
-    }
-  }, [isExpanded, id]);
-
-  // Set image source based on available images
-  useEffect(() => {
-    if (imageUrl) {
-      setImageSource(imageUrl);
-    } else if (featuredImageUrl) {
-      setImageSource(featuredImageUrl);
-    } else if (typeof window !== 'undefined') {
-      // Only generate Unsplash image on client side
-      const unsplashImage = getArticleImage(subject, {
-        width: 800,
-        height: 600,
-        blur: 1,
-        grayscale: true
-      });
-      setImageSource(unsplashImage);
-    }
-  }, [imageUrl, featuredImageUrl, subject]);
-
-  // Calculate size class based on content length
-  const getSizeClass = () => {
-    const contentLength = content?.length || 0;
-    if (contentLength > 2000) return 'md:col-span-2 lg:col-span-2';
-    if (contentLength > 1000) return 'md:col-span-2';
-    return '';
+    action();
   };
 
   return (
-    <div className={`group relative flex h-full flex-col overflow-hidden rounded-xl bg-white shadow-sm transition-all hover:shadow-md dark:bg-gray-800 ${
-      isArchived ? 'bg-yellow-50/50 dark:bg-yellow-900/20' : ''
-    } ${getSizeClass()} ${className}`}>
-      <article
-        id={`card-${id}`}
-        className="h-full flex flex-col"
-      >
-        <div 
-          className={`relative h-48 w-full cursor-pointer overflow-hidden ${!imageSource ? 'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-700 dark:to-gray-800' : ''}`}
-          onClick={handleImageClick}
-          role="button"
-          aria-expanded={isExpanded}
-          aria-controls={`card-${id}-content`}
-        >
-        {imageSource ? (
+    <Card
+      className={cn(
+        "group relative flex flex-col h-full transition-all duration-200",
+        "hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-700",
+        isRead && "opacity-70",
+        isArchived && "border-yellow-400 dark:border-yellow-600",
+        className,
+      )}
+      role="button"
+      tabIndex={0}
+      onClick={handleCardClick}
+      onKeyDown={handleKeyDown}
+      aria-label={`Open article: ${subject}`}
+    >
+      {imageUrl && !imageError ? (
+        <div className="relative aspect-video overflow-hidden bg-muted/20">
           <Image
-            src={imageSource}
+            src={imageUrl}
             alt={subject}
             fill
-            className="object-cover transition-transform duration-200 group-hover:scale-105"
+            className="object-cover transition-opacity duration-300 hover:opacity-90"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            onError={() => setImageError(true)}
+            onLoad={() => setIsImageLoading(false)}
             priority={false}
-            onError={() => {
-              // If image fails to load, generate a new one
-              const fallbackImage = getArticleImage(subject, {
-                width: 800,
-                height: 600,
-                random: true
-              });
-              setImageSource(fallbackImage);
-            }}
+            loading="lazy"
+            unoptimized={imageUrl.startsWith("http")} // Only optimize local images
           />
-        ) : (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-muted-foreground/50 text-sm">No image available</span>
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-      </div>
-
-      <div className="flex h-full flex-col p-5">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-600 dark:text-gray-300">{sender}</span>
-          <div className="flex items-center space-x-2">
-            {isNew && (
-              <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                New
-              </span>
-            )}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleToggleRead();
-              }}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md p-0 text-muted-foreground hover:bg-muted"
-              aria-label={isRead ? 'Mark as unread' : 'Mark as read'}
-            >
-              {isRead ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleToggleArchive();
-              }}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md p-0 text-muted-foreground hover:bg-muted"
-              aria-label={isArchived ? 'Unarchive' : 'Archive'}
-            >
-              {isArchived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleShare();
-              }}
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md p-0 text-muted-foreground hover:bg-muted"
-              aria-label="Share"
-            >
-              <Share2 className="h-4 w-4" />
-            </button>
-          </div>
         </div>
-
-        <h3 
-          className="mb-1 cursor-pointer text-lg font-semibold leading-tight text-gray-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400"
-          onClick={handleTitleClick}
-        >
-          {subject}
-        </h3>
-        <time className="mb-3 text-xs text-gray-500 dark:text-gray-400">{formattedDate}</time>
-
-        <div className="flex-1">
-          <div 
-            className="overflow-hidden transition-all duration-300 ease-in-out"
-            ref={contentRef}
-            style={{
-              height: isExpanded ? contentHeight : '0',
-              opacity: isExpanded ? 1 : 0.8,
-              transition: 'height 300ms ease-in-out, opacity 300ms ease-in-out'
-            }}
-          >
-            <div 
-              className={`prose prose-sm max-w-none text-gray-700 dark:text-gray-200 ${isArchived ? 'dark:text-gray-300/80' : ''}`}
-              dangerouslySetInnerHTML={{ __html: sanitizedContent }}
-            />
-          </div>
-          
-          {/* Show summary when collapsed */}
-          {!isExpanded && (
-            <div 
-              className="cursor-pointer"
-              onClick={handleCardClick}
-            >
-              <p className={`text-sm text-gray-600 dark:text-gray-400 ${isArchived ? 'dark:text-gray-300/80' : ''} line-clamp-4`}>
-                {summary}
-              </p>
-            </div>
-          )}
-          
-          {/* Tags */}
-          {tags.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {tags.map((tag) => (
-                <span 
-                  key={tag} 
-                  className="text-xs px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
-                >
-                  {tag}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="text-center mb-2 mt-2">
-          <span className="text-xs text-gray-400 dark:text-gray-500 font-mono">
-            ID: {id}
+      ) : (
+        <div className="relative aspect-video bg-muted/50 flex flex-col items-center justify-center gap-2 p-4 text-center">
+          <ImageOff className="w-8 h-8 text-muted-foreground/50" />
+          <span className="text-sm text-muted-foreground">
+            No image available
           </span>
         </div>
-        
-        <div className="flex items-center justify-between text-sm mt-auto">
-          <button 
-            className="flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
-            onClick={(e) => {
-              e.stopPropagation();
-              setIsExpanded(!isExpanded);
-            }}
+      )}
+
+      <CardContent className="flex-1 p-4 flex flex-col">
+        <div className="flex justify-between items-start mb-2">
+          <h3 className="text-lg font-semibold text-foreground dark:text-white line-clamp-2">
+            {subject}
+          </h3>
+          {isNew && (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+              New
+            </span>
+          )}
+        </div>
+
+        <div className="text-sm text-muted-foreground mb-2">
+          {sender} • {formattedDate}
+        </div>
+
+        <p className="text-sm text-foreground/80 mt-2 line-clamp-3">
+          {previewContent}
+        </p>
+
+        {tags?.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-1">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-muted text-muted-foreground"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      <CardFooter className="p-3 pt-0 border-t border-border">
+        <div className="flex justify-between w-full items-center">
+          <div className="flex space-x-1">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => handleActionClick(e, () => onToggleRead(id))}
+              className="h-8 px-2 text-muted-foreground hover:text-foreground"
+              title={isRead ? "Mark as unread" : "Mark as read"}
+            >
+              {isRead ? (
+                <EyeOff className="h-4 w-4" />
+              ) : (
+                <Eye className="h-4 w-4" />
+              )}
+            </Button>
+
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={(e) => handleActionClick(e, () => onToggleArchive(id))}
+              className="h-8 px-2 text-muted-foreground hover:text-foreground"
+              title={isArchived ? "Unarchive" : "Archive"}
+            >
+              {isArchived ? (
+                <BookmarkCheck className="h-4 w-4" />
+              ) : (
+                <Bookmark className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => handleActionClick(e, () => onShare(id))}
+            className="h-8 px-2 text-muted-foreground hover:text-foreground"
+            title="Share"
           >
-            {isExpanded ? (
-              <>
-                <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                </svg>
-                Show less
-              </>
-            ) : (
-              <>
-                <svg className="mr-1 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-                Read more
-              </>
-            )}
-          </button>
+            <Share2 className="h-4 w-4" />
+          </Button>
         </div>
-        </div>
-      </article>
-    </div>
+      </CardFooter>
+    </Card>
   );
 }

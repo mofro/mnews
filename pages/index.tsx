@@ -188,9 +188,6 @@ export default function TestArticleGrid() {
   const [showArchived, setShowArchived] = useState(false);
   const [fullViewArticle, setFullViewArticle] =
     useState<TransformedArticle | null>(null);
-  const [expandedArticleId, setExpandedArticleId] = useState<string | null>(
-    null,
-  );
   const [showDebug, setShowDebug] = useState(false);
   const [showArticleDebug, setShowArticleDebug] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
@@ -554,25 +551,13 @@ export default function TestArticleGrid() {
     );
   }, []);
 
-  // Handle article expansion
-  const handleExpandArticle = useCallback(
-    (article: TransformedArticle) => {
-      // If clicking the same article, collapse it
-      if (expandedArticleId === article.id) {
-        setExpandedArticleId(null);
-        setFullViewArticle(null);
-      } else {
-        // Expand the clicked article and collapse any others
-        setExpandedArticleId(article.id);
-        setFullViewArticle(article);
-      }
-    },
-    [expandedArticleId],
-  );
+  // Handle article expansion - now only opens the popup
+  const handleExpandArticle = useCallback((article: TransformedArticle) => {
+    setFullViewArticle(article);
+  }, []);
 
   // Close full view modal
   const handleCloseFullView = useCallback(() => {
-    setExpandedArticleId(null);
     setFullViewArticle(null);
   }, []);
 
@@ -866,7 +851,7 @@ export default function TestArticleGrid() {
                   <path
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth={2}
+                    strokeWidth={1.5}
                     d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
                   />
                 </svg>
@@ -997,29 +982,25 @@ export default function TestArticleGrid() {
                       });
                       return (
                         <BentoItem key={article.id}>
-                          <div
-                            onClick={() => handleExpandArticle(article)}
+                          <ArticleGridCard
+                            id={article.id}
+                            sender={article.sender}
+                            subject={article.subject}
+                            date={article.date}
+                            content={article.content}
+                            imageUrl={article.imageUrl}
+                            isNew={article.isNew}
+                            isRead={article.isRead}
+                            isArchived={article.isArchived}
+                            tags={article.tags}
+                            onToggleRead={() => handleToggleRead(article.id)}
+                            onToggleArchive={() =>
+                              handleToggleArchive(article.id)
+                            }
+                            onShare={() => handleShare(article.id)}
+                            onExpand={() => handleExpandArticle(article)}
                             className="h-full"
-                          >
-                            <ArticleGridCard
-                              id={article.id}
-                              sender={article.sender}
-                              subject={article.subject}
-                              date={article.date}
-                              content={article.content}
-                              imageUrl={article.imageUrl}
-                              isNew={article.isNew}
-                              isRead={article.isRead}
-                              isArchived={article.isArchived}
-                              tags={article.tags}
-                              onToggleRead={() => handleToggleRead(article.id)}
-                              onToggleArchive={() =>
-                                handleToggleArchive(article.id)
-                              }
-                              onShare={() => handleShare(article.id)}
-                              className="h-full"
-                            />
-                          </div>
+                          />
                         </BentoItem>
                       );
                     })}
@@ -1081,8 +1062,16 @@ export default function TestArticleGrid() {
               title: fullViewArticle.subject,
               content: fullViewArticle.content || "No content available",
               publishDate: fullViewArticle.date,
+              sender: fullViewArticle.sender,
+              tags: fullViewArticle.tags,
+              imageUrl: fullViewArticle.imageUrl,
+              isRead: fullViewArticle.isRead,
+              isArchived: fullViewArticle.isArchived,
             }}
             onClose={handleCloseFullView}
+            onToggleRead={handleToggleRead}
+            onToggleArchive={handleToggleArchive}
+            onShare={handleShare}
             className={theme === "dark" ? "dark" : ""}
           />
         )}
