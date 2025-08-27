@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatDate } from "@/lib/utils";
+import { formatDateSafely } from "@/utils/dateService";
 import DOMPurify from "dompurify";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -63,7 +63,21 @@ export function ArticleGridCard({
       : plainText;
   }, [content]);
 
-  const formattedDate = useMemo(() => formatDate(date), [date]);
+  const formattedDate = useMemo(
+    () =>
+      formatDateSafely<string>(
+        date,
+        (d: Date) =>
+          d.toLocaleDateString(undefined, {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+          }),
+        "No date",
+        { fallbackBehavior: "current-date", logWarnings: true },
+      ),
+    [date],
+  );
 
   const [imageError, setImageError] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
