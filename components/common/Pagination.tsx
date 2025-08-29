@@ -1,5 +1,6 @@
 "use client";
 
+import React from 'react';
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "../../components/ui/button";
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";

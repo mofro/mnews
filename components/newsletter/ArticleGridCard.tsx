@@ -1,7 +1,7 @@
 // components/newsletter/ArticleGridCard.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Bookmark,
   BookmarkCheck,

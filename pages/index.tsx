@@ -99,6 +99,8 @@ interface TransformedArticle {
   subject: string;
   date: string;
   content: string;
+  cleanContent?: string;
+  rawContent?: string;
   isNew: boolean;
   isRead: boolean;
   isArchived: boolean;
@@ -390,7 +392,7 @@ export default function TestArticleGrid() {
             setTotalPages(responseData.pagination.totalPages || 1);
             setTotalItems(
               responseData.pagination.totalItems ||
-                transformedNewsletters.length,
+              transformedNewsletters.length,
             );
           } else {
             debugLog("No pagination data, using defaults");
@@ -447,12 +449,12 @@ export default function TestArticleGrid() {
     const newPage = urlPage ? Math.max(1, parseInt(urlPage, 10) || 1) : 1;
     const newPageSize = urlPageSize
       ? Math.max(
-          1,
-          Math.min(
-            parseInt(urlPageSize, 10) || DEFAULT_PAGE_SIZE,
-            MAX_PAGE_SIZE,
-          ),
-        )
+        1,
+        Math.min(
+          parseInt(urlPageSize, 10) || DEFAULT_PAGE_SIZE,
+          MAX_PAGE_SIZE,
+        ),
+      )
       : DEFAULT_PAGE_SIZE;
 
     // Only update state if values have changed to prevent infinite loops
@@ -629,12 +631,12 @@ export default function TestArticleGrid() {
       showArchived,
       firstArticle: articles[0]
         ? {
-            id: articles[0].id,
-            subject: articles[0].subject,
-            sender: articles[0].sender,
-            isArchived: articles[0].isArchived,
-            date: articles[0].date,
-          }
+          id: articles[0].id,
+          subject: articles[0].subject,
+          sender: articles[0].sender,
+          isArchived: articles[0].isArchived,
+          date: articles[0].date,
+        }
         : "No articles",
     });
 
@@ -812,11 +814,10 @@ export default function TestArticleGrid() {
 
                 <button
                   onClick={() => setShowArchived(!showArchived)}
-                  className={`px-4 py-2 rounded-lg transition-colors ${
-                    showArchived
+                  className={`px-4 py-2 rounded-lg transition-colors ${showArchived
                       ? "bg-yellow-100 text-yellow-800 hover:bg-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:hover:bg-yellow-900/50"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-                  }`}
+                    }`}
                 >
                   {showArchived ? "Hide Archived" : "Show Archived"}
                 </button>
@@ -1060,13 +1061,16 @@ export default function TestArticleGrid() {
             article={{
               id: fullViewArticle.id,
               title: fullViewArticle.subject,
-              content: fullViewArticle.content || "No content available",
+              content: fullViewArticle.content || "", // Start with empty content, will be loaded on demand
               publishDate: fullViewArticle.date,
               sender: fullViewArticle.sender,
               tags: fullViewArticle.tags,
               imageUrl: fullViewArticle.imageUrl,
               isRead: fullViewArticle.isRead,
               isArchived: fullViewArticle.isArchived,
+              // Include raw and clean content if available
+              rawContent: fullViewArticle.rawContent,
+              cleanContent: fullViewArticle.cleanContent
             }}
             onClose={handleCloseFullView}
             onToggleRead={handleToggleRead}

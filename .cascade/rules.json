@@ -1,0 +1,15 @@
+{
+  "rules": [
+    {
+      "id": "no-immediate-refactor",
+      "description": "Don't enter into a refactor immediately after discovering an issue",
+      "steps": [
+        "Explicate the issue clearly",
+        "Mention the presumed fix",
+        "Analyze if it's a surface-level issue or root cause",
+        "Make the assessment known",
+        "Wait for confirmation before proceeding"
+      ]
+    }
+  ]
+}
