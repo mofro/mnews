@@ -1,10 +1,10 @@
 "use client";
 
-import { X, Share2, Eye, EyeOff, Archive, ArchiveRestore } from "lucide-react";
+import { X, Share2, Eye, EyeOff, Archive, ArchiveRestore, Loader2 } from "lucide-react";
 import { Portal } from "@/components/ui/Portal";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { useEffect, useCallback, useMemo } from "react";
+import { useEffect, useCallback, useMemo, useState } from "react";
 import Image from "next/image";
 import DOMPurify from "dompurify";
 
@@ -18,6 +18,12 @@ interface Article {
   imageUrl?: string;
   isRead?: boolean;
   isArchived?: boolean;
+  // New fields for content loading
+  isLoading?: boolean;
+  error?: string | null;
+  // Raw content from the API
+  rawContent?: string;
+  cleanContent?: string;
 }
 
 interface FullViewArticleProps {
@@ -30,13 +36,54 @@ interface FullViewArticleProps {
 }
 
 export function FullViewArticle({
-  article,
+  article: initialArticle,
   onClose,
   onToggleRead,
   onToggleArchive,
   onShare,
   className,
 }: FullViewArticleProps) {
+  const [article, setArticle] = useState<Article>({
+    ...initialArticle,
+    isLoading: false,
+    error: null,
+  });
+
+  // Fetch full article content when component mounts
+  useEffect(() => {
+    const fetchFullContent = async () => {
+      // Skip if we already have content or it's already loading
+      if (article.content || article.isLoading || article.error) return;
+
+      setArticle(prev => ({ ...prev, isLoading: true, error: null }));
+
+      try {
+        const response = await fetch(`/api/articles/${article.id}`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch article content');
+        }
+        const data = await response.json();
+        
+        setArticle(prev => ({
+          ...prev,
+          content: data.content || prev.content,
+          rawContent: data.rawContent || prev.rawContent,
+          cleanContent: data.cleanContent || prev.cleanContent,
+          isLoading: false,
+          error: null
+        }));
+      } catch (error) {
+        console.error('Error fetching article content:', error);
+        setArticle(prev => ({
+          ...prev,
+          isLoading: false,
+          error: error instanceof Error ? error.message : 'Failed to load article content'
+        }));
+      }
+    };
+
+    fetchFullContent();
+  }, [article.id, article.content, article.isLoading, article.error]);
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -56,6 +103,23 @@ export function FullViewArticle({
       document.body.style.overflow = "unset";
     };
   }, []);
+
+  // Debug log the incoming article data
+  useEffect(() => {
+    console.log('FullViewArticle received article:', {
+      id: article.id,
+      title: article.title,
+      contentLength: article.content?.length,
+      hasContent: !!article.content,
+      contentSample: article.content?.substring(0, 50) + '...',
+      publishDate: article.publishDate,
+      sender: article.sender,
+      tags: article.tags,
+      imageUrl: article.imageUrl,
+      isRead: article.isRead,
+      isArchived: article.isArchived
+    });
+  }, [article]);
 
   // Sanitize content
   const sanitizedContent = useMemo(() => {
@@ -257,10 +321,35 @@ export function FullViewArticle({
               </header>
 
               {/* Article content */}
-              <div
-                className="prose dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: sanitizedContent }}
-              />
+              <div className="prose dark:prose-invert max-w-none min-h-[200px]">
+                {article.isLoading ? (
+                  <div className="flex flex-col items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-gray-400 mb-4" />
+                    <p className="text-gray-500 dark:text-gray-400">Loading article content...</p>
+                  </div>
+                ) : article.error ? (
+                  <div className="text-center py-8 text-red-500 dark:text-red-400">
+                    <p>Error loading content: {article.error}</p>
+                    <button
+                      onClick={() => setArticle(prev => ({ ...prev, error: null }))}
+                      className="mt-2 px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700"
+                    >
+                      Retry
+                    </button>
+                  </div>
+                ) : (
+                  <div 
+                    dangerouslySetInnerHTML={{ __html: sanitizedContent }}
+                    className="prose-content"
+                  />
+                )}
+                
+                {!sanitizedContent && !article.isLoading && !article.error && (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    No content available for this article.
+                  </div>
+                )}
+              </div>
 
               {/* Footer */}
               <footer className="mt-12 pt-6 border-t border-gray-200 dark:border-gray-700">

@@ -608,6 +608,34 @@ export async function updateNewsletterArchiveStatus(id: string, isArchived: bool
   }
 }
 
+/**
+ * Updates the read status of a newsletter in Redis
+ * @param id The ID of the newsletter to update
+ * @param isRead Whether the newsletter should be marked as read
+ * @returns A promise that resolves to true if successful, false otherwise
+ */
+export async function updateNewsletterReadStatus(
+  id: string,
+  isRead: boolean
+): Promise<boolean> {
+  try {
+    const client = getRedisClient();
+    const key = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
+    
+    // Update the read status in the newsletter's metadata
+    await client.hset(key, 'metadata', JSON.stringify({
+      isRead,
+      readTimestamp: new Date().toISOString()
+    }));
+    
+    logger.debug(`Updated read status for ${key} to ${isRead}`);
+    return true;
+  } catch (error) {
+    logger.error('Error updating newsletter read status:', error);
+    return false;
+  }
+}
+
 export async function updateNewsletterContent(
   id: string,
   content: string,
