@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createMocks } from 'node-mocks-http';
 import handler from '../../pages/api/articles/[id]';
-import { getRedisClient } from '../../lib/redis';
+import { getRedisClient } from "@/lib/redisClient";
 
 // Mock the Redis client
 jest.mock('../../lib/redis', () => ({

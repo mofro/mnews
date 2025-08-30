@@ -1,4 +1,4 @@
-import { Redis } from '@upstash/redis';
+import { redisClient } from './redisClient';
 
 /**
  * Feature-flag gate: enable by setting PATTERN_SYSTEM_ENABLED=true in env.
@@ -7,13 +7,8 @@ import { Redis } from '@upstash/redis';
  */
 const PATTERN_SYSTEM_ENABLED = process.env.PATTERN_SYSTEM_ENABLED === 'true';
 
-// Fallbacks avoid runtime crashes even if Redis vars are missing in dev.
-const redis = PATTERN_SYSTEM_ENABLED
-  ? new Redis({
-      url: process.env.KV_REST_API_URL!,
-      token: process.env.KV_REST_API_TOKEN!,
-    })
-  : null;
+// Use the singleton Redis client instance
+const redis = PATTERN_SYSTEM_ENABLED ? redisClient : null;
 
 export interface PatternConfig {
   // placeholder – will be expanded in later phases
@@ -61,7 +56,11 @@ export async function loadCurrentPattern(domain: string): Promise<LoadedPattern>
 export async function recordPatternUsage(domain: string, version: string) {
   if (!PATTERN_SYSTEM_ENABLED || !redis) return;
   try {
-    await redis.incr(`PATTERN_USAGE:${domain}:${version}`);
+    const key = `PATTERN_USAGE:${domain}:${version}`;
+    // Using get and set to implement increment since our wrapper doesn't have incr
+    const current = await redis.get(key);
+    const newValue = (parseInt(current || '0', 10) + 1).toString();
+    await redis.set(key, newValue);
   } catch (err) {
     if (process.env.NODE_ENV === 'development') {
       // eslint-disable-next-line no-console

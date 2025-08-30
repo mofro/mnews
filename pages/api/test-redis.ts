@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { testRedisConnection } from '@/lib/redis';
+import { testRedisConnection } from "@/lib/redisClient";
 import logger from '../../utils/logger';
 
 export default async function handler(

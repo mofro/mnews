@@ -1,4 +1,4 @@
-import { getRedisClient } from '../lib/redis';
+import { getRedisClient } from "@/lib/redisClient";
 import logger from '../utils/logger';
 
 async function listNewsletterIds() {

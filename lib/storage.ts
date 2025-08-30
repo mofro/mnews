@@ -1,11 +1,10 @@
-// FILE: /lib/storage.ts (CREATE NEW - Compatible with existing Redis structure)
 import { Newsletter } from './types';
 import { parseDate } from '../utils/dateService';
-import { getRedisClient } from './redis';
+import { redisClient } from './redisClient';
 import logger from '../utils/logger';
 
-// Use the Redis client wrapper
-const redis = getRedisClient();
+// Use the singleton Redis client instance
+const redis = redisClient;
 
 export class NewsletterStorage {
   // Your existing Redis pattern: newsletter_ids list + newsletter:${id} keys

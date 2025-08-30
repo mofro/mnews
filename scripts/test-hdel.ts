@@ -1,4 +1,4 @@
-import { getRedisClient } from '../lib/redis';
+import { getRedisClient } from "@/lib/redisClient";
 
 async function testHdel(useFirstImpl: boolean = true): Promise<boolean> {
   const redis = getRedisClient();

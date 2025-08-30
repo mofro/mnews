@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { updateNewsletterReadStatus, getRedisClient } from '@/lib/redis';
+import { updateNewsletterReadStatus, getRedisClient } from "@/lib/redisClient";
 
 type UpdateResult = 
   | { success: true }

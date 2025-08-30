@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getRedisClient } from '@/lib/redis';
+import { getRedisClient } from "@/lib/redisClient";
 import { cleanNewsletterContent } from '@/lib/cleaners/contentCleaner';
 
 type ArchiveRequest = NextApiRequest & {

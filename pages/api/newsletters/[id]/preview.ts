@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { updateNewsletterContent } from '@/lib/redis';
+import { updateNewsletterContent } from "@/lib/redisClient";
 import logger from '../../../../utils/logger';
 
 type PreviewRequest = NextApiRequest & {

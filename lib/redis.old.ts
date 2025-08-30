@@ -680,7 +680,8 @@ export async function updateNewsletterContent(
           }
         }
       } else if (typeof existingMetadata === 'object' && existingMetadata !== null) {
-        metadata = { ...existingMetadata };
+        // Properly clone the object to avoid TypeScript errors
+        metadata = Object.assign({}, existingMetadata);
       }
     }
     
