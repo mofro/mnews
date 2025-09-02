@@ -1,14 +1,24 @@
 {
   "rules": [
     {
-      "id": "no-immediate-refactor",
-      "description": "Don't enter into a refactor immediately after discovering an issue",
+      "id": "plan-before-action",
+      "description": "Always present a clear plan and get explicit approval before making ANY changes",
       "steps": [
-        "Explicate the issue clearly",
-        "Mention the presumed fix",
-        "Analyze if it's a surface-level issue or root cause",
-        "Make the assessment known",
-        "Wait for confirmation before proceeding"
+        "State the proposed action clearly",
+        "List exact files and changes to be made",
+        "Explain why these changes are needed",
+        "Wait for explicit approval before proceeding",
+        "If unsure, ask clarifying questions first"
+      ]
+    },
+    {
+      "id": "no-immediate-refactor",
+      "description": "Never immediately refactor - always analyze first",
+      "steps": [
+        "Explicitly state the issue",
+        "Describe the proposed fix",
+        "Confirm if it addresses root cause or symptoms",
+        "Get approval before making any changes"
       ]
     }
   ]

@@ -108,8 +108,8 @@ export class IncrementalNewsletterParser {
         finalOutput: fallbackContent,
         steps: [{ 
           stepName: 'fallback', 
-          input: rawHTML.substring(0, 100) + '...', 
-          output: fallbackContent.substring(0, 100) + '...', 
+          input: rawHTML, 
+          output: fallbackContent, 
           success: false,
           error: error instanceof Error ? error.message : 'Unknown error'
         }],
@@ -148,8 +148,8 @@ export class IncrementalNewsletterParser {
       
       steps.push({
         stepName: 'basic-html-to-text',
-        input: input.substring(0, 200) + '...',
-        output: text.substring(0, 200) + '...',
+        input: input,
+        output: text,
         success: true
       });
       
@@ -158,7 +158,7 @@ export class IncrementalNewsletterParser {
     } catch (error) {
       steps.push({
         stepName: 'basic-html-to-text',
-        input: input.substring(0, 200) + '...',
+        input: input,
         output: content, // Return original on failure
         success: false,
         error: error instanceof Error ? error.message : 'Step 1 failed'
@@ -205,8 +205,8 @@ export class IncrementalNewsletterParser {
       
       steps.push({
         stepName: 'clean-whitespace-enhanced',
-        input: input.substring(0, 200) + '...',
-        output: cleaned.substring(0, 200) + '...',
+        input: input,
+        output: cleaned,
         success: true
       });
       
@@ -215,7 +215,7 @@ export class IncrementalNewsletterParser {
     } catch (error) {
       steps.push({
         stepName: 'clean-whitespace-enhanced',
-        input: input.substring(0, 200) + '...',
+        input: input,
         output: content,
         success: false,
         error: error instanceof Error ? error.message : 'Enhanced Step 2 failed'
@@ -254,8 +254,8 @@ export class IncrementalNewsletterParser {
       
       steps.push({
         stepName: 'recover-structure-enhanced',
-        input: input.substring(0, 200) + '...',
-        output: structured.substring(0, 200) + '...',
+        input: input,
+        output: structured,
         success: true
       });
       
@@ -264,7 +264,7 @@ export class IncrementalNewsletterParser {
     } catch (error) {
       steps.push({
         stepName: 'recover-structure-enhanced',
-        input: input.substring(0, 200) + '...',
+        input: input,
         output: content,
         success: false,
         error: error instanceof Error ? error.message : 'Enhanced Step 3 failed'
@@ -287,8 +287,8 @@ export class IncrementalNewsletterParser {
       
       steps.push({
         stepName: 'preserve-links',
-        input: input.substring(0, 200) + '...',
-        output: content.substring(0, 200) + '...',
+        input: input,
+        output: content,
         success: true
       });
       
@@ -297,7 +297,7 @@ export class IncrementalNewsletterParser {
     } catch (error) {
       steps.push({
         stepName: 'preserve-links',
-        input: input.substring(0, 200) + '...',
+        input: input,
         output: content,
         success: false,
         error: error instanceof Error ? error.message : 'Step 4 failed'
@@ -320,8 +320,8 @@ export class IncrementalNewsletterParser {
       
       steps.push({
         stepName: 'handle-images',
-        input: input.substring(0, 200) + '...',
-        output: content.substring(0, 200) + '...',
+        input: input,
+        output: content,
         success: true
       });
       
@@ -330,7 +330,7 @@ export class IncrementalNewsletterParser {
     } catch (error) {
       steps.push({
         stepName: 'handle-images',
-        input: input.substring(0, 200) + '...',
+        input: input,
         output: content,
         success: false,
         error: error instanceof Error ? error.message : 'Step 5 failed'

@@ -6,11 +6,12 @@ export interface Newsletter {
   date: string;
   isNew: boolean;        // Your existing field
   
-  // NEW: Additive content model
+  // Content model
   rawContent: string;      // Original email content
   cleanContent?: string;   // Processed clean content
+  url?: string;            // URL to the original article
   
-  // NEW: Processing metadata
+  // Processing metadata
   metadata: {
     processingVersion: string;
     processedAt: string;
@@ -25,7 +26,7 @@ export interface Newsletter {
     trashedAt?: string; // For future trash implementation
   };
   
-  // LEGACY: Backward compatibility (will be deprecated)
+  // Backward compatibility
   content: string;         // Keep for existing dashboard compatibility
 }
 

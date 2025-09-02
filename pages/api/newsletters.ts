@@ -81,6 +81,24 @@ export default async function handler(
       skip + pageSize,
     );
 
+    // Log content field information for debugging
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('Newsletters API Response Sample:', {
+        sampleSize: Math.min(3, paginatedNewsletters.length),
+        newsletters: paginatedNewsletters.slice(0, 3).map(n => ({
+          id: n.id,
+          subject: n.subject,
+          hasContent: Boolean(n.content),
+          hasCleanContent: Boolean(n.cleanContent),
+          hasRawContent: Boolean(n.rawContent),
+          contentLength: n.content?.length,
+          cleanContentLength: n.cleanContent?.length,
+          rawContentLength: n.rawContent?.length,
+          metadata: n.metadata
+        }))
+      });
+    }
+
     // Calculate stats for the response
     const stats: DashboardStats = {
       totalNewsletters: filteredNewsletters.length,
@@ -117,7 +135,7 @@ export default async function handler(
           readAt: metadata.readAt,
           archivedAt: metadata.archivedAt,
         },
-        cleanContent: cleanContent?.substring(0, 200), // Truncate content for the list view
+        cleanContent: cleanContent, // Removed truncation
       }),
     );
 

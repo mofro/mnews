@@ -24,14 +24,13 @@ async function findArticle(redis: any, id: string) {
       
       if (typeof data === 'string') {
         console.log(`[findArticle] Data is string, length: ${data.length}`);
-        console.log(`[findArticle] First 100 chars: ${data.substring(0, 100)}...`);
         try {
           const parsedData = JSON.parse(data);
           console.log(`[findArticle] Successfully parsed JSON for ${exactKey}`);
           return { data: parsedData, key: exactKey };
         } catch (parseError) {
           console.error(`[findArticle] Error parsing JSON for key ${exactKey}:`, parseError);
-          console.error(`[findArticle] Content that failed to parse: ${data.substring(0, 500)}`);
+          console.error(`[findArticle] Content that failed to parse:`, data);
         }
       } else if (typeof data === 'object' && data !== null) {
         console.log(`[findArticle] Data is object, keys:`, Object.keys(data));
@@ -258,8 +257,8 @@ export default async function handler(
       ...(process.env.NODE_ENV === 'development' && { _raw: articleData })
     };
     
-    // Log the first 200 chars of content for debugging
-    console.log(`Content preview (first 200 chars): ${formattedArticle.content?.substring(0, 200)}...`);
+    // Log content length for debugging
+    console.log(`Content length: ${formattedArticle.content?.length || 0} chars`);
     
     return res.status(200).json({
       success: true,

@@ -9,7 +9,7 @@ import Link from "next/link";
 import { ArticleGridCard } from "@/components/newsletter/ArticleGridCard";
 import { BentoGrid } from "@/components/layout/BentoGrid";
 import { BentoItem } from "@/components/layout/BentoItem";
-import { FullViewArticle } from "@/components/article/FullViewArticle";
+import FullViewArticle from "@/components/article/FullViewArticle";
 import { Pagination } from "@/components/common/Pagination";
 import newslettersData from "@/data/newsletters.json";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ interface NewsletterData {
   content: string;
   cleanContent?: string;
   rawContent?: string;
+  url?: string; // URL to the original article
   metadata?: {
     redisIndex?: string;
     isRead?: boolean;
@@ -106,6 +107,7 @@ interface TransformedArticle {
   isArchived: boolean;
   tags: string[];
   imageUrl?: string;
+  url?: string; // URL to the original article
 }
 
 // Transform the newsletter data to match the expected article format
@@ -146,11 +148,14 @@ const transformNewsletterToArticle = (
     subject: newsletter.subject || "No Subject",
     date: newsletter.date || new Date().toISOString(),
     content,
+    cleanContent: newsletter.cleanContent,
+    rawContent: newsletter.rawContent,
     isNew: !isRead,
     isRead,
     isArchived,
     tags,
     imageUrl,
+    url: newsletter.url, // Include the URL if available
   };
 
   logger.debug("Transformed article:", {
@@ -360,7 +365,8 @@ export default function TestArticleGrid() {
                 articleDate = new Date().toISOString();
               }
 
-              return {
+              // Preserve all content fields without truncation
+              const article = {
                 id:
                   newsletter.id ||
                   `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -368,18 +374,29 @@ export default function TestArticleGrid() {
                 sender: newsletter.sender || "Unknown Sender",
                 subject: newsletter.subject || "No Subject",
                 date: articleDate,
-                content: cleanContent || "No content available",
+                // Use the original content fields without modification
+                content: newsletter.content || cleanContent || "No content available",
+                cleanContent: newsletter.cleanContent || cleanContent || "",
+                rawContent: newsletter.rawContent || "",
                 isNew: newsletter.isNew || false,
-                isRead:
-                  newsletter.isRead || newsletter.metadata?.isRead || false,
-                isArchived:
-                  newsletter.isArchived ||
-                  newsletter.metadata?.archived ||
-                  false,
+                isRead: newsletter.isRead || newsletter.metadata?.isRead || false,
+                isArchived: newsletter.isArchived || newsletter.metadata?.archived || false,
                 tags: newsletter.tags || [],
                 imageUrl: newsletter.imageUrl || "",
-                rawContent: newsletter.rawContent || "",
+                url: newsletter.url || ""
               };
+
+              // Debug log the content lengths
+              debugLog(`Article content lengths - ID: ${article.id}`, {
+                contentLength: article.content?.length || 0,
+                cleanContentLength: article.cleanContent?.length || 0,
+                rawContentLength: article.rawContent?.length || 0,
+                hasContent: !!article.content,
+                hasCleanContent: !!article.cleanContent,
+                hasRawContent: !!article.rawContent
+              });
+
+              return article;
             },
           );
 
@@ -562,6 +579,41 @@ export default function TestArticleGrid() {
   const handleCloseFullView = useCallback(() => {
     setFullViewArticle(null);
   }, []);
+
+  // Memoize the article object to prevent unnecessary re-renders
+  const memoizedArticle = useMemo(() => {
+    if (!fullViewArticle) return null;
+    
+    const article = {
+      id: fullViewArticle.id,
+      title: fullViewArticle.subject,
+      content: fullViewArticle.content || fullViewArticle.cleanContent || fullViewArticle.rawContent || "",
+      publishDate: fullViewArticle.date,
+      sender: fullViewArticle.sender,
+      tags: fullViewArticle.tags || [],
+      imageUrl: fullViewArticle.imageUrl,
+      isRead: fullViewArticle.isRead || false,
+      isArchived: fullViewArticle.isArchived || false,
+      rawContent: fullViewArticle.rawContent,
+      cleanContent: fullViewArticle.cleanContent,
+      url: fullViewArticle.url
+    };
+    
+    // Log the available content for debugging in development only
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('Article content available:', {
+        id: article.id,
+        hasContent: !!article.content,
+        hasRawContent: !!article.rawContent,
+        hasCleanContent: !!article.cleanContent,
+        contentPreview: article.content?.substring(0, 100) + '...',
+        rawContentPreview: article.rawContent?.substring(0, 100) + '...',
+        cleanContentPreview: article.cleanContent?.substring(0, 100) + '...'
+      });
+    }
+    
+    return article;
+  }, [fullViewArticle]);
 
   // Toggle archive status
   const handleToggleArchive = useCallback(
@@ -1056,22 +1108,9 @@ export default function TestArticleGrid() {
         )}
 
         {/* Full View Article Modal */}
-        {fullViewArticle && (
+        {memoizedArticle && (
           <FullViewArticle
-            article={{
-              id: fullViewArticle.id,
-              title: fullViewArticle.subject,
-              content: fullViewArticle.content || "", // Start with empty content, will be loaded on demand
-              publishDate: fullViewArticle.date,
-              sender: fullViewArticle.sender,
-              tags: fullViewArticle.tags,
-              imageUrl: fullViewArticle.imageUrl,
-              isRead: fullViewArticle.isRead,
-              isArchived: fullViewArticle.isArchived,
-              // Include raw and clean content if available
-              rawContent: fullViewArticle.rawContent,
-              cleanContent: fullViewArticle.cleanContent
-            }}
+            article={memoizedArticle}
             onClose={handleCloseFullView}
             onToggleRead={handleToggleRead}
             onToggleArchive={handleToggleArchive}

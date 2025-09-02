@@ -52,15 +52,11 @@ export function ArticleGridCard({
   onExpand,
   className,
 }: ArticleGridCardProps) {
-  // Sanitize and truncate content for preview
+  // Sanitize content for preview
   const previewContent = useMemo(() => {
     if (!content) return "";
-
-    // Remove HTML tags and limit length
-    const plainText = DOMPurify.sanitize(content, { ALLOWED_TAGS: [] });
-    return plainText.length > 200
-      ? `${plainText.substring(0, 200)}...`
-      : plainText;
+    // Remove HTML tags but keep full content
+    return DOMPurify.sanitize(content, { ALLOWED_TAGS: [] });
   }, [content]);
 
   const formattedDate = useMemo(
