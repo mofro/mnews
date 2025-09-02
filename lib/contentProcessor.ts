@@ -77,7 +77,7 @@ export function processArticleContent(article: {
   }
 
   // 3. Clean and prepare HTML before sanitization
-  let cleanedContent = contentToProcess
+  const cleanedContent = contentToProcess
     // Fix common malformed tags and attributes first
     .replace(/<\/?di>/g, '') // Remove malformed <di> tags
     .replace(/<\/?titl[^>]*>/g, '') // Remove malformed <titl> tags
