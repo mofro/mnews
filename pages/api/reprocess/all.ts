@@ -54,6 +54,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       try {
         logger.info(`Processing newsletter ${newsletter.id}: ${newsletter.subject}`);
 
+        if (!newsletter.rawContent) {
+          logger.warn(`Skipping newsletter ${newsletter.id} - no raw content available`);
+          continue;
+        }
+
         // Clean the content first
         const cleanedResult = cleanNewsletterContent(newsletter.rawContent);
         

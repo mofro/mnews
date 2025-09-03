@@ -1,5 +1,18 @@
 import { Redis } from '@upstash/redis';
 import logger from '../utils/logger';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// Load environment variables from .env.local
+dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
+
+// Get environment variables
+const url = process.env.KV_REST_API_URL;
+const token = process.env.KV_REST_API_TOKEN;
+
+if (!url || !token) {
+  throw new Error('Missing required Redis environment variables: KV_REST_API_URL and KV_REST_API_TOKEN must be set');
+}
 
 type RedisConfig = {
   url: string;
@@ -27,18 +40,21 @@ class RedisClient {
   private config: RedisConfig;
 
   constructor() {
-    const url = process.env.KV_REST_API_URL?.trim();
-    const token = process.env.KV_REST_API_TOKEN?.trim();
-
-    if (!url || !token) {
-      const missingVars = [];
-      if (!url) missingVars.push('KV_REST_API_URL');
-      if (!token) missingVars.push('KV_REST_API_TOKEN');
-      throw new Error(`Missing required Redis environment variables: ${missingVars.join(', ')}`);
-    }
-
-    this.config = { url, token };
+    this.config = { url: url!, token: token! };
     this.client = new Redis(this.config);
+    
+    // Test the connection on initialization
+    this.testConnection()
+      .then(success => {
+        if (success) {
+          logger.info('Redis client initialized successfully');
+        } else {
+          logger.error('Failed to connect to Redis');
+        }
+      })
+      .catch(error => {
+        logger.error('Error initializing Redis client:', error);
+      });
   }
 
   /**
@@ -85,6 +101,26 @@ class RedisClient {
       return (await this.client.get(key)) as unknown as T;
     } catch (error) {
       logger.error(`Error getting key ${key}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove elements from a list
+   * @param key The key of the list
+   * @param count The number of occurrences to remove
+   * @param value The value to remove
+   * @returns The number of elements removed
+   */
+  async lrem(key: string, count: number, value: string): Promise<number> {
+    try {
+      type RedisWithLRem = typeof this.client & {
+        lrem: (key: string, count: number, value: string) => Promise<number>;
+      };
+      const client = this.client as RedisWithLRem;
+      return await client.lrem(key, count, value);
+    } catch (error) {
+      logger.error(`Error removing elements from list ${key}:`, error);
       throw error;
     }
   }

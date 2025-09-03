@@ -122,22 +122,26 @@ export default async function handler(
     };
 
     // Optimize the response by removing unnecessary fields
-    const optimizedNewsletters = paginatedNewsletters.map(
-      ({ id, subject, sender, date, isNew, metadata = {}, cleanContent }) => ({
+    const optimizedNewsletters = paginatedNewsletters.map((newsletter) => {
+      // Cast to Newsletter type to access isNew property
+      const typedNewsletter = newsletter as unknown as Newsletter;
+      const { id, subject, sender, date, metadata = {} as Newsletter['metadata'] } = newsletter;
+      
+      return {
         id,
         subject,
         sender,
         date,
-        isNew,
+        isNew: typedNewsletter.isNew ?? false, // Use isNew from Newsletter type with fallback
         metadata: {
           isRead: metadata.isRead ?? false,
           archived: metadata.archived ?? false,
           readAt: metadata.readAt,
           archivedAt: metadata.archivedAt,
         },
-        cleanContent: cleanContent, // Removed truncation
-      }),
-    );
+        cleanContent: newsletter.cleanContent, // Removed truncation
+      };
+    });
 
     res.status(200).json({
       newsletters: optimizedNewsletters,

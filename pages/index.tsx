@@ -141,9 +141,14 @@ const transformNewsletterToArticle = (
     metadata: newsletter.metadata,
   });
 
+  // Generate a unique ID by combining the original ID with a timestamp if available
+  const uniqueId = newsletter.id 
+    ? `${newsletter.id}-${Date.now()}` 
+    : `temp-${Date.now()}-${index}`;
+
   const result = {
-    id: newsletter.id || `temp-${index}`,
-    redisId,
+    id: uniqueId,
+    redisId: redisId || uniqueId, // Use the unique ID as redisId if not provided
     sender: newsletter.sender || "Unknown Sender",
     subject: newsletter.subject || "No Subject",
     date: newsletter.date || new Date().toISOString(),
@@ -1026,15 +1031,18 @@ export default function TestArticleGrid() {
                     </div>
                   )}
                   <BentoGrid columns={[1, 2, 2, 3]} gap={1.5}>
-                    {filteredArticles.map((article) => {
+                    {filteredArticles.map((article, index) => {
+                      // Create a unique key by combining the article ID and its index
+                      const uniqueKey = `${article.id}-${index}`;
                       logger.debug("Rendering article in grid:", {
                         id: article.id,
+                        key: uniqueKey,
                         subject: article.subject,
                         contentLength: article.content?.length,
                         hasImage: !!article.imageUrl,
                       });
                       return (
-                        <BentoItem key={article.id}>
+                        <BentoItem key={uniqueKey}>
                           <ArticleGridCard
                             id={article.id}
                             sender={article.sender}

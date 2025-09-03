@@ -28,6 +28,7 @@ export interface Newsletter {
   
   // Backward compatibility
   content: string;         // Keep for existing dashboard compatibility
+  hasFullContent?: boolean; // Flag indicating if full content is available
 }
 
 // BACKWARD COMPATIBILITY: Alias for existing dashboard

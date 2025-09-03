@@ -1,9 +1,31 @@
 # Lazy Loading Implementation Plan
 
 ## Overview
+
 This document outlines the plan to implement lazy loading of article content to improve performance and reduce bandwidth usage. The key idea is to only load full article content when needed (when a user clicks to read an article) rather than loading all content upfront.
 
+## Current Redis Schema
+
+```typescript
+// Current Structure
+{
+  // List of all newsletter IDs
+  "newsletter_ids": ["id1", "id2", ...],
+  
+  // Individual newsletter data
+  "newsletter:id1": {
+    id: string,
+    subject: string,
+    content: string,  // Full content
+    publishDate: string,
+    sender: string,
+    // ... other fields
+  }
+}
+```
+
 ## Current Architecture
+
 ```mermaid
 graph LR
     A[API /newsletters] -->|Returns full articles| B[Article List]
@@ -12,6 +34,7 @@ graph LR
 ```
 
 ## Proposed Architecture
+
 ```mermaid
 graph LR
     A[API /newsletters] -->|Returns summaries| B[Article List]
@@ -23,6 +46,7 @@ graph LR
 ## Data Model Changes
 
 ### Current
+
 ```typescript
 interface Article {
   id: string;
@@ -35,6 +59,7 @@ interface Article {
 ```
 
 ### New
+
 ```typescript
 interface ArticleSummary {
   id: string;
@@ -56,8 +81,10 @@ interface ArticleContent {
 ## API Endpoints
 
 ### 1. Get Article List (Updated)
+
 **Endpoint:** `GET /api/newsletters`
 **Response:**
+
 ```typescript
 {
   articles: ArticleSummary[];
@@ -66,8 +93,10 @@ interface ArticleContent {
 ```
 
 ### 2. Get Article Content (New)
+
 **Endpoint:** `GET /api/articles/:id/content`
 **Response:**
+
 ```typescript
 {
   content: string;  // Full HTML content
@@ -78,9 +107,59 @@ interface ArticleContent {
 
 ## Implementation Phases
 
+### Phase 0: Non-Breaking Schema Migration
+
+1. **Dual-Write Strategy**:
+   - New writes go to both old and new schemas
+   - Existing data remains accessible via old schema
+   - New endpoints use the new schema
+
+2. **New Redis Schema**:
+
+   ```typescript
+   // New structure (alongside existing)
+   "newsletter:meta:id1": {  // New key pattern
+     id: string,
+     subject: string,
+     summary: string,
+     publishDate: string,
+     sender: string,
+     hasFullContent: boolean,
+     // ... other metadata
+   }
+   
+   "newsletter:content:id1": {  // New key pattern
+     content: string,
+     processedAt: string
+   }
+   ```
+
+3. **Migration Script**:
+
+   ```typescript
+   // scripts/migrate-newsletters.ts
+   const ids = await redis.lrange('newsletter_ids', 0, -1);
+   for (const id of ids) {
+     const oldData = await redis.get(`newsletter:${id}`);
+     if (oldData) {
+       const article = JSON.parse(oldData);
+       await redis.hset(`newsletter:meta:${id}`, {
+         id: article.id,
+         subject: article.subject,
+         summary: generateSummary(article.content),
+         publishDate: article.publishDate,
+         sender: article.sender,
+         hasFullContent: true
+       });
+       await redis.set(`newsletter:content:${id}`, article.content);
+     }
+   }
+   ```
+
 ### Phase 1: Backend Changes
 
 #### 1.1 Content Summarization Utility
+
 ```typescript
 // utils/contentUtils.ts
 export function generateSummary(content: string, maxLength = 200): string {
@@ -92,6 +171,7 @@ export function generateSummary(content: string, maxLength = 200): string {
 ```
 
 #### 1.2 Update Storage Layer
+
 ```typescript
 // lib/storage.ts
 class ArticleStorage {
@@ -126,6 +206,7 @@ class ArticleStorage {
 ### Phase 2: Frontend Changes
 
 #### 2.1 Update ArticleGridCard
+
 ```tsx
 // components/newsletter/ArticleGridCard.tsx
 interface ArticleGridCardProps {
@@ -147,6 +228,7 @@ export function ArticleGridCard({ id, summary, onExpand }: ArticleGridCardProps)
 ```
 
 #### 2.2 Update FullViewArticle
+
 ```tsx
 // components/article/FullViewArticle.tsx
 interface FullViewArticleProps {
@@ -218,7 +300,7 @@ async function migrateArticles() {
 
 ## Performance Benefits
 
-1. **Reduced Initial Payload**: 
+1. **Reduced Initial Payload**:
    - Before: 100 articles × ~50KB = ~5MB
    - After: 100 articles × ~2KB = ~200KB
    - **Savings: ~96% reduction**
@@ -226,19 +308,45 @@ async function migrateArticles() {
 2. **Faster Time to Interactive**: Pages load faster with smaller payloads
 3. **Reduced Server Load**: Less data transferred per request
 4. **Better Mobile Experience**: Lower bandwidth usage for mobile users
+5. **Improved Cache Efficiency**: Smaller payloads increase cache hit rates
+6. **Progressive Enhancement**: Users see content faster while full content loads
 
 ## Potential Issues and Mitigations
 
 1. **Content Flash When Loading**
    - Mitigation: Show skeleton loaders during content fetch
+   - Strategy: Use React Suspense with fallback UI
 
 2. **API Latency**
-   - Mitigation: Implement client-side caching of fetched content
-   - Consider using SWR or React Query for better caching
+   - Mitigation: Implement client-side caching with stale-while-revalidate
+   - Strategy: Use SWR or React Query with appropriate cache TTLs
+   - Implementation:
+
+     ```typescript
+     // lib/cache.ts
+     const CACHE_NAME = 'newsletter-cache-v1';
+     
+     async function cacheArticle(article) {
+       const cache = await caches.open(CACHE_NAME);
+       await cache.put(
+         `/api/articles/${article.id}/content`,
+         new Response(JSON.stringify(article.content))
+       );
+     }
+     ```
 
 3. **Backward Compatibility**
-   - Mitigation: Keep old API endpoints working during transition
-   - Use feature flags to control rollout
+   - Mitigation: Dual-write during migration period
+   - Strategy: Keep old endpoints until all clients are updated
+   - Monitoring: Track usage of old vs new endpoints
+
+4. **Cache Invalidation**
+   - Strategy: Use content hashes or versioning
+   - Implementation: Include `ETag` or `Last-Modified` headers
+
+5. **Offline Support**
+   - Strategy: Service Worker caching for content
+   - Fallback: Show cached content with offline indicator
 
 ## Next Steps
 
@@ -251,8 +359,11 @@ async function migrateArticles() {
 
 ## Monitoring
 
-Add the following metrics:
-- Average article content size
-- Time to load full content
+For detailed metrics and monitoring implementation, see [Metrics Implementation Plan](./metrics_implementation_plan.md).
+
+Key metrics to track for lazy loading:
+
+- Content load times
 - Cache hit/miss rates
 - Error rates for content loading
+- Storage usage and eviction metrics
