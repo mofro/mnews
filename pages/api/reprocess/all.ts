@@ -5,6 +5,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { NewsletterStorage } from '../../../lib/storage';
 import { cleanNewsletterContent } from '../../../lib/cleaners/contentCleaner';
 import { IncrementalNewsletterParser, NewsletterParser } from '../../../lib/parser';
+import { redisClient } from '../../../lib/redisClient';
 import logger from '../../../utils/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -83,7 +84,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         });
 
         const newCleanContent = parseResult.cleanHTML || parseResult.finalOutput;
-        await NewsletterStorage.updateCleanContent(newsletter.id, newCleanContent);
+        
+        // Update the existing newsletter with new clean content
+        const existingNewsletter = await NewsletterStorage.getNewsletter(newsletter.id);
+        if (!existingNewsletter) {
+          throw new Error('Newsletter not found after reprocessing');
+        }
+        
+        // Update the clean content and processing version
+        existingNewsletter.cleanContent = newCleanContent;
+        
+        // Create a new metadata object with proper typing
+        const updatedMetadata = {
+          ...(existingNewsletter.metadata || {}),
+          processingVersion: parseResult.metadata.processingVersion,
+          // Only include valid metadata fields from parseResult
+          ...(parseResult.metadata.processingSteps && { processingSteps: parseResult.metadata.processingSteps }),
+          ...(parseResult.metadata.compressionRatio && { compressionRatio: parseResult.metadata.compressionRatio }),
+          // Add our custom metadata
+          _reprocessedAt: new Date().toISOString(),
+          _originalLength: newsletter.rawContent.length,
+          _newLength: newCleanContent.length
+        };
+        
+        existingNewsletter.metadata = updatedMetadata;
+        
+        // Save the updated newsletter
+        await redisClient.client.set(
+          `newsletter:${newsletter.id}`, 
+          JSON.stringify(existingNewsletter)
+        );
 
         results.push({
           newsletterId: newsletter.id,
@@ -95,11 +125,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               id: newsletter.id,
               subject: newsletter.subject,
               cleanContent: newCleanContent,
-              metadata: {
-                ...parseResult.metadata,
-                originalLength: newsletter.rawContent.length,
-                newLength: newCleanContent.length
-              }
+              metadata: existingNewsletter.metadata
             },
             processingInfo: {
               originalVersion: newsletter.metadata?.processingVersion || 'unknown',

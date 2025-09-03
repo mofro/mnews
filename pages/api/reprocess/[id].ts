@@ -10,6 +10,7 @@ import {
   ProcessingStep 
 } from '../../../lib/parser';
 import { cleanNewsletterContent } from '../../../lib/cleaners/contentCleaner';
+import { redisClient } from '../../../lib/redisClient';
 import logger from '../../../utils/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -99,7 +100,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     // Update the newsletter with new content
     try {
-      await NewsletterStorage.updateCleanContent(id, parseResult.finalOutput);
+      // Get the existing newsletter to preserve other fields
+      const existingNewsletter = await NewsletterStorage.getNewsletter(id);
+      if (!existingNewsletter) {
+        throw new Error('Newsletter not found after reprocessing');
+      }
+      
+      // Update the clean content and processing version
+      existingNewsletter.cleanContent = parseResult.finalOutput;
+      existingNewsletter.metadata = existingNewsletter.metadata || {};
+      existingNewsletter.metadata.processingVersion = parseResult.metadata.processingVersion;
+      
+      // Save the updated newsletter
+      await redisClient.client.set(
+        `newsletter:${id}`, 
+        JSON.stringify(existingNewsletter)
+      );
+      
       logger.log('Successfully updated newsletter content');
     } catch (updateError) {
       logger.error('Failed to update newsletter:', updateError);
