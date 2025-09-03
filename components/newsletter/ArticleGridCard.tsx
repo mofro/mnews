@@ -131,7 +131,7 @@ export function ArticleGridCard({
       onKeyDown={handleKeyDown}
       aria-label={`Open article: ${subject}`}
     >
-      {imageUrl && !imageError ? (
+      {imageUrl && !imageError && (
         <div className="relative aspect-video overflow-hidden bg-muted/20">
           <Image
             src={imageUrl}
@@ -145,13 +145,6 @@ export function ArticleGridCard({
             loading="lazy"
             unoptimized={imageUrl.startsWith("http")} // Only optimize local images
           />
-        </div>
-      ) : (
-        <div className="relative aspect-video bg-muted/50 flex flex-col items-center justify-center gap-2 p-4 text-center">
-          <ImageOff className="w-8 h-8 text-muted-foreground/50" />
-          <span className="text-sm text-muted-foreground">
-            No image available
-          </span>
         </div>
       )}
 
