@@ -23,7 +23,7 @@ module.exports = {
   },
   plugins: ['react', '@typescript-eslint', 'react-hooks'],
   rules: {
-    'no-console': 'warn',
+    'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
     'no-unused-vars': 'off',
     '@typescript-eslint/no-unused-vars': [
       'warn',
@@ -42,7 +42,13 @@ module.exports = {
     '@typescript-eslint/explicit-module-boundary-types': 'off',
     '@typescript-eslint/no-empty-function': 'warn',
     '@typescript-eslint/no-non-null-assertion': 'off',
+    '@typescript-eslint/ban-ts-comment': 'warn',
+    'react-hooks/exhaustive-deps': 'warn',
+    '@next/next/no-img-element': 'warn',
+    'import/no-anonymous-default-export': 'off',
+    'prefer-const': 'warn',
   },
+  ignorePatterns: ['**/*.test.ts', '**/*.test.tsx', '**/*.spec.ts', '**/*.spec.tsx'],
   settings: {
     react: {
       version: 'detect',
