@@ -1,0 +1,16 @@
+**/*.test.ts
+**/*.spec.ts
+**/__tests__/**
+**/__mocks__/**
+**/node_modules/**
+**/.next/**
+**/out/**
+**/dist/**
+**/public/**
+**/types/**
+**/coverage/**
+**/*.d.ts
+**/*.js
+**/*.mjs
+**/*.cjs
+scripts/**
