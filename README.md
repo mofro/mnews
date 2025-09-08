@@ -7,7 +7,7 @@ Nemo helps you find your newsletters in the vast ocean of email by aggregating f
 ## Features
 
 - 📧 **Email forwarding integration** - Forward newsletters to a webhook
-- 🔍 **Search and filter** - Find newsletters by sender or content  
+- 🔍 **Search and filter** - Find newsletters by sender or content
 - 📱 **Mobile-friendly** - Check your news on any device
 - 🕐 **Recency indicators** - See what's new today
 - 📄 **Expandable content** - Read full newsletters in-place
@@ -28,6 +28,7 @@ Nemo helps you find your newsletters in the vast ocean of email by aggregating f
 ## Quick Start
 
 ### 1. Install Dependencies
+
 ```bash
 npm install
 # or
@@ -35,9 +36,10 @@ yarn install
 ```
 
 ### 2. Development Server
+
 ```bash
 npm run dev
-# or  
+# or
 yarn dev
 ```
 
@@ -64,6 +66,7 @@ npm run migrate:rollback:run
 ```
 
 ### 3. Deploy to Vercel
+
 ```bash
 # Connect to GitHub repo and deploy
 npx vercel
@@ -75,11 +78,13 @@ npx vercel
 ### 4. Set Up Email Forwarding
 
 Forward your newsletters to your webhook endpoint:
+
 ```
 https://your-project.vercel.app/api/webhook
 ```
 
 The webhook expects POST requests with email data:
+
 ```json
 {
   "from": "newsletter@example.com",
@@ -139,13 +144,14 @@ mnews/
 The webhook is designed to work with email forwarding services. You may need to adjust the webhook format based on your email provider:
 
 - **Zapier Email Parser**
-- **Gmail forwarding rules**  
+- **Gmail forwarding rules**
 - **SendGrid Inbound Parse**
 - **Mailgun Routes**
 
 ### Environment Variables
 
 Create `.env.local` for any configuration:
+
 ```env
 # Optional: Add webhook authentication
 WEBHOOK_SECRET=your-secret-key
@@ -166,6 +172,7 @@ STORAGE_PATH=./data/newsletters.json
 ### Testing Webhook Locally
 
 Use ngrok to test email forwarding during development:
+
 ```bash
 # Install ngrok
 npm install -g ngrok
@@ -173,7 +180,7 @@ npm install -g ngrok
 # In one terminal
 npm run dev
 
-# In another terminal  
+# In another terminal
 ngrok http 3000
 
 # Use the ngrok URL for webhook testing
@@ -196,4 +203,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 **Built with Next.js, TypeScript, and a love for organized information** 📰
 
-*"Just keep swimming... through newsletters!"* 🐠
+_"Just keep swimming... through newsletters!"_ 🐠
