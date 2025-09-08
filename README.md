@@ -1,41 +1,77 @@
-# 🐠 Nemo (mnews)
+# 📰 MNews
 
-Personal newsletter aggregation and digest system
+Modern Newsletter Management System
 
-Nemo helps you find your newsletters in the vast ocean of email by aggregating forwarded newsletters into a single, searchable dashboard!
+MNews is a powerful tool for managing and reading newsletters in a clean, organized interface. It helps you take control of your newsletter subscriptions and reading experience.
 
-## Features
+## ✨ Features
 
-- 📧 **Email forwarding integration** - Forward newsletters to a webhook
-- 🔍 **Search and filter** - Find newsletters by sender or content
-- 📱 **Mobile-friendly** - Check your news on any device
-- 🕐 **Recency indicators** - See what's new today
-- 📄 **Expandable content** - Read full newsletters in-place
-- 🏷️ **Source filtering** - Focus on specific newsletter sources
+- 📧 **Email Integration** - Webhook support for receiving newsletters
+- 📱 **Responsive Design** - Optimized for all device sizes
+- 🔍 **Content Processing** - Clean, readable formatting of newsletter content
+- 🏷️ **Organization** - Mark as read/unread, archive, and filter newsletters
+- 📊 **Statistics** - Track your reading habits and newsletter sources
+- ⚡ **Fast** - Built with Next.js for optimal performance
 
-## Project Structure
+## 🏗️ Project Structure
 
 ```text
-├── .devnotes/         # Local development notes and documentation (not version controlled)
-├── components/        # React components
-├── pages/            # Next.js pages and API routes
-├── public/           # Static files
+├── .devnotes/         # Development documentation and notes
+├── components/        # Reusable React components
+│   ├── article/      # Article display components
+│   ├── common/       # Shared UI components
+│   ├── layout/       # Layout components
+│   └── newsletter/   # Newsletter-specific components
+├── context/          # React context providers
+├── data/             # Static data files
+├── docs/             # Project documentation
+├── hooks/            # Custom React hooks
+├── lib/              # Core application logic
+│   └── cleaners/     # Content cleaning utilities
+├── pages/
+│   ├── api/          # API routes
+│   └── ...           # Next.js pages
+├── public/           # Static assets
+├── scripts/          # Utility scripts
 ├── styles/           # Global styles
 ├── types/            # TypeScript type definitions
 └── utils/            # Utility functions
 ```
 
-## Quick Start
+## 🚀 Quick Start
 
-### 1. Install Dependencies
+### Prerequisites
+
+- Node.js 16+
+- Redis (Upstash Redis recommended)
+- npm or yarn
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/mofro/mnews.git
+cd mnews
+```
+
+### 2. Install Dependencies
 
 ```bash
 npm install
 # or
-yarn install
+yarn
 ```
 
-### 2. Development Server
+### 3. Environment Setup
+
+Create a `.env.local` file:
+
+```env
+KV_REST_API_URL=your_redis_url
+KV_REST_API_TOKEN=your_redis_token
+NEXT_PUBLIC_API_URL=http://localhost:3000
+```
+
+### 4. Development Server
 
 ```bash
 npm run dev
@@ -43,13 +79,44 @@ npm run dev
 yarn dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) to see the dashboard (WIP).
+Visit [http://localhost:3000](http://localhost:3000) to see the application.
 
-## Data Migration
+## 📦 Production Build
 
-For migrating newsletter data between schemas, see the [Migration Guide](./docs/MIGRATION_GUIDE.md).
+```bash
+npm run build
+npm start
+```
 
-### Quick Reference
+## 🔧 Development
+
+### Available Scripts
+
+- `dev` - Start development server
+- `build` - Create production build
+- `start` - Start production server
+- `lint` - Run ESLint
+- `test` - Run tests
+
+### Code Style
+
+This project uses:
+
+- ESLint for code linting
+- Prettier for code formatting
+- TypeScript for type safety
+
+### Documentation
+
+- [API Documentation](./.devnotes/actual-api-endpoints.md)
+- [Architecture](./.devnotes/architecture.md)
+- [Technical Specifications](./.devnotes/technical-spec.md)
+
+## 📝 License
+
+MIT © [Your Name]
+
+## 🔄 Quick Reference
 
 ```bash
 # Test migration with sample data
@@ -65,7 +132,9 @@ npm run migrate:newsletters:run
 npm run migrate:rollback:run
 ```
 
-### 3. Deploy to Vercel
+## 🚀 Deployment
+
+### Deploy to Vercel
 
 ```bash
 # Connect to GitHub repo and deploy
