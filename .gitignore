@@ -48,6 +48,9 @@ next-env.d.ts
 
 # IDEs
 .cascade/
+
+# Backup files
+*.bak
 .vscode/
 .idea/
 *.swp
