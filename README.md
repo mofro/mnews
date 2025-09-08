@@ -43,7 +43,7 @@ npm run dev
 yarn dev
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) to see the dashboard.
+Visit [http://localhost:3000](http://localhost:3000) to see the dashboard (WIP).
 
 ## Data Migration
 
