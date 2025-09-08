@@ -47,7 +47,7 @@ next-env.d.ts
 .devnotes/
 
 # IDEs
-.cascade
+.cascade/
 .vscode/
 .idea/
 *.swp
