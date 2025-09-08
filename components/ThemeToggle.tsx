@@ -1,15 +1,17 @@
-import { useTheme } from '../context/ThemeContext.js';
+import { useTheme } from "@/context/ThemeContext";
 
 export const ThemeToggle = () => {
   const { theme, toggleTheme } = useTheme();
-  
+
   return (
     <button
       onClick={toggleTheme}
       className="p-2 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:focus:ring-offset-gray-800"
-      aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label={
+        theme === "dark" ? "Switch to light mode" : "Switch to dark mode"
+      }
     >
-      {theme === 'dark' ? (
+      {theme === "dark" ? (
         <svg
           className="w-5 h-5 text-yellow-300"
           fill="currentColor"
