@@ -21,7 +21,6 @@
       "dest": "/$1"
     }
   ],
-  "nodeVersion": "18.x",
   "regions": ["iad1"],
   "functions": {
     "pages/api/**/*.ts": {
