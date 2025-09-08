@@ -10,12 +10,14 @@ export default async function handler(
   }
 
   try {
-    const redis = getRedisClient();
+    const redis = await getRedisClient();
     
-    // Test connection using client helper
-    const connection = await redis.testConnectionDetailed();
-    if (!connection.success) {
-      throw new Error(connection.error || 'Redis connection failed');
+    // Test connection by pinging Redis
+    try {
+      const pingResponse = await redis.ping();
+      console.log('Redis ping response:', pingResponse);
+    } catch (error) {
+      throw new Error(`Redis connection test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
     // Get all keys
@@ -23,49 +25,53 @@ export default async function handler(
     
     // Get sample data from first 5 keys
     const sampleData: Record<string, unknown> = {};
-    for (const key of keys.slice(0, 5)) {
+    const keysToCheck = keys.slice(0, 5);
+    
+    for (const key of keysToCheck) {
       try {
         // Try to get as string first
         const value = await redis.get(key);
-        if (value) {
+        if (value !== null) {
           try {
-            sampleData[key] = JSON.parse(value);
+            // Try to parse as JSON if it's a string
+            sampleData[key] = typeof value === 'string' ? JSON.parse(value) : value;
           } catch {
             sampleData[key] = value;
           }
         } else {
-          // Try to get as hash
-          const hash = await redis.hgetall(key);
-          if (hash && Object.keys(hash).length > 0) {
-            sampleData[key] = hash;
-          } else {
-            sampleData[key] = null;
+          // Try to get as hash if string is null
+          try {
+            const hash = await redis.hgetall(key);
+            if (hash && typeof hash === 'object' && Object.keys(hash).length > 0) {
+              sampleData[key] = hash;
+            } else {
+              sampleData[key] = null;
+            }
+          } catch (hashError) {
+            console.error(`Error getting hash for key ${key}:`, hashError);
+            sampleData[key] = { error: 'Error getting hash data' };
           }
         }
       } catch (error) {
         const err = error instanceof Error ? error : new Error(String(error));
+        console.error(`Error processing key ${key}:`, err);
         sampleData[key] = { error: err.message };
       }
     }
     
     return res.status(200).json({
       success: true,
-      connection,
+      connection: 'OK',
       totalKeys: keys.length,
-      keys,
       sampleData
     });
     
   } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    console.error('Redis debug error:', err);
+    console.error('Error in debug-redis:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return res.status(500).json({
       success: false,
-      message: 'Error debugging Redis',
-      error: err.message,
-      ...(process.env.NODE_ENV === 'development' && {
-        stack: err.stack
-      })
+      error: errorMessage
     });
   }
 }

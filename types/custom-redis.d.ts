@@ -1,4 +1,4 @@
-import { Redis } from '@upstash/redis';
+import { Redis } from '.upstash/redis';
 
 declare module '@upstash/redis' {
   interface Redis {

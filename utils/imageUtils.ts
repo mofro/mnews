@@ -149,13 +149,13 @@ interface UnsplashImageOptions {
    * @param options - Image options like width, height, etc.
    * @returns Unsplash image URL
    */
-  export function getUnsplashImage(query: string = '', options: UnsplashImageOptions = {}): string {
+  export function getUnsplashImage(_query: string = '', _options: UnsplashImageOptions = {}): string {
     const { 
       width = IMAGE_WIDTH, 
       height = IMAGE_HEIGHT,
       grayscale = true,
       blur = 1
-    } = options;
+    } = _options;
 
     // Select a random photo ID from our curated list
     const randomIndex = Math.floor(Math.random() * UNSPLASH_PHOTOS.length);
@@ -182,36 +182,7 @@ interface UnsplashImageOptions {
     return `${UNSPLASH_SOURCE}${photoId}?${params.toString()}`;
   }
 
-  /**
-   * Extract keywords from text for image search
-   * @param text - Text to extract keywords from
-   * @returns Array of relevant keywords
-   */
-  function extractKeywords(text: string): string[] {
-    if (!text) return [];
-    
-    // Common words to exclude
-    const stopWords = new Set([
-      'a', 'an', 'the', 'and', 'or', 'but', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-      'to', 'of', 'in', 'on', 'at', 'by', 'for', 'with', 'about', 'as', 'into', 'like',
-      'through', 'after', 'over', 'between', 'out', 'against', 'during', 'before', 'after',
-      'above', 'below', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under',
-      'again', 'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how',
-      'all', 'any', 'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no',
-      'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'can',
-      'will', 'just', 'don', 'should', 'now', 'd', 'll', 'm', 'o', 're', 've', 'y', 'ain', 'aren', 'couldn',
-      'didn', 'doesn', 'hadn', 'hasn', 'haven', 'isn', 'ma', 'mightn', 'mustn', 'needn',
-      'shan', 'shouldn', 'wasn', 'weren', 'won', 'wouldn'
-    ]);
-
-    // Extract words, remove punctuation, and filter out stop words
-    return text
-      .toLowerCase()
-      .replace(/[^\w\s]|_/g, '') // Remove punctuation
-      .replace(/\s+/g, ' ') // Normalize whitespace
-      .split(' ')
-      .filter(word => word.length > 2 && !stopWords.has(word));
-  }
+  // extractKeywords function removed as it's not being used
 
   /**
    * Get a relevant Unsplash image URL for a given article title
@@ -219,11 +190,11 @@ interface UnsplashImageOptions {
    * @param options - Image options
    * @returns Unsplash image URL
    */
-  export function getArticleImage(title: string = '', options: UnsplashImageOptions = {}): string {
+  export function getArticleImage(_title: string = '', _options: UnsplashImageOptions = {}): string {
     // Use a simpler approach with our curated list
     return getUnsplashImage('', {
-      width: options.width || IMAGE_WIDTH,
-      height: options.height || IMAGE_HEIGHT,
+      width: _options.width || IMAGE_WIDTH,
+      height: _options.height || IMAGE_HEIGHT,
       grayscale: true,  // Always use grayscale for consistency
       blur: 1           // Slight blur for better text readability
     });
@@ -231,7 +202,7 @@ interface UnsplashImageOptions {
   
   function isImageUrlValid(url: string): boolean {
     try {
-      const { hostname, pathname } = new URL(url);
+      const { pathname } = new URL(url);
       const invalidExtensions = ['.svg', '.gif'];
       const hasInvalidExtension = invalidExtensions.some(ext => 
         pathname.toLowerCase().endsWith(ext)

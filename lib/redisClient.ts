@@ -1,7 +1,7 @@
 import { Redis } from '@upstash/redis';
-import logger from '../utils/logger';
+import logger from '../utils/logger.js';
 import dotenv from 'dotenv';
-import path from 'path';
+import path from 'node:path';
 
 // Load environment variables from .env.local
 dotenv.config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -25,7 +25,7 @@ type ConnectionTestResult = {
   pingTime?: number;
 };
 
-type UpdateResult<T = undefined> = 
+type UpdateResult<T = undefined> =
   | { success: true; data?: T }
   | { success: false; error: string; details?: any };
 
@@ -42,7 +42,7 @@ class RedisClient {
   constructor() {
     this.config = { url: url!, token: token! };
     this.client = new Redis(this.config);
-    
+
     // Test the connection on initialization
     this.testConnection()
       .then(success => {
@@ -62,11 +62,80 @@ class RedisClient {
    */
   async testConnection(): Promise<boolean> {
     try {
-      const result = await this.client.ping();
-      return result === 'PONG';
+      const start = Date.now();
+      await this.client.ping();
+      const pingTime = Date.now() - start;
+      logger.info(`Redis connection test successful. Ping: ${pingTime}ms`);
+      return true;
     } catch (error) {
       logger.error('Redis connection test failed:', error);
       return false;
+    }
+  }
+
+  /**
+   * Verifies and repairs the integrity of the newsletter IDs list
+   * @returns Object with repair statistics
+   */
+  async verifyAndRepairNewsletterIds(): Promise<{
+    repaired: boolean;
+    added: number;
+    removed: number;
+    total: number;
+  }> {
+    try {
+      // Get all newsletter content keys
+      const allKeys = await this.keys('newsletter:*');
+      const contentKeys = allKeys.filter(
+        k => k.startsWith('newsletter:') && 
+             !k.startsWith('newsletter:meta:') && 
+             k !== 'newsletter_ids'
+      );
+
+      // Extract IDs from content keys
+      const contentIds = new Set(contentKeys.map(k => k.split(':')[1]));
+      
+      // Get current list of IDs
+      const currentIds = await this.lrange('newsletter_ids', 0, -1);
+      const currentIdSet = new Set(currentIds);
+
+      // Find missing and extra IDs
+      const missingIds = Array.from(contentIds).filter(id => !currentIdSet.has(id));
+      const extraIds = currentIds.filter(id => !contentIds.has(id));
+
+      // If no issues found
+      if (missingIds.length === 0 && extraIds.length === 0) {
+        return { repaired: false, added: 0, removed: 0, total: contentIds.size };
+      }
+
+      // Rebuild the list if needed
+      if (missingIds.length > 0 || extraIds.length > 0) {
+        // Remove extra IDs from the list
+        if (extraIds.length > 0) {
+          // Remove IDs one by one to avoid spread operator issues with tuples
+          for (const id of extraIds) {
+            await this.lrem('newsletter_ids', 0, id);
+          }
+        }
+        
+        // Add missing IDs to the list
+        if (missingIds.length > 0) {
+          await this.lpush('newsletter_ids', ...missingIds);
+        }
+
+        logger.info(`Repaired newsletter_ids: Added ${missingIds.length}, Removed ${extraIds.length}`);
+        return {
+          repaired: true,
+          added: missingIds.length,
+          removed: extraIds.length,
+          total: contentIds.size
+        };
+      }
+
+      return { repaired: false, added: 0, removed: 0, total: contentIds.size };
+    } catch (error) {
+      logger.error('Failed to verify/repair newsletter IDs:', error);
+      throw error;
     }
   }
 
@@ -78,17 +147,17 @@ class RedisClient {
     try {
       const result = await this.client.ping();
       const pingTime = Date.now() - start;
-      
+
       if (result !== 'PONG') {
         return { success: false, error: 'Unexpected ping response', pingTime };
       }
-      
+
       return { success: true, pingTime };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Redis connection test failed:', error);
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: errorMessage,
         pingTime: Date.now() - start
       };
@@ -132,7 +201,7 @@ class RedisClient {
   async smembers(key: string): Promise<string[]> {
     try {
       // The Upstash Redis client provides sMembers as a method
-      // @ts-expect-error - The sMembers method exists on the Redis instance at runtime; types may not include it
+      // @ts-ignore - The sMembers method exists on the Redis instance at runtime; types may not include it
       const result = await this.client.sMembers(key);
       return Array.isArray(result) ? result.map(String) : [];
     } catch (error) {
@@ -219,7 +288,7 @@ class RedisClient {
   // Hash Operations
   async hgetall<T extends Record<string, any> = Record<string, any>>(key: string): Promise<T | null> {
     logger.debug(`[RedisClient] hgetall called for key: ${key}`);
-    
+
     try {
       return await this.client.hgetall(key) as T | null;
     } catch (error) {
@@ -241,17 +310,17 @@ class RedisClient {
       if (typeof field === 'object' && field !== null && value === undefined) {
         return await this.client.hset(key, field);
       }
-      
+
       // Handle the old signature: hset(key, field1, value1, field2, value2, ...)
       if (typeof field === 'string' && value !== undefined) {
         const fields: (string | number)[] = [field, value];
         if (args.length > 0) {
           fields.push(...args);
         }
-        // @ts-expect-error - The Redis client supports this signature
+        // @ts-ignore - The Redis client supports this signature
         return await this.client.hset(key, ...fields);
       }
-      
+
       throw new Error('Invalid arguments for hset');
     } catch (error) {
       logger.error(`Error setting hash ${key}:`, error);
@@ -306,7 +375,7 @@ class RedisClient {
         match: options.match || '*',
         count: options.count || 10
       });
-      
+
       return [Number(result[0]), result[1]];
     } catch (error) {
       logger.error('Error scanning keys:', error);
@@ -374,32 +443,32 @@ class RedisClient {
   ): Promise<boolean> {
     try {
       const key = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
-      
+
       // Get existing metadata to preserve it
       const existingData = await this.hgetall<{ metadata?: string }>(key);
       let metadata: Record<string, any> = {};
-      
+
       if (existingData?.metadata) {
         try {
-          metadata = typeof existingData.metadata === 'string' 
-            ? JSON.parse(existingData.metadata) 
+          metadata = typeof existingData.metadata === 'string'
+            ? JSON.parse(existingData.metadata)
             : existingData.metadata;
         } catch (e) {
           logger.error(`Error parsing metadata for ${key}:`, e);
         }
       }
-      
+
       // Update the read status in the newsletter's metadata
       const updatedMetadata = {
         ...metadata,
         isRead,
         readTimestamp: new Date().toISOString()
       };
-      
+
       await this.hset(key, {
         metadata: JSON.stringify(updatedMetadata)
       });
-      
+
       logger.debug(`Updated read status for ${key} to ${isRead}`);
       return true;
     } catch (error) {
@@ -421,16 +490,16 @@ class RedisClient {
     previewText?: string
   ): Promise<UpdateResult<ContentUpdateResult>> {
     const timestamp = new Date().toISOString();
-    
+
     try {
       if (process.env.NODE_ENV === 'development') {
         logger.debug(`Updating content for newsletter: ${id}`);
       }
-      
+
       // Get the existing newsletter data
       const newsletterKey = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
       const existingData = await this.hgetall<Record<string, any>>(newsletterKey);
-      
+
       if (!existingData) {
         logger.error(`Newsletter not found: ${id}`);
         return {
@@ -439,7 +508,7 @@ class RedisClient {
           details: { key: newsletterKey, keyType: 'none' }
         };
       }
-      
+
       // Parse metadata if it's a string
       let metadata: Record<string, any> = {};
       const existingMetadata = existingData.metadata;
@@ -454,7 +523,7 @@ class RedisClient {
           metadata = { ...(existingMetadata as Record<string, any>) };
         }
       }
-      
+
       // Update the content and metadata
       const updateData: Record<string, string | number> = {
         content: content,
@@ -467,17 +536,17 @@ class RedisClient {
           wordCount: content.split(/\s+/).length,
         })
       };
-      
+
       // Add preview text if provided
       if (typeof previewText === 'string') {
         updateData.previewText = previewText;
       }
-      
+
       // Update the newsletter in Redis
       await this.hset(newsletterKey, updateData);
-      
+
       logger.debug(`Successfully updated content for newsletter: ${id}`);
-      
+
       return {
         success: true,
         data: {
@@ -486,7 +555,7 @@ class RedisClient {
           timestamp: timestamp
         }
       };
-      
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       logger.error(`Error updating content for ${id}:`, error);

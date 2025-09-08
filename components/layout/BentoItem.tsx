@@ -1,6 +1,6 @@
 'use client';
 
-import { cn } from '@/lib/utils';
+import { cn } from "@/lib/cn";
 import React, { forwardRef } from 'react';
 
 interface BentoItemProps extends React.HTMLAttributes<HTMLDivElement> {

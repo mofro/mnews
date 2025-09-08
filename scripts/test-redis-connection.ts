@@ -1,37 +1,37 @@
-import { redisClient } from '../lib/redisClient';
-import logger from '../utils/logger';
+import { redisClient } from '../lib/redisClient.js';
+import logger from '../utils/logger.js';
 
 async function testRedisConnection() {
   try {
     logger.info('Testing Redis connection...');
     
     // Test basic ping
-    const pingResult = await redisClient.client.ping();
-    logger.info(`Redis ping result: ${pingResult}`);
+    const pingResult = await redisClient.testConnection();
+    logger.info('Ping result:', pingResult);
     
-    // List all keys
-    const keys = await redisClient.client.keys('*');
-    logger.info(`Found ${keys.length} keys in Redis`);
+    // Test getting a key
+    const testKey = 'test:connection';
+    await redisClient.client.set(testKey, 'test-value');
+    const value = await redisClient.client.get(testKey);
+    logger.info(`Test key "${testKey}" value:`, value);
     
-    // Show first 5 keys as sample
-    const sampleKeys = keys.slice(0, 5);
-    logger.info('Sample keys:', sampleKeys);
+    // Test listing newsletter keys
+    const newsletterKeys = await redisClient.client.keys('newsletter:*');
+    logger.info(`Found ${newsletterKeys.length} newsletter keys`);
     
-    // Show newsletter count
-    const newsletterCount = keys.filter(k => k.startsWith('newsletter:')).length;
-    logger.info(`Found ${newsletterCount} newsletter keys`);
-    
-    // Test getting a newsletter
-    if (sampleKeys.length > 0) {
-      const sampleKey = sampleKeys[0];
-      const value = await redisClient.client.get(sampleKey);
-      logger.info(`Sample value for key '${sampleKey}':`, 
-        typeof value === 'string' ? value.substring(0, 100) + '...' : value);
+    // Get some sample data if available
+    if (newsletterKeys.length > 0) {
+      const sampleKey = newsletterKeys[0];
+      const sampleData = await redisClient.client.get(sampleKey);
+      const sampleText = typeof sampleData === 'string' ? sampleData.substring(0, 100) + '...' : 'No data or invalid format';
+      logger.info(`Sample newsletter data (${sampleKey}):`, sampleText);
     }
     
+    logger.info('Redis connection test completed successfully');
   } catch (error) {
-    logger.error('Error testing Redis connection:', error);
+    logger.error('Redis connection test failed:', error);
   } finally {
+    // Close the Redis connection
     process.exit(0);
   }
 }

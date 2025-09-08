@@ -63,10 +63,30 @@ export interface NewsletterMetadata {
 /**
  * Complete newsletter object combining content and metadata
  */
-export interface Newsletter extends NewsletterContent, NewsletterMetadata {
-  /** URL of the newsletter if available */
+export interface Newsletter extends Partial<NewsletterContent>, Partial<NewsletterMetadata> {
+  id: string;
+  title?: string;
+  subject?: string;
+  sender?: string;
+  from?: string;
+  publishDate?: string;
+  date?: string;
+  content?: string;
+  cleanContent?: string;
+  rawContent?: string;
+  textContent?: string;
   url?: string;
+  isRead?: boolean;
+  isArchived?: boolean;
+  tags?: string[];
+  imageUrl?: string;
+  
+  // Add any additional fields that might be present in the API response
+  [key: string]: any;
 }
+
+// Export the type for use in API routes
+export type { Newsletter as NewsletterType };
 
 /**
  * Options for processing newsletter content

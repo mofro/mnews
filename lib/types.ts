@@ -23,12 +23,17 @@ export interface Newsletter {
     readAt?: string;
     archived?: boolean;
     archivedAt?: string;
+    lastAccessedAt?: string; // Track when the newsletter was last accessed
     trashedAt?: string; // For future trash implementation
   };
   
   // Backward compatibility
   content: string;         // Keep for existing dashboard compatibility
   hasFullContent?: boolean; // Flag indicating if full content is available
+  
+  // UI state
+  isRead: boolean;        // Derived from metadata for easier access in components
+  isArchived: boolean;    // Derived from metadata for easier access in components
 }
 
 // BACKWARD COMPATIBILITY: Alias for existing dashboard

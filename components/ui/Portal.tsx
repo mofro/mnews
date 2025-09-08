@@ -1,29 +1,44 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
-interface PortalProps {
+type PortalProps = {
   children: React.ReactNode;
   wrapperId?: string;
-}
+};
 
-export const Portal = ({ children, wrapperId = 'portal-root' }: PortalProps) => {
+export const Portal = ({ children, wrapperId = 'portal-root' }: PortalProps): React.ReactPortal | null => {
   const [mounted, setMounted] = useState(false);
+  const [container, setContainer] = useState<HTMLElement | null>(null);
 
   useEffect(() => {
+    // Ensure this runs only on the client side
+    if (typeof window === 'undefined') return;
+    
     setMounted(true);
-    return () => setMounted(false);
-  }, []);
+    
+    // Find or create the portal container
+    let element = document.getElementById(wrapperId);
+    let created = false;
+    
+    if (!element) {
+      element = document.createElement('div');
+      element.setAttribute('id', wrapperId);
+      document.body.appendChild(element);
+      created = true;
+    }
+    
+    setContainer(element);
+    
+    return () => {
+      if (created && element?.parentNode) {
+        element.parentNode.removeChild(element);
+      }
+      setMounted(false);
+    };
+  }, [wrapperId]);
 
-  if (!mounted) return null;
-
-  let portalRoot = document.getElementById(wrapperId);
-  if (!portalRoot) {
-    portalRoot = document.createElement('div');
-    portalRoot.setAttribute('id', wrapperId);
-    document.body.appendChild(portalRoot);
-  }
-
-  return createPortal(children, portalRoot);
+  if (!mounted || !container) return null;
+  return createPortal(children, container);
 };

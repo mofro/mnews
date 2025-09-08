@@ -1,14 +1,7 @@
 // FILE: /pages/api/migrate.ts (CREATE NEW - Optional testing endpoint)
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { NewsletterStorage } from '../../lib/storage';
-// Inline logger implementation to avoid path resolution issues
-const logger = {
-  log: (...args: any[]) => console.log(...args),
-  error: (...args: any[]) => console.error(...args),
-  warn: (...args: any[]) => console.warn(...args),
-  info: (...args: any[]) => console.info(...args),
-  debug: (...args: any[]) => console.debug(...args)
-};
+import { NewsletterStorage } from '@/lib/storage';
+import logger from '@/utils/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -23,9 +16,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     
     const migrationStats = {
       total: newsletters.length,
-      withRawContent: newsletters.filter(n => n.rawContent).length,
-      withCleanContent: newsletters.filter(n => n.cleanContent).length,
-      legacy: newsletters.filter(n => n.metadata.processingVersion === 'legacy-migrated').length
+      withRawContent: newsletters.filter(n => 'content' in n && !!n.content).length,
+      withCleanContent: newsletters.filter(n => 'cleanContent' in n && !!n.cleanContent).length,
+      legacy: newsletters.filter(n => 
+        'metadata' in n && 
+        n.metadata && 
+        typeof n.metadata === 'object' && 
+        'processingVersion' in n.metadata && 
+        n.metadata.processingVersion === 'legacy-migrated'
+      ).length
     };
     
     res.status(200).json({

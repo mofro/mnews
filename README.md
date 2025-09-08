@@ -43,6 +43,26 @@ yarn dev
 
 Visit [http://localhost:3000](http://localhost:3000) to see the dashboard.
 
+## Data Migration
+
+For migrating newsletter data between schemas, see the [Migration Guide](./docs/MIGRATION_GUIDE.md).
+
+### Quick Reference
+
+```bash
+# Test migration with sample data
+npm run migrate:test
+
+# Dry run (no changes)
+npm run migrate:newsletters
+
+# Run actual migration
+npm run migrate:newsletters:run
+
+# Rollback if needed
+npm run migrate:rollback:run
+```
+
 ### 3. Deploy to Vercel
 ```bash
 # Connect to GitHub repo and deploy

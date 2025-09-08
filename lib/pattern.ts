@@ -1,4 +1,4 @@
-import { redisClient } from './redisClient';
+import { redisClient } from './redisClient.js';
 
 /**
  * Feature-flag gate: enable by setting PATTERN_SYSTEM_ENABLED=true in env.

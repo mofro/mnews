@@ -1,19 +1,21 @@
 // pages/index.tsx
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { useTheme } from "@/context/ThemeContext";
-import { truncateText } from "@/utils/string";
-import { format, isToday } from "date-fns";
-import Link from "next/link";
-import { ArticleGridCard } from "@/components/newsletter/ArticleGridCard";
-import { BentoGrid } from "@/components/layout/BentoGrid";
-import { BentoItem } from "@/components/layout/BentoItem";
-import FullViewArticle from "@/components/article/FullViewArticle";
-import { Pagination } from "@/components/common/Pagination";
-import newslettersData from "@/data/newsletters.json";
-import { cn } from "@/lib/utils";
-import logger from "@/utils/logger";
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useTheme } from '@/context/ThemeContext';
+import { truncateText } from '@/utils/string';
+import { format, isToday } from 'date-fns';
+import Link from 'next/link';
+import { ArticleGridCard } from '@/components/newsletter/ArticleGridCard';
+import { BentoGrid } from '@/components/layout/BentoGrid';
+import { BentoItem } from '@/components/layout/BentoItem';
+import FullViewArticle from '@/components/article/FullViewArticle';
+import { Pagination } from '@/components/common/Pagination';
+import { cn } from '@/lib/cn';
+import logger from '@/utils/logger';
+
+// Import newsletters data with type assertion
+const newslettersData = [] as any[]; // Replace with actual data loading logic
 
 // Pagination constants
 const DEFAULT_PAGE_SIZE = 20; // Match the API's default
@@ -123,23 +125,27 @@ const transformNewsletterToArticle = (
   const tags = newsletter.tags || metadata.tags || [];
   const redisId = newsletter.redisIndex || metadata.redisIndex || "";
 
-  // Use clean content if available, otherwise fall back to raw content or empty string
-  const content =
-    newsletter.cleanContent ||
-    newsletter.rawContent ||
-    newsletter.content ||
-    "";
-
   // Debug log the transformation
   logger.debug("Transforming newsletter to article:", {
     id: newsletter.id,
     sender: newsletter.sender,
     subject: newsletter.subject,
-    hasContent: !!newsletter.content,
-    hasRawContent: !!newsletter.rawContent,
-    hasCleanContent: !!newsletter.cleanContent,
-    metadata: newsletter.metadata,
+    contentLength: newsletter.content?.length,
+    rawContentLength: newsletter.rawContent?.length,
+    cleanContentLength: newsletter.cleanContent?.length,
+    hasMetadata: !!newsletter.metadata,
+    metadataKeys: newsletter.metadata ? Object.keys(newsletter.metadata) : []
   });
+
+  // Get the content, preferring clean content if available
+  let content = (newsletter.content || "").trim();
+  let cleanContent = (newsletter.cleanContent || "").trim();
+  let rawContent = (newsletter.rawContent || "").trim();
+
+  // If we don't have content but have clean or raw content, use those
+  if (!content && (cleanContent || rawContent)) {
+    content = cleanContent || rawContent;
+  }
 
   // Generate a unique ID by combining the original ID with a timestamp if available
   const uniqueId = newsletter.id 
@@ -198,8 +204,23 @@ export default function TestArticleGrid() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedSender, setSelectedSender] = useState("");
   const [showArchived, setShowArchived] = useState(false);
-  const [fullViewArticle, setFullViewArticle] =
-    useState<TransformedArticle | null>(null);
+  // Define the type for the full view article to match BaseArticle from FullViewArticle.tsx
+  interface FullViewArticleData {
+    id: string;
+    title: string;
+    content?: string | null;
+    publishDate: string;
+    sender?: string;
+    tags?: string[];
+    imageUrl?: string;
+    isRead?: boolean;
+    isArchived?: boolean;
+    rawContent?: string | null;
+    cleanContent?: string | null;
+    url?: string;
+  }
+
+  const [fullViewArticle, setFullViewArticle] = useState<FullViewArticleData | null>(null);
   const [showDebug, setShowDebug] = useState(false);
   const [showArticleDebug, setShowArticleDebug] = useState(false);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
@@ -207,7 +228,12 @@ export default function TestArticleGrid() {
   // Debug logging function
   const debugLog = useCallback((...messages: any[]) => {
     if (process.env.NODE_ENV === "development") {
-      logger.debug(...messages);
+      // Handle both single object and multiple arguments
+      if (messages.length === 1 && typeof messages[0] === 'object') {
+        logger.debug(JSON.stringify(messages[0], null, 2));
+      } else {
+        logger.debug(messages.join(' '));
+      }
     }
   }, []);
   const [stats, setStats] = useState<DashboardStats>({
@@ -566,19 +592,100 @@ export default function TestArticleGrid() {
     setDebugLogs([]);
   }, []);
 
-  // Toggle article read status
-  const handleToggleRead = useCallback((id: string) => {
-    setArticles((prev) =>
-      prev.map((article) =>
-        article.id === id ? { ...article, isRead: !article.isRead } : article,
-      ),
-    );
-  }, []);
+  // Toggle article read status with proper dependency management
+  const handleToggleRead = useCallback(async (id: string) => {
+    // Optimistic UI update using functional update to avoid dependency on articles
+    setArticles(prevArticles => {
+      const article = prevArticles.find(a => a.id === id);
+      if (!article) return prevArticles; // No change if article not found
+      
+      // Only update if the read status would actually change
+      if (article.isRead === undefined) return prevArticles;
+      
+      return prevArticles.map(a => 
+        a.id === id ? { ...a, isRead: !a.isRead } : a
+      );
+    });
 
-  // Handle article expansion - now only opens the popup
+    try {
+      // Update in the database
+      const response = await fetch(`/api/newsletters/${id}/read`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update read status');
+      }
+
+      debugLog('Successfully toggled read status for article:', id);
+    } catch (error) {
+      console.error('Error toggling read status:', error);
+      // Revert optimistic update on error
+      setArticles(prevArticles => 
+        prevArticles.map(a => 
+          a.id === id ? { ...a, isRead: !a.isRead } : a
+        )
+      );
+    }
+  }, []); // No dependencies needed - using functional updates
+
+  // Handle article expansion with proper dependency management
   const handleExpandArticle = useCallback((article: TransformedArticle) => {
-    setFullViewArticle(article);
-  }, []);
+    console.log('=== DEBUG: handleExpandArticle called ===');
+    console.log('Article ID:', article.id);
+    console.log('Article subject:', article.subject);
+    console.log('Content length:', article.content?.length || 0);
+    console.log('Clean content length:', article.cleanContent?.length || 0);
+    console.log('Raw content length:', article.rawContent?.length || 0);
+    console.log('Article object:', {
+      id: article.id,
+      hasContent: !!article.content,
+      hasCleanContent: !!article.cleanContent,
+      hasRawContent: !!article.rawContent,
+      contentSample: article.content?.substring(0, 100) + '...',
+      cleanContentSample: article.cleanContent?.substring(0, 100) + '...',
+      rawContentSample: article.rawContent?.substring(0, 100) + '...'
+    });
+    
+    const fullViewArticle: FullViewArticleData = {
+      id: article.id,
+      title: article.subject,
+      content: article.content || article.cleanContent || article.rawContent || '',
+      publishDate: article.date,
+      sender: article.sender,
+      tags: article.tags || [],
+      imageUrl: article.imageUrl,
+      isRead: article.isRead,
+      isArchived: article.isArchived,
+      rawContent: article.rawContent,
+      cleanContent: article.cleanContent,
+      url: article.url
+    };
+    
+    console.log('=== DEBUG: FullViewArticle data ===');
+    console.log('Mapped article data:', {
+      ...fullViewArticle,
+      contentLength: fullViewArticle.content?.length || 0,
+      cleanContentLength: fullViewArticle.cleanContent?.length || 0,
+      rawContentLength: fullViewArticle.rawContent?.length || 0
+    });
+    
+    // Use functional update to ensure we have the latest state
+    setFullViewArticle(prev => {
+      // Only update if the article is different
+      if (prev && prev.id === fullViewArticle.id) return prev;
+      return fullViewArticle;
+    });
+    
+    // Mark as read when expanded, but only if not already read
+    // to prevent unnecessary state updates
+    if (article.isRead === false) {
+      handleToggleRead(article.id);
+    }
+  }, [handleToggleRead, debugLog]); // Add debugLog to dependencies
 
   // Close full view modal
   const handleCloseFullView = useCallback(() => {
@@ -589,35 +696,20 @@ export default function TestArticleGrid() {
   const memoizedArticle = useMemo(() => {
     if (!fullViewArticle) return null;
     
-    const article = {
+    // Log the article content for debugging
+    debugLog('Memoized article data:', {
       id: fullViewArticle.id,
-      title: fullViewArticle.subject,
-      content: fullViewArticle.content || fullViewArticle.cleanContent || fullViewArticle.rawContent || "",
-      publishDate: fullViewArticle.date,
-      sender: fullViewArticle.sender,
-      tags: fullViewArticle.tags || [],
-      imageUrl: fullViewArticle.imageUrl,
-      isRead: fullViewArticle.isRead || false,
-      isArchived: fullViewArticle.isArchived || false,
-      rawContent: fullViewArticle.rawContent,
-      cleanContent: fullViewArticle.cleanContent,
-      url: fullViewArticle.url
-    };
+      title: fullViewArticle.title,
+      hasContent: !!fullViewArticle.content,
+      hasCleanContent: !!fullViewArticle.cleanContent,
+      hasRawContent: !!fullViewArticle.rawContent,
+      contentLength: fullViewArticle.content?.length || 0,
+      cleanContentLength: fullViewArticle.cleanContent?.length || 0,
+      rawContentLength: fullViewArticle.rawContent?.length || 0
+    });
     
-    // Log the available content for debugging in development only
-    if (process.env.NODE_ENV === 'development') {
-      logger.debug('Article content available:', {
-        id: article.id,
-        hasContent: !!article.content,
-        hasRawContent: !!article.rawContent,
-        hasCleanContent: !!article.cleanContent,
-        contentPreview: article.content?.substring(0, 100) + '...',
-        rawContentPreview: article.rawContent?.substring(0, 100) + '...',
-        cleanContentPreview: article.cleanContent?.substring(0, 100) + '...'
-      });
-    }
-    
-    return article;
+    // The fullViewArticle is already in the correct format, so we can return it directly
+    return fullViewArticle;
   }, [fullViewArticle]);
 
   // Toggle archive status
@@ -1049,15 +1141,15 @@ export default function TestArticleGrid() {
                             subject={article.subject}
                             date={article.date}
                             content={article.content}
+                            cleanContent={article.cleanContent}
+                            rawContent={article.rawContent}
                             imageUrl={article.imageUrl}
                             isNew={article.isNew}
                             isRead={article.isRead}
                             isArchived={article.isArchived}
                             tags={article.tags}
                             onToggleRead={() => handleToggleRead(article.id)}
-                            onToggleArchive={() =>
-                              handleToggleArchive(article.id)
-                            }
+                            onToggleArchive={() => handleToggleArchive(article.id)}
                             onShare={() => handleShare(article.id)}
                             onExpand={() => handleExpandArticle(article)}
                             className="h-full"

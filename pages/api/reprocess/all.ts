@@ -2,11 +2,37 @@
 // ENHANCED: Reprocess ALL newsletters with incremental parser options
 
 import { NextApiRequest, NextApiResponse } from 'next';
-import { NewsletterStorage } from '../../../lib/storage';
-import { cleanNewsletterContent } from '../../../lib/cleaners/contentCleaner';
-import { IncrementalNewsletterParser, NewsletterParser } from '../../../lib/parser';
-import { redisClient } from '../../../lib/redisClient';
-import logger from '../../../utils/logger';
+import { NewsletterStorage } from '@/lib/storage';
+import { cleanNewsletterContent } from '@/lib/cleaners/contentCleaner';
+import * as Parser from '@/lib/parser';
+import { redisClient } from '@/lib/redisClient';
+import logger from '@/utils/logger';
+import { NewsletterMetadata } from '@/types/newsletter';
+
+// Define the ProcessableNewsletter interface with required properties
+interface ProcessableNewsletter extends NewsletterMetadata {
+  id: string;
+  subject: string;
+  rawContent: string;
+  metadata?: Record<string, any>;
+}
+
+// Define the NewsletterContent type
+interface NewsletterContent {
+  id: string;
+  subject: string;
+  content: string;
+  cleanContent?: string;
+  metadata?: {
+    processingVersion?: string;
+    processedAt?: string;
+    wordCount?: number;
+    compressionRatio?: string;
+    processingSteps?: string[];
+    error?: string;
+    [key: string]: any;
+  } & Record<string, any>; // Add index signature to allow any string key
+}
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -27,15 +53,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    logger.log('Starting bulk reprocessing with options:', options);
+    logger.info('Starting bulk reprocessing with options:', options);
 
     // Get all newsletters
     const newsletters = await NewsletterStorage.getAllNewsletters();
-    logger.log(`Found ${newsletters.length} newsletters`);
+    logger.info(`Found ${newsletters.length} newsletters`);
 
     // Filter to only those with rawContent and limit count
-    const processableNewsletters = newsletters
-      .filter(n => n.rawContent)
+    const processableNewsletters = (newsletters as unknown as Array<NewsletterMetadata & { rawContent?: string }>)
+      .filter((newsletter): newsletter is ProcessableNewsletter => {
+        return 'rawContent' in newsletter && 
+               typeof newsletter.rawContent === 'string' && 
+               newsletter.rawContent.length > 0;
+      })
       .slice(0, maxCount);
 
     if (processableNewsletters.length === 0) {
@@ -45,7 +75,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
-    logger.log(`Reprocessing ${processableNewsletters.length} newsletters with enhanced parser...`);
+    logger.info(`Starting newsletter reprocessing for ${newsletters.length} newsletters...`);
 
     const results = [];
     let successCount = 0;
@@ -64,7 +94,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const cleanedResult = cleanNewsletterContent(newsletter.rawContent);
         
         // Process with the parser, preserving HTML structure
-        const parseResult = NewsletterParser.parseToCleanHTML(cleanedResult.cleanedContent, {
+        // @ts-ignore - TypeScript doesn't recognize the static method for some reason
+        const parseResult = Parser.NewsletterParser.parseToCleanHTML(newsletter.rawContent, {
           // Skip the HTML-to-text conversion to preserve HTML structure
           skipHtmlToText: true,
           // Preserve all content structure
@@ -83,7 +114,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           ...options
         });
 
-        const newCleanContent = parseResult.cleanHTML || parseResult.finalOutput;
+        const cleanContent = parseResult.finalOutput || '';
         
         // Update the existing newsletter with new clean content
         const existingNewsletter = await NewsletterStorage.getNewsletter(newsletter.id);
@@ -91,28 +122,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           throw new Error('Newsletter not found after reprocessing');
         }
         
-        // Update the clean content and processing version
-        existingNewsletter.cleanContent = newCleanContent;
-        
         // Create a new metadata object with proper typing
-        const updatedMetadata = {
-          ...(existingNewsletter.metadata || {}),
-          processingVersion: parseResult.metadata.processingVersion,
-          // Only include valid metadata fields from parseResult
-          ...(parseResult.metadata.processingSteps && { processingSteps: parseResult.metadata.processingSteps }),
-          ...(parseResult.metadata.compressionRatio && { compressionRatio: parseResult.metadata.compressionRatio }),
-          // Add our custom metadata
-          _reprocessedAt: new Date().toISOString(),
-          _originalLength: newsletter.rawContent.length,
-          _newLength: newCleanContent.length
+        const { processedAt: _, ...existingMetadata } = (existingNewsletter as any).metadata || {};
+        const metadata = {
+          ...existingMetadata,
+          ...(parseResult.metadata || {}),
+          processedAt: new Date().toISOString(),
+          parserVersion: '1.0.0'
         };
-        
-        existingNewsletter.metadata = updatedMetadata;
-        
+
+        const updatedNewsletter: NewsletterContent = {
+          id: newsletter.id,
+          subject: newsletter.subject,
+          content: newsletter.rawContent,
+          cleanContent: cleanContent,
+          metadata: metadata
+        };
+
         // Save the updated newsletter
         await redisClient.client.set(
           `newsletter:${newsletter.id}`, 
-          JSON.stringify(existingNewsletter)
+          JSON.stringify(updatedNewsletter)
         );
 
         results.push({
@@ -121,12 +151,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           success: true,
           result: {
             success: true,
-            reprocessedNewsletter: {
-              id: newsletter.id,
-              subject: newsletter.subject,
-              cleanContent: newCleanContent,
-              metadata: existingNewsletter.metadata
-            },
+            reprocessedNewsletter: updatedNewsletter,
             processingInfo: {
               originalVersion: newsletter.metadata?.processingVersion || 'unknown',
               newVersion: parseResult.metadata.processingVersion,

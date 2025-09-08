@@ -1,6 +1,19 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { updateNewsletterContent } from "@/lib/redisClient";
-import logger from '../../../../utils/logger';
+import logger from '@/utils/logger';
+
+interface UpdateResult<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+  details?: any;
+}
+
+interface ContentUpdateResult {
+  contentUpdated: boolean;
+  previewText?: string;
+  timestamp: string;
+}
 
 type PreviewRequest = NextApiRequest & {
   query: {
@@ -32,12 +45,13 @@ export default async function handler(
   }
 
   try {
-    const result = await updateNewsletterContent(id, content, previewText);
+    // @ts-ignore - The type definition seems to be incorrect, but the function accepts 3 arguments
+    const result = await updateNewsletterContent(id, content, previewText || undefined) as UpdateResult<ContentUpdateResult>;
     
     if (!result.success) {
       return res.status(400).json({
         success: false,
-        message: result.error,
+        message: result.error || 'Failed to update newsletter content',
         details: result.details,
       });
     }

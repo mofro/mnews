@@ -1,13 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { Redis } from '@upstash/redis';
-// Use a relative path to the logger
-const logger = {
-  log: (...args: any[]) => console.log(...args),
-  error: (...args: any[]) => console.error(...args),
-  warn: (...args: any[]) => console.warn(...args),
-  info: (...args: any[]) => console.info(...args),
-  debug: (...args: any[]) => console.debug(...args)
-};
+import logger from '@/utils/logger';
 
 // Initialize Redis connection using existing KV variables
 if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {

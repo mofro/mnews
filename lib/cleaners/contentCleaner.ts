@@ -31,7 +31,7 @@ const CLEANING_RULES: CleaningRule[] = [
     id: 'clean-inline-styles',
     description: 'Clean inline styles while preserving semantic structure',
     pattern: /<([a-z][a-z0-9]*)(?:[^>]*?\s+style=["'][^"']*["'])([^>]*)>/gi,
-    replacement: (match: string, tag: string, rest: string) => {
+    replacement: (_match: string, tag: string, rest: string) => {
       // Preserve these specific attributes
       const preservedAttrs = ['colspan', 'rowspan', 'scope', 'headers', 'abbr', 'title'];
       const attrs = rest.match(/\s+([a-z-]+)(?:=["']([^"']*)["'])?/gi) || [];

@@ -1,5 +1,5 @@
 import DOMPurify from 'dompurify';
-import logger from '../utils/logger';
+import logger from '../utils/logger.js';
 
 interface ProcessedContent {
   content: string;
@@ -86,7 +86,7 @@ export function processArticleContent(article: {
     .replace(/<\/?(html|head|body)[^>]*>/g, '') // Remove any HTML/HEAD/BODY tags
     
     // Fix malformed image tags
-    .replace(/<img([^>]*)>/g, (match, attrs) => {
+    .replace(/<img([^>]*)>/g, (_match, attrs) => {
       // Ensure img tags are properly closed and have required attributes
       let fixedAttrs = attrs;
       
@@ -104,13 +104,13 @@ export function processArticleContent(article: {
     })
     
     // Fix unclosed tags (except self-closing ones)
-    .replace(/<([a-z]+)([^>]*[^/])?>(?![\s\S]*<\/\1>)/gi, (match, tag, attrs = '') => {
+    .replace(/<([a-z]+)([^>]*[^/])?>(?![\s\S]*<\/\1>)/gi, (_match, tag, _attrs = '') => {
       const selfClosingTags = ['img', 'br', 'hr', 'meta', 'link', 'input'];
       // Don't close self-closing tags
       if (selfClosingTags.includes(tag.toLowerCase())) {
-        return match.endsWith('/>') ? match : `${match.replace(/\/?>$/, '')} />`;
+        return _match.endsWith('/>') ? _match : `${_match.replace(/\/?>$/, '')} />`;
       }
-      return `${match}</${tag}>`;
+      return `${_match}</${tag}>`;
     })
     
     // Remove empty paragraphs and divs that can cause layout issues

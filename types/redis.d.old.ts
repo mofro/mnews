@@ -1,4 +1,4 @@
-import { Redis } from '@upstash/redis';
+import { Redis } from '.upstash/redis';
 
 declare module '@/lib/redis' {
   // Redis client wrapper class

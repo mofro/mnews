@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getRedisClient } from '@/lib/redisClient';
+import { getRedisClient } from "@/lib/redisClient";
 
 export default async function handler(
   req: NextApiRequest,
@@ -10,16 +10,16 @@ export default async function handler(
   }
 
   try {
-    const redis = getRedisClient();
+    const client = await getRedisClient();
+    const redis = await client;
     
-    // Get all keys
+    // Get all keys with a pattern
     const keys = await redis.keys('*');
     
-    // Get type for each key
-    const keyTypes = await Promise.all(keys.map(async (key: string) => {
-      const type = await redis.type(key);
-      return { key, type };
-    }));
+    // Get key types
+    const keyTypes = await Promise.all(
+      keys.map(key => redis.type(key).then(type => ({ key, type })))
+    );
     
     return res.status(200).json({ keys: keyTypes });
   } catch (error) {
