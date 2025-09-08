@@ -47,10 +47,12 @@ next-env.d.ts
 .devnotes/
 
 # IDEs
+.cascade
 .vscode/
 .idea/
 *.swp
 *.swo
+*.code-workspace
 *~
 
 # OS generated files
@@ -99,4 +101,3 @@ scripts/backup
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
-.env.local
