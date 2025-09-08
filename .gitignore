@@ -79,6 +79,9 @@ Thumbs.db
 *.tmp
 *.temp
 
+# Backup and Archived files
+scripts/backup
+
 # Database files
 *.db
 *.sqlite
@@ -92,3 +95,7 @@ Thumbs.db
 # Ignore all Windsurf rules files
 .windsurf/
 .cascade/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts

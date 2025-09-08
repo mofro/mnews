@@ -1,13 +1,13 @@
 {
+  "extends": "./tsconfig.paths.json",
   "compilerOptions": {
-    "target": "es2018",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "target": "es2020",
+    "lib": ["dom", "dom.iterable", "es2020"],
     "allowJs": true,
     "skipLibCheck": true,
     "strict": true,
+    "forceConsistentCasingInFileNames": true,
     "noEmit": true,
-    "noUnusedParameters": false,
-    "noImplicitReturns": true,
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "node",
@@ -15,24 +15,50 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "plugins": [
-      {
-        "name": "next"
-      }
+    "types": ["node", "jest", "next"],
+    "typeRoots": [
+      "./node_modules/@types",
+      "./types"
     ],
+    "allowSyntheticDefaultImports": true,
+    "jsxImportSource": "@emotion/react",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "preserveSymlinks": true,
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./*"]
     },
-    "baseUrl": "."
+    "outDir": "./dist",
+    "rootDirs": ["."],
+    "allowImportingTsExtensions": true,
+    "noEmitOnError": false
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
+    "**/*.jsx",
+    "**/*.js",
+    "**/*.d.ts",
     "types/**/*.d.ts",
-    "types/custom.d.ts"
+    "types/**/*.ts",
+    "types/components/**/*.d.ts",
+    "paths.d.ts",
+    "types.d.ts",
+    "types/next-types.d.ts",
+    "types/ui.d.ts"
   ],
   "exclude": [
-    "node_modules"
-  ]
+    "node_modules",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "scripts/**/*"
+  ],
+  "ts-node": {
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
+  }
 }

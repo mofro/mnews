@@ -1,10 +1,11 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { redisClient } from "@/lib/redisClient";
-import { NewsletterParser, ParseResult } from "../../lib/parser";
-import { cleanNewsletterContent } from "../../lib/cleaners/contentCleaner";
-import logger from "../../utils/logger";
-import { Newsletter } from "../../types/newsletter";
-import { processNewsletterContent } from "../../utils/content";
+// Import the correct parser implementation
+import { NewsletterParser } from "@/lib/parser";
+import { cleanNewsletterContent } from "@/lib/cleaners/contentCleaner";
+import logger from "@/utils/logger";
+import type { Newsletter as ProcessableNewsletter } from "@/types/newsletter";
+import { processNewsletterContent } from "@/utils/content";
 
 // Verify required environment variables are present
 if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
@@ -41,7 +42,7 @@ function htmlToText(html: string): string {
 }
 
 // Using the centralized date service instead of local implementation
-import { parseDateToISOString } from "../../utils/dateService";
+import { parseDateToISOString } from "@/utils/dateService";
 
 // Wrapper to maintain backward compatibility
 const normalizeDate = (dateInput: any): string => {
@@ -60,162 +61,188 @@ export default async function handler(
     // Extract newsletter data from request (your existing field names)
     const { subject, body, from, date } = req.body;
 
-    logger.log("Newsletter received:", { subject, from, date });
+    logger.info("Newsletter received", { subject, from, date });
 
     // UPDATED: Handle both original content and cleaned content
     const originalContent = body || "";
     let cleanContent: string;
-    let processingVersion = "2.6.0-existing-logic";
-
+    let cleanHTML = '';
+    let text = '';
+    let processingVersion = '1.0.0'; // Default version
+    
     try {
       // Clean the content with our enhanced cleaner
       const cleanedResult = cleanNewsletterContent(originalContent);
+      logger.info("Cleaned content");
 
-      // Log what was removed during cleaning
-      logger.log(
-        `Initial cleaning removed ${cleanedResult.removedItems.length} elements:`,
-      );
-      cleanedResult.removedItems.forEach((item) => {
-        logger.log(`- ${item.description}: ${item.matches} matches`);
+      // Parse the email content using the incremental parser
+      // @ts-ignore - Using internal implementation details
+      const parseResult = new NewsletterParser().parseToCleanHTML(cleanedResult.cleanedContent);
+      logger.info("Parsed content");
+
+      // Get the cleaned HTML content
+      cleanHTML = parseResult.finalOutput || "";
+      logger.info("Cleaned HTML content");
+
+      // Process the content
+      const processed = await processNewsletterContent(cleanHTML, {
+        cleanHtml: true,
+        extractText: true,
+        extractImages: true
       });
 
-      // Process with the parser, preserving HTML structure but allowing some cleaning
-      const parseResult = NewsletterParser.parseToCleanHTML(
-        cleanedResult.cleanedContent,
-        {
-          skipHtmlToText: true, // Keep HTML structure
-          enableImages: true, // Preserve images
-          enableLinks: true, // Preserve links
-          enableStructureRecovery: true,
-          enableLinkPreservation: true,
-          enableImagePreservation: true,
-          enableContentCleaning: true, // Let the parser do some cleaning
+      // Create the newsletter object with processed content
+      const now = new Date().toISOString();
+      const newsletter: ProcessableNewsletter = {
+        id: '', // Will be set later
+        cleanContent: cleanHTML,
+        textContent: processed.text || '',
+        subject: '', // Will be set from webhook data
+        from: '',  // Will be set from webhook data
+        date: now,
+        metadata: {
+          processedAt: now
+        }
+      };
 
-          // Allow common HTML tags
-          ALLOWED_TAGS: [
-            "p",
-            "div",
-            "span",
-            "a",
-            "img",
-            "br",
-            "strong",
-            "em",
-            "b",
-            "i",
-            "u",
-            "ul",
-            "ol",
-            "li",
-            "h1",
-            "h2",
-            "h3",
-            "h4",
-            "h5",
-            "h6",
-            "table",
-            "tr",
-            "td",
-            "th",
-            "thead",
-            "tbody",
-            "tfoot",
-            "blockquote",
-            "pre",
-            "code",
-            "hr",
-            "img",
-            "figure",
-            "figcaption",
-          ],
-
-          // Allow common attributes
-          ALLOWED_ATTR: [
-            "href",
-            "src",
-            "alt",
-            "title",
-            "target",
-            "class",
-            "style",
-            "width",
-            "height",
-            "align",
-            "valign",
-            "border",
-            "cellpadding",
-            "cellspacing",
-          ],
-
-          // Don't allow data attributes as they often contain tracking info
-          ALLOW_DATA_ATTR: false,
-        },
-      );
-
-      // Get the parsed content and clean it again to catch anything the parser might have introduced
-      const parsedContent = parseResult.finalOutput;
-
-      // Process the content using our centralized utilities
-      const { cleanContent: processedCleanContent, textContent } =
-        processNewsletterContent(parsedContent);
-      const wordCount = textContent.split(/\s+/).filter(Boolean).length;
+      text = processed.text || "";
 
       // Update processing version with our custom version
-      processingVersion = `3.0.0-cleaner-${parseResult.metadata.processingVersion}`;
-      logger.log("Enhanced parser success:", {
-        originalLength: originalContent.length,
-        cleanLength: processedCleanContent.length,
-        compressionRatio: parseResult.metadata.compressionRatio,
+      processingVersion = `3.0.0-cleaner-${parseResult.metadata?.processingVersion || 'unknown'}`;
+      logger.info("Enhanced parser success");
+      logger.info("Content lengths", {
+        original: originalContent.length,
+        clean: cleanHTML.length,
+        compression: parseResult.metadata?.compressionRatio || 0,
       });
 
-      cleanContent = processedCleanContent;
+      cleanContent = cleanHTML;
     } catch (parseError) {
       logger.error("Parser failed, using original HTML:", parseError);
       cleanContent = originalContent; // Fall back to original HTML if parsing fails
     }
 
-    logger.log("Content cleaned, length:", cleanContent.length);
+    logger.info(`Content cleaned, length: ${cleanContent.length}`);
 
+    // Define the newsletter type with all required properties
+    interface Newsletter {
+      // Core fields
+      id: string;
+      subject: string;
+      from: string;
+      date: string;
+      content: string;
+      rawContent: string;
+      cleanContent: string;
+      textContent: string;
+      processingVersion: string;
+      
+      // Status fields
+      isRead: boolean;
+      isArchived: boolean;
+      lastAccessedAt?: string | null;
+      
+      // Additional fields
+      url: string;
+      tags: string[];
+      
+      // Metadata
+      metadata: {
+        source: string;
+        processingTime: number;
+        compressionRatio: number;
+        processedAt: string;
+        isRead?: boolean;
+        archived?: boolean;
+      };
+      
+      // Alias for compatibility
+      sender: string;
+      receivedAt: string;
+    }
+
+    // Track processing time
+    const startTime = Date.now();
+    
     // Create the newsletter object with our standardized content model
     const id = Date.now().toString();
-    const textContent = htmlToText(cleanContent);
+    const textContent = cleanContent.replace(/<[^>]*>?/gm, ''); // Simple HTML to text conversion
     const wordCount = textContent.split(/\s+/).filter(Boolean).length;
+    
+    // Set end time after all processing is done
+    const endTime = Date.now();
 
+    const now = new Date().toISOString();
     const newsletter: Newsletter = {
       // Core fields
       id,
       subject: subject || "No Subject",
-      sender: from || "Unknown Sender",
-      receivedAt: date || new Date().toISOString(),
+      from: from || "Unknown Sender",
+      date: date || now,
+      content: cleanContent,
+      rawContent: originalContent,
+      cleanContent: cleanContent,
+      textContent: textContent,
+      processingVersion: processingVersion,
+      
+      // Status fields
       isRead: false,
       isArchived: false,
-      lastAccessedAt: null,
-
-      // Content fields
-      rawContent: originalContent,
-      cleanContent,
-      textContent,
-
-      // Additional metadata
+      lastAccessedAt: now,
+      
+      // Additional fields
+      url: `/newsletters/${id}`,
       tags: [],
-
-      // Legacy field (temporary)
-      content: cleanContent,
+      
+      // Metadata
+      metadata: {
+        source: "webhook",
+        processingTime: Date.now() - startTime,
+        compressionRatio: 0, // This would need to be calculated
+        processedAt: now,
+        isRead: false,
+        archived: false
+      },
+      
+      // Aliases for compatibility
+      sender: from || "Unknown Sender",
+      receivedAt: date || now,
     };
 
-    logger.log("Saving newsletter data to Redis...");
+    logger.info("Saving newsletter data to Redis...");
 
     // Store the main content in the format expected by the application
     const contentData = {
       id: newsletter.id,
       subject: newsletter.subject,
       sender: newsletter.sender,
+      from: newsletter.sender, // Ensure 'from' field is set
       date: newsletter.receivedAt,
-      content: newsletter.cleanContent,
-      cleanContent: newsletter.cleanContent,
-      rawContent: newsletter.rawContent,
-      url: newsletter.url || "",
+      // Store all content variants
+      content: newsletter.cleanContent || newsletter.content,
+      cleanContent: newsletter.cleanContent || newsletter.content,
+      rawContent: newsletter.rawContent || newsletter.content,
+      textContent: newsletter.textContent || (typeof newsletter.content === 'string' ? 
+        newsletter.content.replace(/<[^>]*>?/gm, '') : ''),
+      url: newsletter.url || `/newsletters/${newsletter.id}`,
+      // Add any additional fields that the frontend might expect
+      title: newsletter.subject,
+      publishDate: newsletter.receivedAt,
+      // Ensure these fields are always present
+      isRead: false,
+      isArchived: false,
+      tags: []
     };
+    
+    // Log the data we're about to store
+    logger.info('Storing newsletter content:', {
+      id: newsletter.id,
+      contentLength: contentData.content?.length,
+      cleanContentLength: contentData.cleanContent?.length,
+      rawContentLength: contentData.rawContent?.length,
+      textContentLength: contentData.textContent?.length,
+      keys: Object.keys(contentData)
+    });
 
     // Store the main content
     await redis.set(`newsletter:${newsletter.id}`, JSON.stringify(contentData));
@@ -244,11 +271,13 @@ export default async function handler(
     await redis.lpush("newsletter_ids", newsletter.id);
 
     // Verify the data was saved
-    logger.log("Verifying saved data...");
+    logger.info("Verifying saved data...");
     const savedData = await redis.get(`newsletter:${newsletter.id}`);
-    logger.log("Retrieved data:", savedData);
+    logger.info("Retrieved data", { hasData: !!savedData });
 
-    logger.log("Newsletter saved to Redis:", newsletter.id);
+    logger.info("Newsletter saved to Redis", { id, subject, from });
+    logger.info(`Processing time: ${endTime - startTime}ms`);
+    logger.info(`Processing version: ${processingVersion}`);
 
     // Your existing response format (preserved)
     res.status(200).json({

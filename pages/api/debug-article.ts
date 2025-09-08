@@ -75,8 +75,16 @@ export default async function handler(
     const hashData = parsedData ? null : await safeHGetAll(exactKey);
     
     // Log what we found
-    console.log(`[debug-article] String data length:`, stringData?.length || 0);
-    console.log(`[debug-article] Hash data fields:`, hashData ? Object.keys(hashData).length : 0);
+    console.log(`[debug-article] String data type:`, typeof stringData);
+    console.log(`[debug-article] String data:`, stringData);
+    
+    if (typeof stringData === 'string') {
+      console.log(`[debug-article] String data length:`, stringData.length);
+    }
+    
+    if (hashData && typeof hashData === 'object') {
+      console.log(`[debug-article] Hash data fields:`, Object.keys(hashData).length);
+    }
     
     // If we have parsed data, try to extract content
     let content = '';

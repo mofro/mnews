@@ -1,10 +1,9 @@
 "use client";
 
 import React from 'react';
-import { useRouter, useSearchParams } from "next/navigation";
-import { Button } from "../../components/ui/button";
-import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
-import { cn } from "../../lib/utils";
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { cn } from "@/lib/cn";
+import { Button } from '@/components/ui/button';
 
 interface PaginationProps {
   currentPage: number;
@@ -25,8 +24,6 @@ export function Pagination({
   onPageSizeChange,
   className,
 }: PaginationProps) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const pageSizeOptions = [10, 20, 50];
 
   // Calculate visible page numbers with ellipsis
@@ -88,11 +85,6 @@ export function Pagination({
 
     // Only proceed if page actually changed
     if (newPage === currentPage) return;
-
-    // Update URL without page reload
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("page", newPage.toString());
-    router.push(`?${params.toString()}`, { scroll: false });
 
     // Call the callback
     onPageChange(newPage);

@@ -216,10 +216,10 @@ export default async function handler(
       clientMethods: Object.keys(redisClient)
     });
 
-    // Test Redis connection
+    // Test Redis connection with a simple ping
     try {
-      const ping = await redisClient.testConnection();
-      console.log(`[API] Redis ping:`, ping);
+      const ping = await redisClient.ping();
+      console.log(`[API] Redis ping response:`, ping);
     } catch (pingError) {
       console.error('[API] Redis connection test failed:', pingError);
     }

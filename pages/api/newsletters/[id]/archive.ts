@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getRedisClient } from "@/lib/redisClient";
+import { redisClient } from '@/lib/redisClient';
 import { cleanNewsletterContent } from '@/lib/cleaners/contentCleaner';
 
 type ArchiveRequest = NextApiRequest & {
@@ -37,12 +37,15 @@ export default async function handler(
     return res.status(400).json({ message: 'Invalid newsletter ID' });
   }
 
-  const redis = getRedisClient();
-  const now = new Date().toISOString();
-  const { isArchived = true, content } = req.body;
-  const newsletterId = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
-
   try {
+    const redis = redisClient;
+    if (!redis) {
+      throw new Error('Failed to connect to Redis');
+    }
+    const now = new Date().toISOString();
+    const { isArchived = true, content } = req.body;
+    const newsletterId = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
+
     console.log(`[API] Processing archive update for: ${newsletterId}`, { isArchived });
     
     // 1. Get current newsletter data

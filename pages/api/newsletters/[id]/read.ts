@@ -1,10 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { updateNewsletterReadStatus, getRedisClient } from "@/lib/redisClient";
-
-type UpdateResult = 
-  | { success: true }
-  | { success: false; error: string; details?: any }
-  | boolean; // For backward compatibility
+import { getRedisClient } from "@/lib/redisClient";
+import logger from '@/utils/logger';
 
 interface ReadRequest extends NextApiRequest {
   body: {
@@ -31,120 +27,96 @@ export default async function handler(
     
     // Ensure we're using the correct ID format
     const newsletterId = id.startsWith('newsletter:') ? id : `newsletter:${id}`;
-    console.log(`[API] Updating read status for ID: ${id} (normalized to: ${newsletterId})`);
+    const metaKey = `newsletter:meta:${id.replace(/^newsletter:/, '')}`;
     
-    const result: UpdateResult = await updateNewsletterReadStatus(newsletterId, isRead);
+    logger.info(`Updating read status for newsletter`, { 
+      id, 
+      newsletterId,
+      metaKey,
+      isRead 
+    });
     
-    // Handle the case where updateNewsletterReadStatus returns a boolean for backward compatibility
-    if (result === true) {
+    // Get the Redis client
+    const redis = await getRedisClient();
+    const client = await redis;
+    
+    try {
+      // Check if we have a meta key for this newsletter
+      const exists = await client.exists(metaKey);
+      
+      if (exists) {
+        // Update the read status in the metadata hash
+        const result = await client.hset(metaKey, { 
+          isRead: isRead ? '1' : '0',
+          lastAccessedAt: new Date().toISOString()
+        });
+        
+        logger.info('Updated read status in metadata', { result });
+      } else {
+        // Create the metadata hash if it doesn't exist
+        const result = await client.hset(metaKey, {
+          id: id.replace(/^newsletter:/, ''),
+          isRead: isRead ? '1' : '0',
+          lastAccessedAt: new Date().toISOString(),
+          // Add minimal required fields
+          subject: '',
+          sender: '',
+          receivedAt: new Date().toISOString(),
+          wordCount: '0',
+          tags: '[]',
+          metadata: JSON.stringify({
+            processingVersion: '1.0',
+            processedAt: new Date().toISOString(),
+            isRead,
+            archived: false
+          })
+        });
+        
+        logger.info('Created new metadata entry', { result });
+      }
+      
+      // Also update the main newsletter object if it's a hash
+      try {
+        const type = await client.type(newsletterId);
+        if (type === 'hash') {
+          await client.hset(newsletterId, { isRead });
+          logger.info('Updated read status in main newsletter hash');
+        } else {
+          // If it's a string, we need to parse it, update, and save it back
+          const data = await client.get(newsletterId);
+          if (data) {
+            const parsed = typeof data === 'string' ? JSON.parse(data) : data;
+            const updated = { ...parsed, isRead };
+            await client.set(newsletterId, JSON.stringify(updated));
+            logger.info('Updated read status in main newsletter string');
+          }
+        }
+      } catch (updateError) {
+        logger.error('Error updating main newsletter object', { error: updateError });
+        // Don't fail the request if this part fails
+      }
+      
       return res.status(200).json({ 
         success: true,
         isRead,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        updatedIn: 'metadata',
+        metaKey
+      });
+    } catch (error) {
+      console.error('Error updating read status in Redis:', error);
+      return res.status(500).json({
+        success: false,
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error'
       });
     }
-    
-    // Handle the new UpdateResult type
-    if (typeof result === 'object' && result !== null && 'success' in result) {
-      const typedResult = result as { success: boolean; error?: string; details?: any };
-      if (typedResult.success) {
-        return res.status(200).json({ 
-          success: true,
-          isRead,
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        // Extract error details from the result
-        const { error, details } = typedResult;
-        return res.status(404).json({
-          message: 'Failed to update newsletter',
-          debug: {
-            requestedId: id,
-            resolvedKey: newsletterId,
-            error,
-            details: details || 'No additional details available'
-          },
-          suggestion: 'Check the debug information for details on what went wrong'
-        });
-      }
-    }
-    
-    if (result === false) {
-      // Try to list all newsletter keys for debugging
-      try {
-        const client = getRedisClient();
-        // Try to get a sample of newsletter keys using SCAN
-        const [cursor, keys] = await client.scan(0, { match: 'newsletter:*', count: 10 });
-        console.log('Sample of available newsletter keys:', keys);
-        
-        // Try to get the requested key directly for more details
-        let keyDetails = null;
-        try {
-          const keyData = await client.hgetall(newsletterId);
-          keyDetails = {
-            exists: keyData !== null,
-            fields: keyData ? Object.keys(keyData) : [],
-            metadataType: keyData?.metadata ? typeof keyData.metadata : 'none'
-          };
-        } catch (e) {
-          keyDetails = { error: 'Failed to inspect key details' };
-        }
-        
-        return res.status(404).json({ 
-          message: 'Newsletter not found or could not be updated',
-          debug: {
-            requestedId: id,
-            resolvedKey: newsletterId,
-            keyInspection: keyDetails,
-            availableKeysSample: keys,
-            totalKeys: keys.length,
-            nextCursor: cursor
-          },
-          suggestion: 'Verify the newsletter ID and try again. Check the debug information for more details.'
-        });
-      } catch (e) {
-        console.error('Error scanning newsletter keys:', e);
-        // Try a different approach - check if we can get any data at all
-        try {
-          const client = getRedisClient();
-          // Try to get any key to test the connection
-          const testKey = 'newsletter:test';
-          await client.hset(testKey, { test: 'test' });
-          const testData = await client.hgetall(testKey);
-          await client.hdel(testKey, 'test');
-          
-          return res.status(404).json({ 
-            message: 'Newsletter not found',
-            debug: {
-              requestedId: id,
-              testConnection: 'Success',
-              testData: testData
-            },
-            error: 'Could not list newsletter keys, but Redis connection is working'
-          });
-        } catch (innerError) {
-          console.error('Error testing Redis connection:', innerError);
-          return res.status(404).json({ 
-            message: 'Newsletter not found',
-            error: 'Could not connect to Redis or list newsletter keys',
-            details: innerError instanceof Error ? innerError.message : 'Unknown error'
-          });
-        }
-      }
-    }
-
-    return res.status(200).json({ 
-      success: true,
-      isRead,
-      timestamp: new Date().toISOString()
-    });
-
   } catch (error) {
-    console.error('Error updating newsletter read status:', error);
-    return res.status(500).json({ 
+    console.error('Unexpected error in read status update:', error);
+    return res.status(500).json({
       success: false,
-      message: 'Internal server error',
-      error: error instanceof Error ? error.message : 'Unknown error'
+      error: 'Internal server error',
+      details: error instanceof Error ? error.message : 'Unknown error'
     });
   }
 }

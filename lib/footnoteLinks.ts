@@ -4,7 +4,7 @@
  * footnote section at the bottom of the content.
  */
 
-import type { ProcessingStep } from './parser';
+import type { ProcessingStep } from './parser.js';
 
 interface LinkReference {
   id: number;

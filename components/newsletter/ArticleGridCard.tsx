@@ -12,10 +12,10 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatDateSafely } from "@/utils/dateService";
+import { format, isValid } from "date-fns";
 import DOMPurify from "dompurify";
-import { cn } from "@/lib/utils";
-import Image from "next/image";
+import { cn } from "@/lib/cn";
+// Using standard img tag instead of Next.js Image component
 
 export interface ArticleGridCardProps {
   id: string;
@@ -23,6 +23,8 @@ export interface ArticleGridCardProps {
   subject: string;
   date: string;
   content: string;
+  cleanContent?: string;
+  rawContent?: string;
   imageUrl?: string;
   isNew?: boolean;
   isRead?: boolean;
@@ -41,6 +43,8 @@ export function ArticleGridCard({
   subject,
   date,
   content = "",
+  cleanContent = "",
+  rawContent = "",
   imageUrl,
   isNew = false,
   isRead = false,
@@ -52,28 +56,91 @@ export function ArticleGridCard({
   onExpand,
   className,
 }: ArticleGridCardProps) {
-  // Sanitize content for preview
+  // Get the best available content for preview
   const previewContent = useMemo(() => {
-    if (!content) return "";
-    // Remove HTML tags but keep full content
-    return DOMPurify.sanitize(content, { ALLOWED_TAGS: [] });
-  }, [content]);
+    try {
+      // Log content details in development
+      if (process.env.NODE_ENV === 'development') {
+        console.log('ArticleGridCard content processing:', {
+          id,
+          contentLength: content?.length,
+          cleanContentLength: cleanContent?.length,
+          rawContentLength: rawContent?.length,
+        });
+      }
+      
+      // Get the first non-empty content source
+      const contentToUse = [content, cleanContent, rawContent].find(
+        c => c && c.trim().length > 0
+      ) || 'No content available';
 
-  const formattedDate = useMemo(
-    () =>
-      formatDateSafely<string>(
-        date,
-        (d: Date) =>
-          d.toLocaleDateString(undefined, {
-            year: "numeric",
-            month: "short",
-            day: "numeric",
-          }),
-        "No date",
-        { fallbackBehavior: "current-date", logWarnings: true },
-      ),
-    [date],
-  );
+      // If we only have the fallback text, return it
+      if (contentToUse === 'No content available') {
+        return contentToUse;
+      }
+
+      // Check if content is a redacted message from the API
+      if (contentToUse.includes('[REDACTED - use /api/newsletters/')) {
+        return 'Content available - click to view full article';
+      }
+
+      // Process the content for preview
+      let text = contentToUse;
+      
+      // Remove HTML tags if present
+      if (text.includes('<')) {
+        text = text
+          .replace(/<[^>]*>?/gm, ' ') // Replace HTML tags with space
+          .replace(/\s+/g, ' ')      // Collapse multiple spaces
+          .trim();
+      }
+      
+      // Decode HTML entities
+      text = text
+        .replace(/&[a-z]+;/g, ' ')  // Replace HTML entities with space
+        .replace(/\s+/g, ' ')      // Collapse spaces again after replacement
+        .trim();
+
+      // If we still have content, try to find a good preview
+      if (text) {
+        // Try to find the first sentence
+        const firstSentenceMatch = text.match(/^.*?[.!?]+(?:\s|$)/);
+        let preview = firstSentenceMatch ? firstSentenceMatch[0] : text;
+        
+        // If the first sentence is too short, get more content
+        if (preview.length < 50 && text.length > 50) {
+          preview = text.substring(0, 200);
+        }
+        
+        // Clean up and truncate
+        preview = preview.replace(/\s+/g, ' ').trim();
+        
+        // Truncate to a reasonable length for preview
+        if (preview.length > 150) {
+          const maxLength = 150;
+          const lastSpace = preview.lastIndexOf(' ', maxLength);
+          const truncateAt = lastSpace > maxLength * 0.8 ? lastSpace : maxLength;
+          preview = preview.substring(0, truncateAt).trim() + '...';
+        }
+        
+        return preview || 'No content available';
+      }
+      
+      return 'No content available';
+    } catch (error) {
+      console.error('Error generating preview content:', error);
+      return 'Content preview unavailable';
+    }
+  }, [content, cleanContent, rawContent]);
+
+  const formattedDate = useMemo(() => {
+    try {
+      const dateObj = new Date(date);
+      return isValid(dateObj) ? format(dateObj, 'MMM d, yyyy') : 'Invalid date';
+    } catch (error) {
+      return 'Invalid date';
+    }
+  }, [date]);
 
   const [imageError, setImageError] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
@@ -133,17 +200,13 @@ export function ArticleGridCard({
     >
       {imageUrl && !imageError && (
         <div className="relative aspect-video overflow-hidden bg-muted/20">
-          <Image
+          <img
             src={imageUrl}
             alt={subject}
-            fill
-            className="object-cover transition-opacity duration-300 hover:opacity-90"
-            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            className="w-full h-full object-cover transition-opacity duration-300 hover:opacity-90"
             onError={() => setImageError(true)}
             onLoad={() => setIsImageLoading(false)}
-            priority={false}
             loading="lazy"
-            unoptimized={imageUrl.startsWith("http")} // Only optimize local images
           />
         </div>
       )}
@@ -188,7 +251,7 @@ export function ArticleGridCard({
             <Button
               variant="ghost"
               size="sm"
-              onClick={(e) => handleActionClick(e, () => onToggleRead(id))}
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleActionClick(e, () => onToggleRead?.(id))}
               className="h-8 px-2 text-muted-foreground hover:text-foreground"
               title={isRead ? "Mark as unread" : "Mark as read"}
             >
@@ -202,7 +265,7 @@ export function ArticleGridCard({
             <Button
               variant="ghost"
               size="sm"
-              onClick={(e) => handleActionClick(e, () => onToggleArchive(id))}
+              onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleActionClick(e, () => onToggleArchive?.(id))}
               className="h-8 px-2 text-muted-foreground hover:text-foreground"
               title={isArchived ? "Unarchive" : "Archive"}
             >
@@ -217,7 +280,7 @@ export function ArticleGridCard({
           <Button
             variant="ghost"
             size="sm"
-            onClick={(e) => handleActionClick(e, () => onShare(id))}
+            onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleActionClick(e, () => onShare?.(id))}
             className="h-8 px-2 text-muted-foreground hover:text-foreground"
             title="Share"
           >

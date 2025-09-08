@@ -1,9 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { X, Share2, Eye, EyeOff, Archive, ArchiveRestore, Loader2, AlertCircle, ExternalLink } from 'lucide-react';
-import { Portal } from "@/components/ui/Portal";
-import { cn } from "@/lib/utils";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { X, Share2, Eye, EyeOff, Archive, ArchiveRestore, Loader2 } from 'lucide-react';
+import { Portal } from '@/components/ui/Portal';
+import { cn } from "@/lib/cn";
 import { format } from "date-fns";
 import DOMPurify from 'dompurify';
 
@@ -31,63 +31,168 @@ interface FullViewArticleProps {
   className?: string;
 }
 
-function FullViewArticleComponent({
+const FullViewArticleComponent: React.FC<FullViewArticleProps> = ({
   article: initialArticle,
   onClose,
   onToggleRead,
   onToggleArchive,
   onShare,
   className,
-}: FullViewArticleProps) {
+}) => {
   const [isClient, setIsClient] = useState(false);
   const [isImageLoading, setIsImageLoading] = useState(true);
   const [isImageError, setIsImageError] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [article, setArticle] = useState<BaseArticle>(initialArticle);
   const modalRef = useRef<HTMLDivElement>(null);
-  
-  // Set client-side flag
+
+  // Set client-side flag on mount
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  // Handle click outside to close
-  const handleBackdropClick = (e: React.MouseEvent) => {
+  // Handle click outside to close modal
+  const handleBackdropClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
       onClose();
     }
-  };
+  }, [onClose]);
 
-  // Get the first available content source
-  const content = useMemo(() => {
-    return initialArticle.cleanContent || 
-           initialArticle.content || 
-           initialArticle.rawContent || 
-           '';
-  }, [initialArticle]);
-
-  // Process content with basic sanitization
-  const processedContent = useMemo(() => {
-    if (!content) return '';
-    
+  // Fetch full article content if needed
+  const fetchFullArticle = useCallback(async () => {
     try {
-      return DOMPurify.sanitize(content, {
-        ALLOWED_TAGS: ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a', 'img', 'ul', 'ol', 'li', 'strong', 'em', 'br'],
-        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'target', 'rel']
+      // Check if we already have meaningful content
+      const hasRealContent = 
+        (article.content && article.content.length > 30) ||
+        (article.cleanContent && article.cleanContent.length > 30) ||
+        (article.rawContent && article.rawContent.length > 30);
+      
+      if (hasRealContent) {
+        console.log('[FullViewArticle] Skipping fetch - already have content');
+        return;
+      }
+      
+      console.log('[FullViewArticle] Fetching full article content...');
+      const response = await fetch(`/api/newsletters/${article.id}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[FullViewArticle] Failed to load article content:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to load article content: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('[FullViewArticle] Received article data:', {
+        id: data.id,
+        hasContent: !!data.content,
+        hasCleanContent: !!data.cleanContent,
+        hasRawContent: !!data.rawContent,
+        contentLength: data.content?.length || 0,
+        cleanContentLength: data.cleanContent?.length || 0,
+        rawContentLength: data.rawContent?.length || 0,
+        keys: Object.keys(data)
       });
-    } catch (error) {
-      console.error('Error sanitizing content:', error);
-      return content;
-    }
-  }, [content]);
 
-  // Format date safely
-  const formattedDate = useMemo(() => {
+      setArticle(prev => ({
+        ...prev,
+        content: data.content || prev.content,
+        cleanContent: data.cleanContent || prev.cleanContent,
+        rawContent: data.rawContent || prev.rawContent
+      }));
+    } catch (err) {
+      console.error('Error fetching article content:', err);
+      setError('Failed to load article content. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [article.id, article.content, article.cleanContent, article.rawContent]);
+
+  // Trigger content fetch when needed
+  useEffect(() => {
+    fetchFullArticle();
+  }, [fetchFullArticle]);
+
+  // Sanitize content for safe rendering
+  const sanitizedContent = useMemo(() => {
     try {
-      if (!initialArticle.publishDate) return '';
+      // Debug log the content we're working with
+      console.log('[FullViewArticle] Processing content for article:', {
+        hasContent: !!article.content,
+        hasCleanContent: !!article.cleanContent,
+        hasRawContent: !!article.rawContent,
+        contentLength: article.content?.length || 0,
+        cleanContentLength: article.cleanContent?.length || 0,
+        rawContentLength: article.rawContent?.length || 0,
+        contentSample: article.content ? article.content.substring(0, 100) + '...' : null
+      });
+      
+      // Try content fields in order of preference
+      let contentToUse = article.content || article.cleanContent || article.rawContent || '';
+      
+      if (!contentToUse) {
+        console.log('[FullViewArticle] No content available for article');
+        return '<p>No content available</p>';
+      }
+
+      // Remove tracking pixels and other unwanted elements
+      const cleanedContent = contentToUse
+        .replace(/<img[^>]*width="1"[^>]*height="1"[^>]*>/gi, '') // Remove tracking pixels
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '') // Remove style tags
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
+        .replace(/<\?[^>]*>/g, '') // Remove PHP tags
+        .replace(/<meta[^>]*>/g, '') // Remove meta tags
+        .replace(/<link[^>]*>/g, '') // Remove link tags
+        .replace(/<\/div>\s*<div[^>]*>/gi, '</div>\n<div>') // Add newlines between divs
+        .replace(/<\/p>\s*<p[^>]*>/gi, '</p>\n<p>') // Add newlines between paragraphs
+        .replace(/<br\s*\/?>/gi, '<br>') // Normalize line breaks
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .replace(/\s*([<>])\s*/g, '$1') // Remove spaces around tags
+        .trim();
+
+      // Sanitize the content with a more permissive policy
+      const sanitized = DOMPurify.sanitize(cleanedContent, {
+        ALLOWED_TAGS: [
+          'p', 'div', 'span', 'br', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li',
+          'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'code', 'hr',
+          'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'figure', 'figcaption'
+        ],
+        ALLOWED_ATTR: [
+          'href', 'title', 'target', 'rel', 'class', 'id', 'style',
+          'src', 'alt', 'width', 'height', 'border', 'colspan', 'rowspan',
+          'cellspacing', 'cellpadding', 'align', 'valign', 'bgcolor'
+        ],
+        ALLOW_DATA_ATTR: false,
+        ALLOW_UNKNOWN_PROTOCOLS: false,
+        FORBID_TAGS: ['style', 'script', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
+        FORBID_ATTR: ['onclick', 'onerror', 'onload', 'onmouseover', 'onmouseout', 'style']
+      });
+
+      console.log('[FullViewArticle] Sanitized content length:', sanitized.length);
+      
+      // Wrap in a container div for styling
+      return sanitized 
+        ? `<div class="email-content">${sanitized}</div>` 
+        : '<p>No content available</p>';
+        
+    } catch (error) {
+      console.error('Error processing content:', error);
+      return '<p>Error loading content</p>';
+    }
+  }, [article.content, article.cleanContent, article.rawContent]);
+
+  // Format the publish date with error handling
+  const formattedDate = useMemo((): string => {
+    try {
+      if (!initialArticle.publishDate) return 'Unknown date';
       const date = new Date(initialArticle.publishDate);
-      return isNaN(date.getTime()) ? '' : format(date, 'MMMM d, yyyy');
+      return isNaN(date.getTime()) ? 'Unknown date' : format(date, 'MMMM d, yyyy');
     } catch (error) {
       console.error('Error formatting date:', error);
-      return '';
+      return 'Unknown date';
     }
   }, [initialArticle.publishDate]);
 
@@ -97,7 +202,11 @@ function FullViewArticleComponent({
   return (
     <Portal>
       <div 
-        className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto"
+        className={cn(
+          "fixed inset-0 z-50 bg-black/50 backdrop-blur-sm overflow-y-auto",
+          "flex items-center justify-center p-4",
+          className
+        )}
         onClick={handleBackdropClick}
       >
         <div 
@@ -112,7 +221,7 @@ function FullViewArticleComponent({
             <div className="flex items-center space-x-2">
               <button
                 onClick={onClose}
-                className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+                className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
                 aria-label="Close"
               >
                 <X className="h-5 w-5" />
@@ -122,40 +231,24 @@ function FullViewArticleComponent({
               </h2>
             </div>
             <div className="flex items-center space-x-2">
-              {initialArticle.url && (
-                <a
-                  href={initialArticle.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
-                  aria-label="Open original article"
-                >
-                  <ExternalLink className="h-5 w-5" />
-                </a>
-              )}
-              {onShare && (
-                <button
-                  onClick={() => onShare(initialArticle.id)}
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
-                  aria-label="Share article"
-                >
-                  <Share2 className="h-5 w-5" />
-                </button>
-              )}
               {onToggleRead && (
                 <button
                   onClick={() => onToggleRead(initialArticle.id)}
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+                  className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
                   aria-label={initialArticle.isRead ? 'Mark as unread' : 'Mark as read'}
                 >
-                  {initialArticle.isRead ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  {initialArticle.isRead ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
                 </button>
               )}
               {onToggleArchive && (
                 <button
                   onClick={() => onToggleArchive(initialArticle.id)}
-                  className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
-                  aria-label={initialArticle.isArchived ? 'Unarchive article' : 'Archive article'}
+                  className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+                  aria-label={initialArticle.isArchived ? 'Unarchive' : 'Archive'}
                 >
                   {initialArticle.isArchived ? (
                     <ArchiveRestore className="h-5 w-5" />
@@ -164,13 +257,22 @@ function FullViewArticleComponent({
                   )}
                 </button>
               )}
+              {onShare && (
+                <button
+                  onClick={() => onShare(initialArticle.id)}
+                  className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+                  aria-label="Share"
+                >
+                  <Share2 className="h-5 w-5" />
+                </button>
+              )}
             </div>
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex-1 overflow-y-auto">
             {/* Meta */}
-            <div className="mb-6">
+            <div className="p-6">
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                 {initialArticle.title}
               </h1>
@@ -180,9 +282,7 @@ function FullViewArticleComponent({
                   {initialArticle.sender && (
                     <span>{initialArticle.sender}</span>
                   )}
-                  {formattedDate && (
-                    <span>{formattedDate}</span>
-                  )}
+                  <span>{formattedDate}</span>
                 </div>
               )}
 
@@ -196,7 +296,7 @@ function FullViewArticleComponent({
                   <img
                     src={initialArticle.imageUrl}
                     alt={initialArticle.title}
-                    className={`w-full h-full object-cover transition-opacity ${isImageLoading ? 'opacity-0' : 'opacity-100'}`}
+                    className={`w-full h-full object-cover transition-opacity duration-200 ${isImageLoading ? 'opacity-0' : 'opacity-100'}`}
                     onLoad={() => setIsImageLoading(false)}
                     onError={() => {
                       setIsImageLoading(false);
@@ -205,20 +305,66 @@ function FullViewArticleComponent({
                   />
                 </div>
               )}
-            </div>
 
-            {/* Article content */}
-            {processedContent ? (
-              <div 
-                className="prose dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: processedContent }}
-              />
-            ) : (
-              <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                <AlertCircle className="h-12 w-12 mx-auto mb-4 text-gray-300 dark:text-gray-600" />
-                <p>No content available for this article.</p>
+              {/* Article content */}
+              <div className="prose max-w-none prose-headings:font-medium prose-p:leading-relaxed dark:prose-invert">
+                <div 
+                  className="newsletter-content"
+                  dangerouslySetInnerHTML={{ __html: sanitizedContent }}
+                />
+                
+                {/* Debug info in development */}
+                {process.env.NODE_ENV === 'development' && (
+                  <div className="mt-8 p-4 bg-gray-100 dark:bg-gray-800 text-xs text-gray-600 dark:text-gray-300 rounded">
+                    <h4 className="font-bold mb-2">Debug Info:</h4>
+                    <pre className="whitespace-pre-wrap break-words">
+                      {JSON.stringify({
+                        hasContent: !!article.content,
+                        hasCleanContent: !!article.cleanContent,
+                        hasRawContent: !!article.rawContent,
+                        contentLength: article.content?.length || 0,
+                        cleanContentLength: article.cleanContent?.length || 0,
+                        rawContentLength: article.rawContent?.length || 0,
+                        sanitizedContentLength: sanitizedContent?.length || 0,
+                        contentSample: article.content ? 
+                          article.content.substring(0, 100) + '...' : 
+                          null
+                      }, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </div>
-            )}
+              
+              <style jsx={true} global={true}>{`
+                .newsletter-content {
+                  word-break: break-word;
+                  hyphens: auto;
+                }
+                .newsletter-content img {
+                  max-width: 100%;
+                  height: auto;
+                  margin: 1rem 0;
+                }
+                .newsletter-content iframe {
+                  max-width: 100%;
+                  border: none;
+                }
+                .newsletter-content table {
+                  width: 100%;
+                  border-collapse: collapse;
+                  margin: 1rem 0;
+                }
+                .newsletter-content th,
+                .newsletter-content td {
+                  border: 1px solid #e5e7eb;
+                  padding: 0.5rem;
+                }
+                .dark .newsletter-content th,
+                .dark .newsletter-content td {
+                  border-color: #374151;
+                }
+              `}</style>
+            </div>
           </div>
 
           {/* Footer */}
@@ -227,10 +373,10 @@ function FullViewArticleComponent({
               <div>
                 {initialArticle.tags && initialArticle.tags.length > 0 && (
                   <div className="flex flex-wrap gap-2">
-                    {initialArticle.tags.map((tag, index) => (
+                    {initialArticle.tags.map((tag: string, index: number) => (
                       <span 
-                        key={index}
-                        className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200"
+                        key={`${tag}-${index}`}
+                        className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded-md text-xs"
                       >
                         {tag}
                       </span>
@@ -238,32 +384,27 @@ function FullViewArticleComponent({
                   </div>
                 )}
               </div>
-              <div>
-                <button
-                  onClick={onClose}
-                  className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
-                >
-                  Close
-                </button>
-              </div>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-md hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
       </div>
     </Portal>
   );
-}
+};
 
-// Custom comparison function for React.memo
-function areEqual(prevProps: FullViewArticleProps, nextProps: FullViewArticleProps) {
-  return (
-    prevProps.article.id === nextProps.article.id &&
-    prevProps.article.isRead === nextProps.article.isRead &&
-    prevProps.article.isArchived === nextProps.article.isArchived
-  );
-}
+// Memoize the component to prevent unnecessary re-renders
+const areEqual = (prevProps: Readonly<FullViewArticleProps>, nextProps: Readonly<FullViewArticleProps>): boolean => {
+  return prevProps.article.id === nextProps.article.id &&
+         prevProps.article.isRead === nextProps.article.isRead &&
+         prevProps.article.isArchived === nextProps.article.isArchived;
+};
 
-// Memoize the component with custom comparison
 const FullViewArticle = React.memo(FullViewArticleComponent, areEqual);
 
 export default FullViewArticle;

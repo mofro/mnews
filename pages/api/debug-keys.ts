@@ -1,5 +1,16 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { getRedisClient } from '@/lib/redisClient';
+import { getRedisClient } from "@/lib/redisClient";
+
+interface KeyValue {
+  key: string;
+  value?: unknown;
+  error?: string;
+}
+
+interface HashData {
+  key: string;
+  hash: Record<string, string> | null;
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -10,7 +21,7 @@ export default async function handler(
   }
 
   try {
-    const redis = getRedisClient();
+    const redis = await getRedisClient();
     
     // Get all keys
     const keys = await redis.keys('*');
@@ -20,29 +31,58 @@ export default async function handler(
     const sampleData: Record<string, unknown> = {};
     const keysToSample = Math.min(keys.length, 5);
     
+    // Get values for each key
+    const values: KeyValue[] = await Promise.all(
+      keys.map(async (key: string) => {
+        try {
+          const value = await redis.get(key);
+          return { key, value };
+        } catch (error) {
+          console.error(`Error getting value for key ${key}:`, error);
+          return { key, error: 'Error retrieving value' };
+        }
+      })
+    );
+    
+    // Get hash data for each key that might be a hash
+    const hashData: HashData[] = await Promise.all(
+      keys.map(async (key: string) => {
+        try {
+          const hash = await redis.hgetall(key);
+          return { 
+            key, 
+            hash: hash && typeof hash === 'object' && Object.keys(hash).length > 0 
+              ? hash as Record<string, string> 
+              : null 
+          };
+        } catch (error) {
+          // Not a hash, or error occurred
+          return { key, hash: null };
+        }
+      })
+    );
+    
+    // Process sample data
     for (let i = 0; i < keysToSample; i++) {
       const key = keys[i];
-      try {
-        // Try to get as string first
-        const value = await redis.get(key);
-        if (value) {
-          try {
-            // Try to parse as JSON
-            sampleData[key] = JSON.parse(value);
-          } catch {
-            sampleData[key] = value;
-          }
-        } else {
-          // Try to get as hash
-          const hash = await redis.hgetall(key);
-          if (hash && Object.keys(hash).length > 0) {
-            sampleData[key] = hash;
-          }
+      const value = values.find((v) => v.key === key);
+      const hash = hashData.find((h) => h.key === key);
+      
+      if (value && 'value' in value && value.value !== undefined) {
+        try {
+          // Try to parse as JSON if it's a string
+          sampleData[key] = typeof value.value === 'string' 
+            ? JSON.parse(value.value) 
+            : value.value;
+        } catch {
+          sampleData[key] = value.value;
         }
-      } catch (error) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        console.error(`Error fetching key ${key}:`, err);
-        sampleData[key] = { error: 'Error fetching key', message: err.message };
+      } else if (hash && hash.hash) {
+        sampleData[key] = hash.hash;
+      } else if (value && 'error' in value) {
+        sampleData[key] = { error: value.error };
+      } else {
+        sampleData[key] = { error: 'Error fetching key', message: 'Unknown error' };
       }
     }
     
@@ -54,15 +94,11 @@ export default async function handler(
     });
     
   } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    console.error('Error in debug-keys:', err);
-    return res.status(500).json({
-      success: false,
-      message: 'Error fetching Redis keys',
-      error: err.message,
-      ...(process.env.NODE_ENV === 'development' && {
-        stack: err.stack
-      })
+    console.error('Error in debug-keys:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    return res.status(500).json({ 
+      success: false, 
+      error: errorMessage 
     });
   }
 }

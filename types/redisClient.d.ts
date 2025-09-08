@@ -1,4 +1,4 @@
-import { RedisClient } from '../lib/redisClient';
+import { RedisClient } from '../lib/redisClient.js';
 
 declare module '@/lib/redisClient' {
   interface RedisClient {

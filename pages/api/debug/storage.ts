@@ -2,8 +2,8 @@
 // Debug endpoint to test storage functions directly
 
 import { NextApiRequest, NextApiResponse } from 'next';
-import { NewsletterStorage } from '../../../lib/storage';
-import logger from '../../../utils/logger';
+import { NewsletterStorage } from '@/lib/storage';
+import logger from '@/utils/logger';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
@@ -13,22 +13,22 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const { id } = req.query;
 
-    logger.log('Debug storage endpoint called');
-    logger.log('Query params:', req.query);
+    logger.info('Debug storage endpoint called');
+    logger.debug('Query params:', req.query);
 
     // Test getAllNewsletters
-    logger.log('Testing NewsletterStorage.getAllNewsletters...');
+    logger.info('Testing NewsletterStorage.getAllNewsletters...');
     const allNewsletters = await NewsletterStorage.getAllNewsletters();
-    logger.log(`Found ${allNewsletters.length} newsletters`);
+    logger.info(`Found ${allNewsletters.length} newsletters`);
     
     const firstFew = allNewsletters.slice(0, 3);
     logger.debug('First few newsletters:', firstFew);
 
     if (id) {
       // Test getNewsletter with specific ID
-      logger.log(`Testing NewsletterStorage.getNewsletter with ID: ${id}`);
+      logger.info(`Testing NewsletterStorage.getNewsletter with ID: ${id}`);
       const newsletter = await NewsletterStorage.getNewsletter(id as string);
-      logger.log('Newsletter data:', newsletter);
+      logger.debug('Newsletter data:', newsletter);
       
       return res.status(200).json({
         success: true,
@@ -38,8 +38,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         newsletter: newsletter ? {
           id: newsletter.id,
           subject: newsletter.subject,
-          hasRawContent: !!newsletter.rawContent,
-          hasCleanContent: !!newsletter.cleanContent
+          hasRawContent: 'content' in newsletter && !!newsletter.content,
+          hasCleanContent: 'cleanContent' in newsletter && !!newsletter.cleanContent
         } : null,
         firstFew: firstFew.map(n => ({
           id: n.id,
