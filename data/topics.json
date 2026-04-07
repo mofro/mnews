@@ -1,0 +1,28 @@
+{
+  "categories": [
+    {
+      "name": "Technology",
+      "color": "blue",
+      "senders": ["techcrunch.com", "theverge.com", "wired.com", "arstechnica.com"],
+      "keywords": ["AI", "artificial intelligence", "machine learning", "startup", "software", "developer", "programming", "tech", "app", "cloud", "open source"]
+    },
+    {
+      "name": "Economics & Policy",
+      "color": "green",
+      "senders": ["noahpinion.substack.com", "marginalrevolution.com", "bloomberg.com"],
+      "keywords": ["inflation", "GDP", "policy", "market", "economy", "fiscal", "monetary", "federal reserve", "interest rate", "recession", "trade", "regulation"]
+    },
+    {
+      "name": "Local",
+      "color": "orange",
+      "senders": [],
+      "keywords": ["Philadelphia", "Philly", "city council", "zoning", "neighborhood", "SEPTA", "mayor", "school district"]
+    },
+    {
+      "name": "Health & Science",
+      "color": "purple",
+      "senders": ["nejm.org", "statnews.com"],
+      "keywords": ["health", "medicine", "research", "study", "clinical", "vaccine", "drug", "treatment", "science", "biology", "climate"]
+    }
+  ]
+}

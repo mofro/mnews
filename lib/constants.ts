@@ -7,6 +7,7 @@ export const SCHEMA = {
   NEWSLETTER_PREFIX: "newsletter:",
   META_PREFIX: "newsletter:meta:",
   CONTENT_PREFIX: "newsletter:content:",
+  SUMMARY_PREFIX: "newsletter:summary:",
 
   // Sorted sets and lists
   NEWSLETTER_IDS_KEY: "newsletter:ids",

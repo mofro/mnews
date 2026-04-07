@@ -81,6 +81,12 @@ export interface Newsletter extends Partial<NewsletterContent>, Partial<Newslett
   tags?: string[];
   imageUrl?: string;
   
+  /** Topic categories assigned during ingestion */
+  topics?: string[];
+
+  /** AI-generated summary of the newsletter */
+  summary?: string;
+
   // Add any additional fields that might be present in the API response
   [key: string]: any;
 }

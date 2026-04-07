@@ -6,6 +6,8 @@ import { cleanNewsletterContent } from "@/lib/cleaners/contentCleaner";
 import logger from "@/utils/logger";
 import type { Newsletter as ProcessableNewsletter } from "@/types/newsletter";
 import { processNewsletterContent } from "@/utils/content";
+import fs from "fs";
+import path from "path";
 
 // Verify required environment variables are present
 if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
@@ -48,6 +50,38 @@ import { parseDateToISOString } from "@/utils/dateService";
 const normalizeDate = (dateInput: any): string => {
   return parseDateToISOString(dateInput) || new Date().toISOString();
 };
+
+interface TopicCategory {
+  name: string;
+  color: string;
+  senders?: string[];
+  keywords?: string[];
+}
+
+function classifyTopics(sender: string, subject: string, textSnippet: string): string[] {
+  try {
+    const topicsPath = path.join(process.cwd(), "data", "topics.json");
+    const { categories }: { categories: TopicCategory[] } = JSON.parse(
+      fs.readFileSync(topicsPath, "utf-8")
+    );
+
+    const senderDomain = sender.match(/@([^>\s]+)/)?.[1]?.toLowerCase() ?? "";
+    const haystack = `${subject} ${textSnippet}`.toLowerCase();
+
+    const matched = categories
+      .filter((cat) => {
+        const senderMatch = cat.senders?.some((s) => senderDomain.includes(s.toLowerCase())) ?? false;
+        const keywordMatch = cat.keywords?.some((kw) => haystack.includes(kw.toLowerCase())) ?? false;
+        return senderMatch || keywordMatch;
+      })
+      .map((cat) => cat.name);
+
+    return matched.length > 0 ? matched : ["Uncategorized"];
+  } catch (err) {
+    logger.warn("Failed to classify topics:", err);
+    return ["Uncategorized"];
+  }
+}
 
 export default async function handler(
   req: NextApiRequest,
@@ -209,6 +243,11 @@ export default async function handler(
       receivedAt: date || now,
     };
 
+    // Classify newsletter into topics
+    const textSnippet = (text || textContent).substring(0, 500);
+    const topics = classifyTopics(newsletter.from, newsletter.subject, textSnippet);
+    logger.info("Newsletter topics:", { topics });
+
     logger.info("Saving newsletter data to Redis...");
 
     // Store the main content in the format expected by the application
@@ -231,7 +270,8 @@ export default async function handler(
       // Ensure these fields are always present
       isRead: false,
       isArchived: false,
-      tags: []
+      tags: [],
+      topics,
     };
     
     // Log the data we're about to store
@@ -258,6 +298,7 @@ export default async function handler(
       lastAccessedAt: newsletter.lastAccessedAt || new Date().toISOString(),
       wordCount: wordCount.toString(),
       tags: JSON.stringify(newsletter.tags || []),
+      topics: JSON.stringify(topics),
       // Include metadata field that the API expects
       metadata: JSON.stringify({
         processingVersion: "1.0",
@@ -269,6 +310,15 @@ export default async function handler(
 
     // Add to newsletter IDs list for chronological ordering
     await redis.lpush("newsletter_ids", newsletter.id);
+
+    // Fire-and-forget AI summary (non-blocking)
+    if (process.env.ANTHROPIC_API_KEY) {
+      import("@/lib/summarizer")
+        .then(({ summarizeNewsletter }) =>
+          summarizeNewsletter(newsletter.id, newsletter.subject, text || textContent)
+        )
+        .catch((err) => logger.warn("Summary generation failed:", err));
+    }
 
     // Verify the data was saved
     logger.info("Verifying saved data...");
