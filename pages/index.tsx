@@ -198,63 +198,97 @@ const Home: React.FC = () => {
 
   // Handler for toggling read status
   const handleToggleRead = useCallback(async (id: string) => {
+    const current = articles.find((a) => a.id === id);
+    const newIsRead = current ? !current.isRead : true;
+
+    // Optimistic UI update
+    setArticles((prevArticles) =>
+      prevArticles.map((article) =>
+        article.id === id ? { ...article, isRead: newIsRead } : article,
+      ),
+    );
+    setFullViewArticle((prev) =>
+      prev?.id === id ? { ...prev, isRead: newIsRead } : prev,
+    );
+
     try {
-      // Optimistic UI update
-      setArticles((prevArticles) =>
-        prevArticles.map((article) =>
-          article.id === id ? { ...article, isRead: !article.isRead } : article,
-        ),
-      );
-
-      // Update full view article if it's the one being toggled
-      setFullViewArticle((prev) =>
-        prev?.id === id ? { ...prev, isRead: !prev.isRead } : prev,
-      );
-
-      // TODO: Add API call to update read status
-      // await updateArticleReadStatus(id, !isRead);
+      const response = await fetch(`/api/newsletters/${id}/read`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isRead: newIsRead }),
+      });
+      if (!response.ok) throw new Error("Failed to update read status");
     } catch (error) {
       logger.error("Error toggling read status:", error);
       // Revert on error
       setArticles((prevArticles) =>
         prevArticles.map((article) =>
-          article.id === id ? { ...article, isRead: !article.isRead } : article,
+          article.id === id ? { ...article, isRead: !newIsRead } : article,
         ),
       );
+      setFullViewArticle((prev) =>
+        prev?.id === id ? { ...prev, isRead: !newIsRead } : prev,
+      );
     }
-  }, []);
+  }, [articles]);
 
   // Handler for toggling archive status
   const handleToggleArchive = useCallback(async (id: string) => {
+    const current = articles.find((a) => a.id === id);
+    const newIsArchived = current ? !current.isArchived : true;
+
+    // Optimistic UI update
+    setArticles((prevArticles) =>
+      prevArticles.map((article) =>
+        article.id === id
+          ? { ...article, isArchived: newIsArchived }
+          : article,
+      ),
+    );
+    setFullViewArticle((prev) =>
+      prev?.id === id ? { ...prev, isArchived: newIsArchived } : prev,
+    );
+
     try {
-      // Optimistic UI update
-      setArticles((prevArticles) =>
-        prevArticles.map((article) =>
-          article.id === id
-            ? { ...article, isArchived: !article.isArchived }
-            : article,
-        ),
-      );
-
-      // Update full view article if it's the one being toggled
-      setFullViewArticle((prev) =>
-        prev?.id === id ? { ...prev, isArchived: !prev.isArchived } : prev,
-      );
-
-      // TODO: Add API call to update archive status
-      // await updateArticleArchiveStatus(id, !isArchived);
+      const response = await fetch(`/api/newsletters/${id}/archive`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isArchived: newIsArchived }),
+      });
+      if (!response.ok) throw new Error("Failed to update archive status");
     } catch (error) {
       logger.error("Error toggling archive status:", error);
       // Revert on error
       setArticles((prevArticles) =>
         prevArticles.map((article) =>
           article.id === id
-            ? { ...article, isArchived: !article.isArchived }
+            ? { ...article, isArchived: !newIsArchived }
             : article,
         ),
       );
+      setFullViewArticle((prev) =>
+        prev?.id === id ? { ...prev, isArchived: !newIsArchived } : prev,
+      );
     }
-  }, []);
+  }, [articles]);
+
+  // Handler for deleting a newsletter
+  const handleDelete = useCallback(async (id: string) => {
+    // Optimistic UI update
+    setArticles((prevArticles) => prevArticles.filter((a) => a.id !== id));
+    if (fullViewArticle?.id === id) setFullViewArticle(null);
+
+    try {
+      const response = await fetch(`/api/newsletters/${id}/delete`, {
+        method: "DELETE",
+      });
+      if (!response.ok) throw new Error("Failed to delete newsletter");
+    } catch (error) {
+      logger.error("Error deleting newsletter:", error);
+      // Can't easily revert a delete without re-fetching; reload to restore state
+      window.location.reload();
+    }
+  }, [fullViewArticle]);
 
   // Handler for sharing articles
   const handleShare = useCallback(
@@ -393,9 +427,17 @@ const Home: React.FC = () => {
         <header className="header mb-6 px-4">
           <div className="header-content">
             <div className="header-titles">
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                🐠 Nemo
-              </h1>
+              <div className="flex items-center justify-between">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                  🐠 Nemo
+                </h1>
+                <Link
+                  href="/morning-report"
+                  className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                >
+                  Morning Report →
+                </Link>
+              </div>
               <p className="text-gray-600 dark:text-gray-300">
                 Finding your newsletters in the vast ocean of email
               </p>
@@ -489,6 +531,7 @@ const Home: React.FC = () => {
                 tags={article.tags}
                 onToggleRead={() => handleToggleRead(article.id)}
                 onToggleArchive={() => handleToggleArchive(article.id)}
+                onDelete={() => handleDelete(article.id)}
                 onShare={() => handleShare(article.id)}
                 onExpand={() => handleExpandArticle(article)}
                 className="h-full transition-all hover:shadow-md hover:-translate-y-0.5"

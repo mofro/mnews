@@ -8,7 +8,7 @@ import {
   Share2,
   Eye,
   EyeOff,
-  ImageOff,
+  Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,6 +32,7 @@ export interface ArticleGridCardProps {
   tags?: string[];
   onToggleRead: (id: string) => void;
   onToggleArchive: (id: string) => void;
+  onDelete?: (id: string) => void;
   onShare: (id: string) => void;
   onExpand: (article: any) => void;
   className?: string;
@@ -52,6 +53,7 @@ export function ArticleGridCard({
   tags = [],
   onToggleRead,
   onToggleArchive,
+  onDelete,
   onShare,
   onExpand,
   className,
@@ -275,6 +277,18 @@ export function ArticleGridCard({
                 <Bookmark className="h-4 w-4" />
               )}
             </Button>
+
+            {onDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e: React.MouseEvent<HTMLButtonElement>) => handleActionClick(e, () => onDelete(id))}
+                className="h-8 px-2 text-muted-foreground hover:text-destructive"
+                title="Delete"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            )}
           </div>
 
           <Button

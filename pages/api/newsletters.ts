@@ -70,12 +70,11 @@ export default async function handler(
     const pageSize = parseInt(req.query.pageSize as string) || DEFAULT_PAGE_SIZE;
     const filter = (req.query.filter as string)?.toLowerCase() || '';
 
-    // Get all newsletter IDs from Redis list
-    const newsletterIds = await redisClient.lrange(SCHEMA.NEWSLETTER_IDS_KEY, 0, -1);
-    console.log('Fetched newsletter IDs:', newsletterIds);
-    
-    if (!newsletterIds || newsletterIds.length === 0) {
-      console.error('No newsletter IDs found in Redis');
+    // For unfiltered requests: get total count cheaply, then fetch only the current page's IDs.
+    // For filtered requests: we still need a full scan (acceptable slow path).
+    const totalIds = await redisClient.client.llen(SCHEMA.NEWSLETTER_IDS_KEY);
+
+    if (!totalIds || totalIds === 0) {
       return res.status(200).json({
         newsletters: [],
         pagination: {
@@ -95,15 +94,41 @@ export default async function handler(
         }
       });
     }
-    
-    // Fetch all newsletters with their full data for sorting and filtering
-    const allNewsletters = [];
+
+    // Determine which IDs to fetch: slice by page for unfiltered, all for filtered
+    const isFiltered = !!filter;
+    const offset = (page - 1) * pageSize;
+    const newsletterIds = isFiltered
+      ? await redisClient.lrange(SCHEMA.NEWSLETTER_IDS_KEY, 0, -1)
+      : await redisClient.lrange(SCHEMA.NEWSLETTER_IDS_KEY, offset, offset + pageSize - 1);
+
+    if (!newsletterIds || newsletterIds.length === 0) {
+      return res.status(200).json({
+        newsletters: [],
+        pagination: {
+          page,
+          pageSize,
+          totalItems: totalIds,
+          totalPages: Math.ceil(totalIds / pageSize),
+          hasNextPage: page < Math.ceil(totalIds / pageSize)
+        },
+        stats: {
+          totalNewsletters: totalIds,
+          todayCount: 0,
+          uniqueSenders: 0,
+          total: totalIds,
+          withCleanContent: 0,
+          withRawContent: 0
+        }
+      });
+    }
+
     const senders = new Set<string>();
     let todayCount = 0;
     let withCleanContent = 0;
     let withRawContent = 0;
-    
-    // Fetch all newsletters in parallel for better performance
+
+    // Fetch newsletters in parallel
     const newsletterPromises = newsletterIds.map(async (id) => {
       try {
         const contentKey = `${SCHEMA.NEWSLETTER_PREFIX}${id}`;
@@ -265,49 +290,47 @@ export default async function handler(
     // Wait for all newsletters to be processed
     const results = await Promise.all(newsletterPromises);
     
-    // Filter out any null results and sort by date (newest first)
+    // Filter out null results and sort by date (newest first)
     const allValidNewsletters = results.filter((n): n is Newsletter => n !== null);
-    
-    // Helper function to safely get date or fallback to current date
+
     const getDate = (dateStr?: string | null): Date => {
-      if (!dateStr) return new Date(0); // Fallback to epoch if no date
+      if (!dateStr) return new Date(0);
       const date = new Date(dateStr);
       return isNaN(date.getTime()) ? new Date(0) : date;
     };
-    
-    const sortedNewsletters = allValidNewsletters.sort((a, b) => 
+
+    const sortedNewsletters = allValidNewsletters.sort((a, b) =>
       getDate(b.date).getTime() - getDate(a.date).getTime()
     );
-    
-    // Apply filters if any
-    let filteredNewsletters = sortedNewsletters;
-    if (filter) {
+
+    // For filtered requests: apply text filter and paginate in memory
+    // For unfiltered requests: IDs were already sliced — results ARE the page
+    let paginatedNewsletters: Newsletter[];
+    let totalItems: number;
+
+    if (isFiltered) {
       const lowerFilter = filter.toLowerCase();
-      filteredNewsletters = sortedNewsletters.filter(n => {
+      const filteredNewsletters = sortedNewsletters.filter(n => {
         const subject = n.subject?.toLowerCase() || '';
         const sender = n.sender?.toLowerCase() || '';
         const content = n.content?.toLowerCase() || '';
-        
-        return subject.includes(lowerFilter) || 
-               sender.includes(lowerFilter) ||
-               content.includes(lowerFilter);
+        return subject.includes(lowerFilter) || sender.includes(lowerFilter) || content.includes(lowerFilter);
       });
+      totalItems = filteredNewsletters.length;
+      const startIdx = (page - 1) * pageSize;
+      paginatedNewsletters = filteredNewsletters.slice(startIdx, startIdx + pageSize);
+    } else {
+      // Already sliced by page — IDs were pre-sliced before fetch
+      totalItems = totalIds;
+      paginatedNewsletters = sortedNewsletters;
     }
-    
-    // Calculate pagination
-    const totalItems = filteredNewsletters.length;
+
     const totalPages = Math.ceil(totalItems / pageSize);
     const hasNextPage = page < totalPages;
-    const startIdx = (page - 1) * pageSize;
-    const endIdx = Math.min(startIdx + pageSize, totalItems);
-    
-    // Get the paginated results
-    const paginatedNewsletters = filteredNewsletters.slice(startIdx, endIdx);
     
     // Log some debug info
     logger.debug('Newsletter stats:', {
       total: allValidNewsletters.length,
-      filtered: filteredNewsletters.length,
       paginated: paginatedNewsletters.length,
       page,
       pageSize,
