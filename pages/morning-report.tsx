@@ -5,30 +5,9 @@ import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import FullViewArticle from "@/components/article/FullViewArticle";
+import type { DigestNewsletter, CategoryGroup, MorningReportData } from "@/pages/api/morning-report";
 
-interface DigestNewsletter {
-  id: string;
-  subject: string;
-  sender: string;
-  date: string;
-  summary: string | null;
-  preview: string;
-  isRead: boolean;
-  isArchived: boolean;
-  topics: string[];
-}
-
-interface CategoryGroup {
-  name: string;
-  color: string;
-  newsletters: DigestNewsletter[];
-}
-
-interface MorningReportProps {
-  date: string;
-  categories: CategoryGroup[];
-  uncategorized: DigestNewsletter[];
-}
+type MorningReportProps = MorningReportData;
 
 const COLOR_MAP: Record<string, string> = {
   blue:   "border-blue-400 bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-200",
@@ -201,23 +180,16 @@ export default function MorningReport({ date, categories, uncategorized }: Morni
   );
 }
 
-export const getServerSideProps: GetServerSideProps = async (context) => {
+export const getServerSideProps: GetServerSideProps<MorningReportProps> = async (context) => {
   const { date } = context.query;
   const dateParam = typeof date === "string" ? date : new Date().toISOString().split("T")[0];
 
   try {
-    // Call the morning-report API internally
-    const baseUrl =
-      process.env.NEXT_PUBLIC_BASE_URL ??
-      `http://localhost:${process.env.PORT ?? 3000}`;
-
-    const res = await fetch(`${baseUrl}/api/morning-report?date=${dateParam}`);
-    if (!res.ok) throw new Error(`API responded with ${res.status}`);
-
-    const data = await res.json();
+    // Dynamic import keeps the Redis client out of the client-side bundle
+    const { getMorningReportData } = await import("@/pages/api/morning-report");
+    const data = await getMorningReportData(dateParam);
     return { props: data };
   } catch (error) {
-    // Return empty state on error rather than 500
     return {
       props: {
         date: dateParam,

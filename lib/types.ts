@@ -34,6 +34,10 @@ export interface Newsletter {
   // UI state
   isRead: boolean;        // Derived from metadata for easier access in components
   isArchived: boolean;    // Derived from metadata for easier access in components
+
+  // Topic classification and AI summary
+  topics?: string[];      // Categories assigned during ingestion (from data/topics.json)
+  summary?: string;       // AI-generated summary (stored at newsletter:summary:{id})
 }
 
 // BACKWARD COMPATIBILITY: Alias for existing dashboard

@@ -12,6 +12,18 @@ export const SCHEMA = {
   // Sorted sets and lists
   NEWSLETTER_IDS_KEY: "newsletter:ids",
 
+  // Meta hash field names (used when reading/writing newsletter:meta:{id})
+  META_FIELDS: {
+    TOPICS: "topics",
+    SUMMARY: "summary",
+    IS_READ: "isRead",
+    IS_ARCHIVED: "isArchived",
+    RECEIVED_AT: "receivedAt",
+    WORD_COUNT: "wordCount",
+    TAGS: "tags",
+    PREVIEW: "preview",
+  },
+
   // Hash fields
   METADATA_FIELDS: {
     ID: "id",
