@@ -20,10 +20,10 @@ export default async function handler(
 
     await Promise.all([
       redisClient.lrem('newsletter_ids', 0, rawId),
-      redisClient.delete(`newsletter:${rawId}`),
-      redisClient.delete(`newsletter:meta:${rawId}`),
-      redisClient.delete(`newsletter:content:${rawId}`),
-      redisClient.delete(`newsletter:summary:${rawId}`),
+      redisClient.client.del(`newsletter:${rawId}`),
+      redisClient.client.del(`newsletter:meta:${rawId}`),
+      redisClient.client.del(`newsletter:content:${rawId}`),
+      redisClient.client.del(`newsletter:summary:${rawId}`),
     ]);
 
     logger.info(`Deleted newsletter ${rawId}`);

@@ -98,6 +98,7 @@
     ]
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.40.0",
     "@emotion/babel-plugin": "^11.13.5",
     "@emotion/cache": "^11.14.0",
     "@emotion/react": "^11.14.0",
