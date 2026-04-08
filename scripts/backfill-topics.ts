@@ -43,7 +43,7 @@ function classifyTopics(sender: string, subject: string, textSnippet: string): s
           ?.filter(Boolean)
           .some((s) => {
             const sl = s.toLowerCase();
-            return senderDomain.includes(sl) || senderFull.includes(sl);
+            return senderDomain.includes(sl) || senderFull.includes(sl) || sl.startsWith(senderFull + ".") || sl.startsWith(senderFull + "@");
           }) ?? false;
         const keywordMatch = cat.keywords?.some((kw) => haystack.includes(kw.toLowerCase())) ?? false;
         return senderMatch || keywordMatch;
