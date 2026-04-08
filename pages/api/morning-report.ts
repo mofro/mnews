@@ -49,23 +49,27 @@ function loadTopicCategories(): TopicCategory[] {
   }
 }
 
-function isSameDay(dateStr: string, targetDate: Date): boolean {
+function isSameDay(dateStr: string, targetDateStr: string, timezone: string): boolean {
   const d = parseDate(dateStr, { fallbackBehavior: "null", logWarnings: false });
   if (!d) return false;
-  return (
-    d.getFullYear() === targetDate.getFullYear() &&
-    d.getMonth() === targetDate.getMonth() &&
-    d.getDate() === targetDate.getDate()
-  );
+  const localStr = new Intl.DateTimeFormat("en-CA", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+  return localStr === targetDateStr;
 }
 
 /**
  * Core data-fetching logic — callable directly from getServerSideProps
  * without making an HTTP round-trip.
  */
-export async function getMorningReportData(dateParam?: string, injectedCategories?: TopicCategory[]): Promise<MorningReportData> {
-  const targetDate = dateParam ? new Date(dateParam) : new Date();
-  const dateStr = targetDate.toISOString().split("T")[0];
+export async function getMorningReportData(dateParam?: string, injectedCategories?: TopicCategory[], timezone = "UTC"): Promise<MorningReportData> {
+  const tz = timezone || "UTC";
+  const dateStr = dateParam ?? new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
 
   // Load all IDs and filter to target date (O(n) scan, acceptable for daily digest)
   const allIds = await redisClient.lrange(NEWSLETTER_IDS_KEY, 0, -1);
@@ -84,7 +88,7 @@ export async function getMorningReportData(dateParam?: string, injectedCategorie
 
   const todayMeta = metaResults.filter(
     (r): r is { id: string; meta: Record<string, string> } =>
-      r !== null && isSameDay(r.meta.receivedAt ?? r.meta.date ?? "", targetDate)
+      r !== null && isSameDay(r.meta.receivedAt ?? r.meta.date ?? "", dateStr, tz)
   );
 
   const categories = injectedCategories ?? loadTopicCategories();
@@ -154,10 +158,11 @@ export default async function handler(
 
   try {
     const dateParam = req.query.date as string | undefined;
+    const tz = req.query.tz as string | undefined;
     if (dateParam && isNaN(new Date(dateParam).getTime())) {
       return res.status(400).json({ error: "Invalid date parameter" });
     }
-    const data = await getMorningReportData(dateParam);
+    const data = await getMorningReportData(dateParam, undefined, tz);
     return res.status(200).json(data);
   } catch (error) {
     logger.error("Morning report error:", error);
