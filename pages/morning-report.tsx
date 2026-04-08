@@ -13,6 +13,7 @@ const COLOR_MAP: Record<string, string> = {
   blue:   "border-blue-400 bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-200",
   green:  "border-green-400 bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200",
   orange: "border-orange-400 bg-orange-50 dark:bg-orange-950 text-orange-800 dark:text-orange-200",
+  yellow: "border-yellow-400 bg-yellow-50 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200",
   purple: "border-purple-400 bg-purple-50 dark:bg-purple-950 text-purple-800 dark:text-purple-200",
   gray:   "border-gray-400 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200",
 };
@@ -21,6 +22,7 @@ const DIVIDER_MAP: Record<string, string> = {
   blue:   "border-blue-400",
   green:  "border-green-400",
   orange: "border-orange-400",
+  yellow: "border-yellow-400",
   purple: "border-purple-400",
   gray:   "border-gray-400",
 };

@@ -3,7 +3,6 @@ import { redisClient } from "@/lib/redisClient";
 import { getSummary } from "@/lib/summarizer";
 import { parseDate } from "@/utils/dateService";
 import logger from "@/utils/logger";
-import topicsData from "@/data/topics.json";
 
 const NEWSLETTER_IDS_KEY = "newsletter_ids";
 const META_PREFIX = "newsletter:meta:";
@@ -40,7 +39,14 @@ export interface MorningReportData {
 }
 
 function loadTopicCategories(): TopicCategory[] {
-  return topicsData.categories as TopicCategory[];
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const data = require("../../data/topics.json") as { categories: TopicCategory[] };
+    return data.categories;
+  } catch (err) {
+    logger.error("[morning-report] Failed to load topics.json:", err);
+    return [];
+  }
 }
 
 function isSameDay(dateStr: string, targetDate: Date): boolean {
