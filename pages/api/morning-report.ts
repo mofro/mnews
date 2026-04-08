@@ -36,6 +36,7 @@ export interface MorningReportData {
   date: string;
   categories: CategoryGroup[];
   uncategorized: DigestNewsletter[];
+  _debug?: Record<string, unknown>;
 }
 
 function loadTopicCategories(): TopicCategory[] {
@@ -139,7 +140,20 @@ export async function getMorningReportData(dateParam?: string, injectedCategorie
       newsletters: grouped.get(c.name)!,
     }));
 
-  return { date: dateStr, categories: categoryGroups, uncategorized };
+  const firstItem = todayMeta[0];
+  return {
+    date: dateStr,
+    categories: categoryGroups,
+    uncategorized,
+    _debug: {
+      categoriesLoaded: categories.length,
+      categoryNames,
+      newslettersFound: todayMeta.length,
+      firstTopicsRaw: firstItem ? (firstItem.meta as any).topics : null,
+      firstTopicsType: firstItem ? typeof (firstItem.meta as any).topics : null,
+      firstTopicsParsed: firstItem ? (() => { try { const t = (firstItem.meta as any).topics; return Array.isArray(t) ? t : JSON.parse(t ?? "[]"); } catch(e) { return String(e); } })() : null,
+    },
+  };
 }
 
 export default async function handler(
