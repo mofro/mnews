@@ -46,7 +46,9 @@
     "migrate:rollback": "tsx scripts/rollback-migration.ts --dry-run",
     "migrate:rollback:run": "tsx scripts/rollback-migration.ts --no-dry-run",
     "backfill:topics": "tsx scripts/backfill-topics.ts",
-    "backfill:topics:run": "tsx scripts/backfill-topics.ts --run"
+    "backfill:topics:run": "tsx scripts/backfill-topics.ts --run",
+    "backfill:content": "tsx scripts/backfill-content.ts",
+    "backfill:content:run": "tsx scripts/backfill-content.ts --run"
   },
   "jest": {
     "preset": "ts-jest",
