@@ -130,9 +130,9 @@ const FullViewArticleComponent: React.FC<FullViewArticleProps> = ({
         contentSample: article.content ? article.content.substring(0, 100) + '...' : null
       });
       
-      // Prefer rawContent for display — it has original email formatting/styles intact.
-      // cleanContent has styles stripped (good for AI, bad for rendering).
-      let contentToUse = article.rawContent || article.content || article.cleanContent || '';
+      // Prefer cleanContent — structural email noise removed, inline styles preserved.
+      // Fall back to rawContent if cleanContent is unavailable (older newsletters).
+      let contentToUse = article.cleanContent || article.content || article.rawContent || '';
       
       if (!contentToUse) {
         console.log('[FullViewArticle] No content available for article');
