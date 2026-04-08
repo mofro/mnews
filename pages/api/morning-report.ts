@@ -3,8 +3,7 @@ import { redisClient } from "@/lib/redisClient";
 import { getSummary } from "@/lib/summarizer";
 import { parseDate } from "@/utils/dateService";
 import logger from "@/utils/logger";
-import fs from "fs";
-import path from "path";
+import topicsData from "@/data/topics.json";
 
 const NEWSLETTER_IDS_KEY = "newsletter_ids";
 const META_PREFIX = "newsletter:meta:";
@@ -41,13 +40,7 @@ export interface MorningReportData {
 }
 
 function loadTopicCategories(): TopicCategory[] {
-  try {
-    const topicsPath = path.join(process.cwd(), "data", "topics.json");
-    const { categories } = JSON.parse(fs.readFileSync(topicsPath, "utf-8"));
-    return categories as TopicCategory[];
-  } catch {
-    return [];
-  }
+  return topicsData.categories as TopicCategory[];
 }
 
 function isSameDay(dateStr: string, targetDate: Date): boolean {
