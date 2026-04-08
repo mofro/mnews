@@ -130,8 +130,9 @@ const FullViewArticleComponent: React.FC<FullViewArticleProps> = ({
         contentSample: article.content ? article.content.substring(0, 100) + '...' : null
       });
       
-      // Try content fields in order of preference
-      let contentToUse = article.content || article.cleanContent || article.rawContent || '';
+      // Prefer rawContent for display — it has original email formatting/styles intact.
+      // cleanContent has styles stripped (good for AI, bad for rendering).
+      let contentToUse = article.rawContent || article.content || article.cleanContent || '';
       
       if (!contentToUse) {
         console.log('[FullViewArticle] No content available for article');
@@ -168,7 +169,7 @@ const FullViewArticleComponent: React.FC<FullViewArticleProps> = ({
         ALLOW_DATA_ATTR: false,
         ALLOW_UNKNOWN_PROTOCOLS: false,
         FORBID_TAGS: ['style', 'script', 'iframe', 'object', 'embed', 'form', 'input', 'button'],
-        FORBID_ATTR: ['onclick', 'onerror', 'onload', 'onmouseover', 'onmouseout', 'style']
+        FORBID_ATTR: ['onclick', 'onerror', 'onload', 'onmouseover', 'onmouseout']
       });
 
       console.log('[FullViewArticle] Sanitized content length:', sanitized.length);
