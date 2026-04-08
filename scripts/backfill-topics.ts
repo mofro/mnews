@@ -155,7 +155,8 @@ async function main() {
 
       // ── Report ───────────────────────────────────────────────────────────
       const fixedStr = flags.length ? `  [+${flags.join(", ")}]` : "";
-      console.log(`${DRY_RUN ? "WOULD" : "OK   "}  ${id}  → ${topics.join(", ")}${fixedStr}`);
+      const senderStr = sender ? `  (${sender})` : "";
+      console.log(`${DRY_RUN ? "WOULD" : "OK   "}  ${id}  → ${topics.join(", ")}${fixedStr}${senderStr}`);
 
       // ── Apply ─────────────────────────────────────────────────────────────
       if (!DRY_RUN) {
