@@ -141,28 +141,7 @@ export async function getMorningReportData(dateParam?: string, injectedCategorie
       newsletters: grouped.get(c.name)!,
     }));
 
-  return {
-    date: dateStr,
-    categories: categoryGroups,
-    uncategorized,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    _debug: {
-      categoryNames,
-      injectedCount: injectedCategories?.length ?? null,
-      loadedCount: categories.length,
-      todayCount: todayMeta.length,
-      totalIds: allIds.length,
-      firstItem: digestItems[0]
-        ? {
-            id: digestItems[0].id,
-            topics: digestItems[0].topics,
-            topicsType: typeof digestItems[0].topics,
-            isArray: Array.isArray(digestItems[0].topics),
-            matchedTopics: digestItems[0].topics.filter((t) => categoryNames.includes(t)),
-          }
-        : null,
-    },
-  } as any;
+  return { date: dateStr, categories: categoryGroups, uncategorized };
 }
 
 export default async function handler(
