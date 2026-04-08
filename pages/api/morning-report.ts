@@ -63,7 +63,7 @@ function isSameDay(dateStr: string, targetDate: Date): boolean {
  * Core data-fetching logic — callable directly from getServerSideProps
  * without making an HTTP round-trip.
  */
-export async function getMorningReportData(dateParam?: string): Promise<MorningReportData> {
+export async function getMorningReportData(dateParam?: string, injectedCategories?: TopicCategory[]): Promise<MorningReportData> {
   const targetDate = dateParam ? new Date(dateParam) : new Date();
   const dateStr = targetDate.toISOString().split("T")[0];
 
@@ -87,7 +87,7 @@ export async function getMorningReportData(dateParam?: string): Promise<MorningR
       r !== null && isSameDay(r.meta.receivedAt ?? r.meta.date ?? "", targetDate)
   );
 
-  const categories = loadTopicCategories();
+  const categories = injectedCategories ?? loadTopicCategories();
   const categoryNames = categories.map((c) => c.name);
 
   const digestItems: DigestNewsletter[] = await Promise.all(

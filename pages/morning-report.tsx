@@ -187,9 +187,12 @@ export const getServerSideProps: GetServerSideProps<MorningReportProps> = async 
   const dateParam = typeof date === "string" ? date : new Date().toISOString().split("T")[0];
 
   try {
-    // Dynamic import keeps the Redis client out of the client-side bundle
-    const { getMorningReportData } = await import("@/pages/api/morning-report");
-    const data = await getMorningReportData(dateParam);
+    // Both imports are dynamic — server-side only, never bundled into the client
+    const [{ getMorningReportData }, topicsModule] = await Promise.all([
+      import("@/pages/api/morning-report"),
+      import("@/data/topics.json"),
+    ]);
+    const data = await getMorningReportData(dateParam, (topicsModule as any).default?.categories ?? (topicsModule as any).categories);
     return { props: data };
   } catch (error) {
     return {
