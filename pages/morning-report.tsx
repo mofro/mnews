@@ -60,7 +60,7 @@ function NewsletterRow({
           )}
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+          <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap" suppressHydrationWarning>
             {format(new Date(item.date), "h:mm a")}
           </span>
           {item.isRead && (
