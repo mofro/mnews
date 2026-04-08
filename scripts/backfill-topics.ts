@@ -51,7 +51,8 @@ function classifyTopics(sender: string, subject: string, textSnippet: string): s
       .map((cat) => cat.name);
 
     return matched.length > 0 ? matched : ["Uncategorized"];
-  } catch {
+  } catch (err) {
+    console.error("  [classifyTopics ERROR]", err);
     return ["Uncategorized"];
   }
 }
