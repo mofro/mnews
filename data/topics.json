@@ -3,26 +3,122 @@
     {
       "name": "Technology",
       "color": "blue",
-      "senders": ["techcrunch.com", "theverge.com", "wired.com", "arstechnica.com"],
-      "keywords": ["AI", "artificial intelligence", "machine learning", "startup", "software", "developer", "programming", "tech", "app", "cloud", "open source"]
+      "senders": [
+        "techcrunch.com",
+        "theverge.com",
+        "wired.com",
+        "arstechnica.com",
+        "pragmaticengineer@substack.com",
+        "deeplearning.ai",
+        "bytebytego@substack.com",
+        "tidyfirst@substack.com",
+        "ia.net",
+        "techscoop@substack.com",
+        "su.org",
+        "fortelabs.com",
+        "",
+        "",
+        ""
+      ],
+      "keywords": [
+        "AI",
+        "artificial intelligence",
+        "machine learning",
+        "startup",
+        "software",
+        "developer",
+        "programming",
+        "tech",
+        "app",
+        "cloud",
+        "open source"
+      ]
     },
     {
       "name": "Economics & Policy",
       "color": "green",
-      "senders": ["noahpinion.substack.com", "marginalrevolution.com", "bloomberg.com"],
-      "keywords": ["inflation", "GDP", "policy", "market", "economy", "fiscal", "monetary", "federal reserve", "interest rate", "recession", "trade", "regulation"]
+      "senders": [
+        "noahpinion.substack.com",
+        "marginalrevolution.com",
+        "bloomberg.com",
+        "thegreatrace@substack.com",
+        "jill@jillianivey.com",
+        "freakonomics.com",
+        "econlib.org",
+        "economist.com"
+      ],
+      "keywords": [
+        "inflation",
+        "GDP",
+        "politics",
+        "policy",
+        "market",
+        "economy",
+        "fiscal",
+        "monetary",
+        "federal reserve",
+        "interest rate",
+        "recession",
+        "trade",
+        "regulation"
+      ]
     },
     {
       "name": "Local",
       "color": "orange",
       "senders": [],
-      "keywords": ["Philadelphia", "Philly", "city council", "zoning", "neighborhood", "SEPTA", "mayor", "school district"]
+      "keywords": [
+        "Philadelphia",
+        "Philly",
+        "city council",
+        "zoning",
+        "neighborhood",
+        "SEPTA",
+        "mayor",
+        "school district"
+      ]
+    },
+    {
+      "name": "Art & Culture",
+      "color": "yellow",
+      "senders": [
+        "21-draw.com",
+        "hyperallergic.com",
+        "artforum.com",
+        "20000words@substack.com",
+        "woodmagazine.com",
+        "arcstudiopro.com",
+        "soundandpicture@mailings1.gtxcel.com",
+        "no-reply@kickstarter.com"
+      ],
+      "keywords": [
+        "Draw",
+        "Art",
+        "Film",
+        "Screenplay",
+        "Movie",
+        "Variety",
+        "mayor",
+        "school district"
+      ]
     },
     {
       "name": "Health & Science",
       "color": "purple",
       "senders": ["nejm.org", "statnews.com"],
-      "keywords": ["health", "medicine", "research", "study", "clinical", "vaccine", "drug", "treatment", "science", "biology", "climate"]
+      "keywords": [
+        "health",
+        "medicine",
+        "research",
+        "study",
+        "clinical",
+        "vaccine",
+        "drug",
+        "treatment",
+        "science",
+        "biology",
+        "climate"
+      ]
     }
   ]
 }
