@@ -41,10 +41,10 @@ const CLEANING_RULES: CleaningRule[] = [
           return preservedAttrs.includes(attrName.toLowerCase());
         })
         .join(' ');
-      
+
       return `<${tag}${cleanAttrs}>`;
     },
-    enabled: true
+    enabled: false  // Keep inline styles — needed for email formatting
   },
   
   // Clean up table structure
@@ -145,13 +145,13 @@ const CLEANING_RULES: CleaningRule[] = [
     enabled: true
   },
   
-  // Inline styles (moved up to catch them before other rules)
+  // Inline styles — disabled: preserve for readable email rendering
   {
     id: 'remove-inline-styles',
     description: 'Remove inline styles',
     pattern: /\s+style=["'][^"']*["']/gi,
     replacement: '',
-    enabled: true
+    enabled: false
   },
   
   // Tracking pixels (1x1, transparent, or tiny images)
@@ -264,12 +264,8 @@ export function cleanNewsletterContent(html: string): CleaningResult {
     cleaned = cleaned.replace(regex, '');
   });
   
-  // Remove any remaining inline styles and classes that might interfere with theming
+  // Remove noise attributes but preserve style and class (needed for email formatting)
   cleaned = cleaned
-    // Remove style attributes
-    .replace(/\s+style=["'][^"']*["']/gi, '')
-    // Remove class attributes except for specific semantic classes
-    .replace(/\s+class=["'](?!.*\b(?:header|footer|nav|main|article|section|aside|button|card|alert|success|error|warning|info|primary|secondary|accent|muted|disabled)\b)[^"']*["']/gi, '')
     // Remove data-* attributes except for specific ones we want to keep
     .replace(/\s+data-(?!testid|id|name|type|value|role|aria-)[a-z0-9-]+(?:=["'][^"']*["'])?/gi, '')
     // Remove any remaining inline event handlers
