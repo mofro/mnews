@@ -34,11 +34,17 @@ function classifyTopics(sender: string, subject: string, textSnippet: string): s
     );
 
     const senderDomain = sender.match(/@([^>\s]+)/)?.[1]?.toLowerCase() ?? "";
+    const senderFull = sender.toLowerCase();
     const haystack = `${subject} ${textSnippet}`.toLowerCase();
 
     const matched = categories
       .filter((cat) => {
-        const senderMatch = cat.senders?.some((s) => senderDomain.includes(s.toLowerCase())) ?? false;
+        const senderMatch = cat.senders
+          ?.filter(Boolean)
+          .some((s) => {
+            const sl = s.toLowerCase();
+            return senderDomain.includes(sl) || senderFull.includes(sl);
+          }) ?? false;
         const keywordMatch = cat.keywords?.some((kw) => haystack.includes(kw.toLowerCase())) ?? false;
         return senderMatch || keywordMatch;
       })
