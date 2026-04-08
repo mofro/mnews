@@ -96,7 +96,9 @@ export async function getMorningReportData(dateParam?: string, injectedCategorie
       const summary = await getSummary(id).catch(() => null);
       const topics: string[] = (() => {
         try {
-          return JSON.parse(meta.topics ?? "[]");
+          const raw = meta.topics ?? "[]";
+          if (Array.isArray(raw)) return raw;
+          return JSON.parse(raw as string);
         } catch {
           return ["Uncategorized"];
         }
