@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { GetServerSideProps } from "next";
 import Link from "next/link";
 import { format } from "date-fns";
@@ -109,6 +109,13 @@ export default function MorningReport({ date, categories, uncategorized }: Morni
   const { theme } = useTheme();
   const [fullViewItem, setFullViewItem] = useState<DigestNewsletter | null>(null);
 
+  // Write the browser's IANA timezone to a cookie so getServerSideProps can
+  // compute "today" in the user's local timezone on subsequent requests.
+  useEffect(() => {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    document.cookie = `tz=${encodeURIComponent(tz)}; path=/; max-age=31536000; SameSite=Lax`;
+  }, []);
+
   const totalCount = categories.reduce((s, c) => s + c.newsletters.length, 0) + uncategorized.length;
   const formattedDate = format(new Date(date + "T12:00:00"), "EEEE, MMMM d, yyyy");
 
@@ -184,7 +191,15 @@ export default function MorningReport({ date, categories, uncategorized }: Morni
 
 export const getServerSideProps: GetServerSideProps<MorningReportProps> = async (context) => {
   const { date } = context.query;
-  const dateParam = typeof date === "string" ? date : new Date().toISOString().split("T")[0];
+  const tz = context.req.cookies.tz
+    ? decodeURIComponent(context.req.cookies.tz)
+    : "UTC";
+  // Compute "today" in the user's local timezone. en-CA locale gives YYYY-MM-DD natively.
+  const localDate = new Intl.DateTimeFormat("en-CA", {
+    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+  // Explicit ?date= param wins over the cookie-derived local date
+  const dateParam = typeof date === "string" ? date : localDate;
 
   try {
     // Both imports are dynamic — server-side only, never bundled into the client
@@ -192,7 +207,7 @@ export const getServerSideProps: GetServerSideProps<MorningReportProps> = async 
       import("@/pages/api/morning-report"),
       import("@/data/topics.json"),
     ]);
-    const data = await getMorningReportData(dateParam, (topicsModule as any).default?.categories ?? (topicsModule as any).categories);
+    const data = await getMorningReportData(dateParam, (topicsModule as any).default?.categories ?? (topicsModule as any).categories, tz);
     return { props: data };
   } catch (error) {
     return {
