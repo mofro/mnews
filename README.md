@@ -1,6 +1,6 @@
 # MNews
 
-Personal newsletter inbox. The premise: instead of newsletters landing in Gmail where they get buried, they're forwarded to a webhook, stored in Redis, and surfaced in a purpose-built reading interface — with topic grouping, AI summaries, and a daily Morning Report digest.
+Personal newsletter inbox. The premise: instead of newsletters disappearing into the noise of a general-purpose email client, they're forwarded to a webhook, stored in Redis, and surfaced in a purpose-built reading interface — with topic grouping, AI summaries, and a daily Morning Report digest.
 
 ## Stack
 
