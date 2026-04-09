@@ -1,6 +1,6 @@
 # MNews
 
-Personal newsletter inbox. Emails arrive via webhook from a mail forwarding service, are stored in Redis, and are displayed in a Next.js dashboard with topic categorization, AI summaries, and a daily Morning Report view.
+Personal newsletter inbox. The premise: instead of newsletters landing in Gmail where they get buried, they're forwarded to a webhook, stored in Redis, and surfaced in a purpose-built reading interface — with topic grouping, AI summaries, and a daily Morning Report digest.
 
 ## Stack
 
@@ -13,14 +13,16 @@ Personal newsletter inbox. Emails arrive via webhook from a mail forwarding serv
 | Deployment | Vercel                           |
 | AI         | Anthropic Claude API (summaries) |
 
+Upstash Redis is used because it's serverless-friendly and requires no infrastructure to manage. The REST API works from Vercel edge functions without connection pooling concerns.
+
 ## Features
 
-- **Webhook ingest** — receives forwarded emails via `POST /api/webhook`, extracts and stores content
-- **Dashboard** — paginated inbox with read/archive state, search, and full-article modal
-- **Topic categorization** — rule-based classifier assigns newsletters to categories (Technology, Economics & Policy, Art & Culture, etc.) based on sender and keywords; configured in `data/topics.json`
-- **AI summaries** — on-demand Claude-powered summarization stored per newsletter
-- **Morning Report** — daily digest page grouped by topic category, timezone-aware
-- **Content cleaning** — semantic HTML extraction strips email layout tables, Gmail forwarding wrappers, tracking URLs, hidden preheaders, and nav chrome; decodes tracking links to real destinations
+- **Webhook ingest** — receives forwarded emails via `POST /api/webhook`, runs content extraction, classifies topics, and stores everything in Redis
+- **Dashboard** — paginated inbox with read/archive state, full-article modal, and dark mode
+- **Topic categorization** — rule-based classifier assigns newsletters to categories (Technology, Economics & Policy, Art & Culture, etc.) based on sender domain and keywords; configured in `data/topics.json` so new rules don't require code changes
+- **AI summaries** — Claude-powered summarization, generated on demand and cached per newsletter
+- **Morning Report** — daily digest grouped by topic category; uses the browser's timezone cookie so the day boundary is correct regardless of where Vercel's servers are running
+- **Content cleaning** — semantic HTML extraction that strips email layout tables, Gmail forwarding wrappers, tracking redirect URLs, hidden preheaders, and navigation chrome — leaving just the readable content with real destination links
 
 ## Environment Variables
 
@@ -98,26 +100,38 @@ https://your-project.vercel.app/api/webhook
 
 ## Maintenance Scripts
 
+These exist because the cleaning and classification logic improves over time, and existing newsletters in Redis need to be retroactively updated when it does.
+
 ```bash
-# Re-classify topics for all newsletters (dry run)
+# Re-classify topics for all newsletters (dry run — shows what would change)
 npx tsx scripts/backfill-topics.ts
 
 # Re-classify and apply
 npx tsx scripts/backfill-topics.ts --run
+```
 
+Topic classification reads `data/topics.json` and matches each newsletter's sender and subject against the configured rules. Run the backfill whenever you add new senders or keywords to the config.
+
+```bash
 # Re-process clean content for all newsletters (dry run)
 npm run backfill:content
 
 # Re-process and apply
 npm run backfill:content:run
+```
 
-# Re-process a single newsletter (prints preview, no writes)
+Content cleaning extracts readable HTML from raw email HTML — stripping layout tables, forwarding wrappers, tracking links, and nav chrome. When the extraction logic improves, existing newsletters still have their original raw content in Redis, so they can be reprocessed without re-fetching anything.
+
+```bash
+# Preview the cleaned output for a single newsletter (no writes)
 npx tsx scripts/backfill-content.ts --id <newsletter-id>
 
-# Re-process a single newsletter and apply
+# Apply to a single newsletter
 npx tsx scripts/backfill-content.ts --id <newsletter-id> --run
 ```
 
+Use the single-ID mode to spot-check a specific newsletter before running a full backfill across all 700+.
+
 ## Deployment
 
-The app is deployed on Vercel. Set the environment variables in the Vercel dashboard. The `data/topics.json` file is bundled at build time and used server-side for topic classification.
+The app is deployed on Vercel. Set the environment variables in the Vercel dashboard. The `data/topics.json` file is bundled at build time via a dynamic import in `getServerSideProps` — this is what makes it available server-side on Vercel without needing `fs.readFileSync`.
