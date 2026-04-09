@@ -94,9 +94,9 @@ All three original known issues have been resolved:
 
 ## Working Conventions
 
-### Verify before claiming capability
+### Don't assert things you haven't verified
 
-Before asserting that a tool, CLI command, or integration is available (e.g. `gh`, browser access), run a quick check (`which <cmd>` or equivalent). Do not claim a capability and then demonstrate its absence — that wastes cycles and erodes trust. If uncertain, say so first.
+If uncertain, say so. Don't claim a capability, state of the code, or promise about future behavior without basis. Uncertainty stated plainly is more useful than confidence that turns out to be wrong.
 
 ### Batching
 
