@@ -45,12 +45,6 @@ declare module "@/lib/cleaners/contentCleaner" {
   };
 }
 
-declare module "@/lib/parser" {
-  export class NewsletterParser {
-    static parse(html: string, options?: any): Promise<any>;
-  }
-}
-
 declare module "@/utils/logger" {
   export interface Logger {
     info(message: string, ...args: any[]): void;
