@@ -88,7 +88,6 @@ All three original known issues have been resolved:
 ### Remaining limitations
 
 - **Filtered search still O(n)**: When a search/filter is active, `pages/api/newsletters.ts` still does `lrange(newsletter_ids, 0, -1)` to load all IDs before filtering. Acceptable for now — fast path covers normal browsing.
-- **Existing newsletter content**: `contentCleaner.ts` now runs on all new incoming mail. Older newsletters in Redis still have uncleaned content. Use `npm run backfill:content:run` to retroactively clean existing entries.
 - **Phase 2 content cleaning not yet done**: Sponsor block detection and footer noise removal are planned (Issue #51 Phase 2) but not yet implemented.
 
 ---
