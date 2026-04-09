@@ -1,275 +1,123 @@
-# 📰 MNews
+# MNews
 
-Modern Newsletter Management System
+Personal newsletter inbox. Emails arrive via webhook from a mail forwarding service, are stored in Redis, and are displayed in a Next.js dashboard with topic categorization, AI summaries, and a daily Morning Report view.
 
-MNews is a powerful tool for managing and reading newsletters in a clean, organized interface. It helps you take control of your newsletter subscriptions and reading experience.
+## Stack
 
-## ✨ Features
+| Layer      | Technology                       |
+| ---------- | -------------------------------- |
+| Framework  | Next.js 14 (Pages Router)        |
+| Language   | TypeScript 5 (strict)            |
+| Styling    | Tailwind CSS 3 + Emotion         |
+| Database   | Upstash Redis (REST API)         |
+| Deployment | Vercel                           |
+| AI         | Anthropic Claude API (summaries) |
 
-- 📧 **Email Integration** - Webhook support for receiving newsletters
-- 📱 **Responsive Design** - Optimized for all device sizes
-- 🔍 **Content Processing** - Clean, readable formatting of newsletter content
-- 🏷️ **Organization** - Mark as read/unread, archive, and filter newsletters
-- 📊 **Statistics** - Track your reading habits and newsletter sources
-- ⚡ **Fast** - Built with Next.js for optimal performance
+## Features
 
-## 🏗️ Project Structure
+- **Webhook ingest** — receives forwarded emails via `POST /api/webhook`, extracts and stores content
+- **Dashboard** — paginated inbox with read/archive state, search, and full-article modal
+- **Topic categorization** — rule-based classifier assigns newsletters to categories (Technology, Economics & Policy, Art & Culture, etc.) based on sender and keywords; configured in `data/topics.json`
+- **AI summaries** — on-demand Claude-powered summarization stored per newsletter
+- **Morning Report** — daily digest page grouped by topic category, timezone-aware
+- **Content cleaning** — semantic HTML extraction strips email layout tables, Gmail forwarding wrappers, tracking URLs, hidden preheaders, and nav chrome; decodes tracking links to real destinations
 
-```text
-├── .devnotes/         # Development documentation and notes
-├── components/        # Reusable React components
-│   ├── article/      # Article display components
-│   ├── common/       # Shared UI components
-│   ├── layout/       # Layout components
-│   └── newsletter/   # Newsletter-specific components
-├── context/          # React context providers
-├── data/             # Static data files
-├── docs/             # Project documentation
-├── hooks/            # Custom React hooks
-├── lib/              # Core application logic
-│   └── cleaners/     # Content cleaning utilities
-├── pages/
-│   ├── api/          # API routes
-│   └── ...           # Next.js pages
-├── public/           # Static assets
-├── scripts/          # Utility scripts
-├── styles/           # Global styles
-├── types/            # TypeScript type definitions
-└── utils/            # Utility functions
+## Environment Variables
+
+```env
+# Required — Upstash Redis
+KV_REST_API_URL=        # Upstash Redis REST endpoint
+KV_REST_API_TOKEN=      # Upstash Redis auth token
+
+# Required for AI summaries
+ANTHROPIC_API_KEY=      # Anthropic API key
+
+# Optional
+SUMMARY_MODEL=claude-haiku-4-5-20251001   # defaults to Haiku if unset
+NODE_ENV=development                       # set automatically by Next.js
 ```
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Node.js 16+
-- Redis (Upstash Redis recommended)
-- npm or yarn
-
-### 1. Clone the Repository
-
-```bash
-git clone https://github.com/mofro/mnews.git
-cd mnews
-```
-
-### 2. Install Dependencies
+## Development
 
 ```bash
 npm install
-# or
-yarn
+npm run dev          # http://localhost:3000
+npm run build        # production build (runs tsc first)
+npm run type-check   # TypeScript check without emitting
+npm run lint         # ESLint via next lint
 ```
 
-### 3. Environment Setup
+## Data Model (Redis)
 
-Create a `.env.local` file:
-
-```env
-KV_REST_API_URL=your_redis_url
-KV_REST_API_TOKEN=your_redis_token
-NEXT_PUBLIC_API_URL=http://localhost:3000
+```
+newsletter_ids          → list of all IDs, newest first
+newsletter:{id}         → full newsletter object (JSON)
+newsletter:meta:{id}    → sender, subject, date, isRead, isArchived, topics, preview
+newsletter:content:{id} → cleaned/processed content
+newsletter:summary:{id} → AI-generated summary (may not exist)
 ```
 
-### 4. Development Server
+## Key Files
 
-```bash
-npm run dev
-# or
-yarn dev
+| File                             | Purpose                                   |
+| -------------------------------- | ----------------------------------------- |
+| `pages/api/webhook.ts`           | Inbound email entry point                 |
+| `pages/api/newsletters.ts`       | Paginated list endpoint                   |
+| `pages/api/morning-report.ts`    | Daily digest data                         |
+| `pages/index.tsx`                | Main dashboard                            |
+| `pages/morning-report.tsx`       | Morning Report page                       |
+| `lib/redisClient.ts`             | Redis singleton — always import from here |
+| `lib/types.ts`                   | Core TypeScript types                     |
+| `lib/constants.ts`               | Redis key prefixes                        |
+| `lib/cleaners/contentCleaner.ts` | HTML extraction pipeline                  |
+| `lib/utils/decodeTrackingUrl.ts` | Tracking URL decoder                      |
+| `lib/summarizer.ts`              | Claude AI summarization                   |
+| `data/topics.json`               | Topic category rules (senders + keywords) |
+| `utils/dateService.ts`           | Date parsing and formatting               |
+| `context/ThemeContext.tsx`       | Dark mode context                         |
+
+## Webhook
+
+The webhook at `POST /api/webhook` expects JSON from a mail forwarding service:
+
+```json
+{
+  "from": "newsletter@example.com",
+  "subject": "Today's digest",
+  "html": "<html>...",
+  "text": "Plain text fallback",
+  "date": "2026-04-09T10:00:00Z"
+}
 ```
 
-Visit [http://localhost:3000](http://localhost:3000) to see the application.
-
-## 📦 Production Build
-
-```bash
-npm run build
-npm start
-```
-
-## 🔧 Development
-
-### Available Scripts
-
-- `dev` - Start development server
-- `build` - Create production build
-- `start` - Start production server
-- `lint` - Run ESLint
-- `test` - Run tests
-
-### Code Style
-
-This project uses:
-
-- ESLint for code linting
-- Prettier for code formatting
-- TypeScript for type safety
-
-### Documentation
-
-- [API Documentation](./.devnotes/actual-api-endpoints.md)
-- [Architecture](./.devnotes/architecture.md)
-- [Technical Specifications](./.devnotes/technical-spec.md)
-
-## 📝 License
-
-MIT © [Your Name]
-
-## 🔄 Quick Reference
-
-```bash
-# Test migration with sample data
-npm run migrate:test
-
-# Dry run (no changes)
-npm run migrate:newsletters
-
-# Run actual migration
-npm run migrate:newsletters:run
-
-# Rollback if needed
-npm run migrate:rollback:run
-```
-
-## 🚀 Deployment
-
-### Deploy to Vercel
-
-```bash
-# Connect to GitHub repo and deploy
-npx vercel
-
-# Your webhook will be available at:
-# https://your-project.vercel.app/api/webhook
-```
-
-### 4. Set Up Email Forwarding
-
-Forward your newsletters to your webhook endpoint:
+Deploy to Vercel and point your forwarding service at:
 
 ```
 https://your-project.vercel.app/api/webhook
 ```
 
-The webhook expects POST requests with email data:
-
-```json
-{
-  "from": "newsletter@example.com",
-  "subject": "Daily News Digest",
-  "text": "Newsletter content...",
-  "date": "2025-07-07T10:00:00Z"
-}
-```
-
-## Project Structure
-
-```text
-mnews/
-├── .devnotes/                 # Local development notes and documentation (not version controlled)
-│
-├── components/                # React components
-│   ├── ui/                    # Reusable UI components (buttons, cards, etc.)
-│   ├── newsletter/            # Newsletter-specific components
-│   ├── article/               # Article display components
-│   └── layout/                # Layout components (headers, grids, etc.)
-│
-├── pages/                     # Next.js pages and API routes
-│   ├── api/                   # API routes
-│   │   ├── webhook.ts         # Email receiver webhook
-│   │   ├── newsletters.ts     # Newsletter data API
-│   │   └── debug/             # Debug and development endpoints
-│   ├── _app.tsx               # Next.js app wrapper
-│   └── index.tsx              # Main dashboard
-│
-├── public/                    # Static files
-│   └── ...
-│
-├── styles/                    # Global styles
-│   └── globals.css
-│
-├── types/                     # TypeScript type definitions
-│   └── index.ts
-│
-├── utils/                     # Utility functions
-│   └── ...
-│
-├── lib/                       # Core application logic
-│   ├── api/                   # API client utilities
-│   └── storage/               # Data storage utilities
-│
-├── hooks/                     # Custom React hooks
-│   └── ...
-│
-└── context/                   # React context providers
-    └── ...
-```
-
-## Configuration
-
-### Email Service Integration
-
-The webhook is designed to work with email forwarding services. You may need to adjust the webhook format based on your email provider:
-
-- **Zapier Email Parser**
-- **Gmail forwarding rules**
-- **SendGrid Inbound Parse**
-- **Mailgun Routes**
-
-### Environment Variables
-
-Create `.env.local` for any configuration:
-
-```env
-# Optional: Add webhook authentication
-WEBHOOK_SECRET=your-secret-key
-
-# Optional: Configure storage
-STORAGE_PATH=./data/newsletters.json
-```
-
-## Development
-
-### Adding Features
-
-- **RSS integration** - Add RSS feed parsing alongside email
-- **AI summarization** - Integrate with OpenAI for newsletter summaries
-- **Email digests** - Send daily/weekly digest emails
-- **Export functionality** - Export newsletters to various formats
-
-### Testing Webhook Locally
-
-Use ngrok to test email forwarding during development:
+## Maintenance Scripts
 
 ```bash
-# Install ngrok
-npm install -g ngrok
+# Re-classify topics for all newsletters (dry run)
+npx tsx scripts/backfill-topics.ts
 
-# In one terminal
-npm run dev
+# Re-classify and apply
+npx tsx scripts/backfill-topics.ts --run
 
-# In another terminal
-ngrok http 3000
+# Re-process clean content for all newsletters (dry run)
+npm run backfill:content
 
-# Use the ngrok URL for webhook testing
-# https://abc123.ngrok.io/api/webhook
+# Re-process and apply
+npm run backfill:content:run
+
+# Re-process a single newsletter (prints preview, no writes)
+npx tsx scripts/backfill-content.ts --id <newsletter-id>
+
+# Re-process a single newsletter and apply
+npx tsx scripts/backfill-content.ts --id <newsletter-id> --run
 ```
 
-## Contributing
+## Deployment
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test locally
-5. Submit a pull request
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details.
-
----
-
-**Built with Next.js, TypeScript, and a love for organized information** 📰
-
-_"Just keep swimming... through newsletters!"_ 🐠
+The app is deployed on Vercel. Set the environment variables in the Vercel dashboard. The `data/topics.json` file is bundled at build time and used server-side for topic classification.
