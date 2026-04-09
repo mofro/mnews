@@ -1,7 +1,5 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { redisClient } from "@/lib/redisClient";
-// Import the correct parser implementation
-import { NewsletterParser } from "@/lib/parser";
 import { cleanNewsletterContent } from "@/lib/cleaners/contentCleaner";
 import logger from "@/utils/logger";
 import type { Newsletter as ProcessableNewsletter } from "@/types/newsletter";
@@ -58,11 +56,15 @@ interface TopicCategory {
   keywords?: string[];
 }
 
-function classifyTopics(sender: string, subject: string, textSnippet: string): string[] {
+function classifyTopics(
+  sender: string,
+  subject: string,
+  textSnippet: string,
+): string[] {
   try {
     const topicsPath = path.join(process.cwd(), "data", "topics.json");
     const { categories }: { categories: TopicCategory[] } = JSON.parse(
-      fs.readFileSync(topicsPath, "utf-8")
+      fs.readFileSync(topicsPath, "utf-8"),
     );
 
     // Match against domain (after @) AND the full sender string so that
@@ -73,13 +75,19 @@ function classifyTopics(sender: string, subject: string, textSnippet: string): s
 
     const matched = categories
       .filter((cat) => {
-        const senderMatch = cat.senders
-          ?.filter(Boolean)
-          .some((s) => {
+        const senderMatch =
+          cat.senders?.filter(Boolean).some((s) => {
             const sl = s.toLowerCase();
-            return senderDomain.includes(sl) || senderFull.includes(sl) || sl.startsWith(senderFull + ".") || sl.startsWith(senderFull + "@");
+            return (
+              senderDomain.includes(sl) ||
+              senderFull.includes(sl) ||
+              sl.startsWith(senderFull + ".") ||
+              sl.startsWith(senderFull + "@")
+            );
           }) ?? false;
-        const keywordMatch = cat.keywords?.some((kw) => haystack.includes(kw.toLowerCase())) ?? false;
+        const keywordMatch =
+          cat.keywords?.some((kw) => haystack.includes(kw.toLowerCase())) ??
+          false;
         return senderMatch || keywordMatch;
       })
       .map((cat) => cat.name);
@@ -108,54 +116,46 @@ export default async function handler(
     // UPDATED: Handle both original content and cleaned content
     const originalContent = body || "";
     let cleanContent: string;
-    let cleanHTML = '';
-    let text = '';
-    let processingVersion = '1.0.0'; // Default version
-    
+    let cleanHTML = "";
+    let text = "";
+    let processingVersion = "1.0.0"; // Default version
+
     try {
       // Clean the content with our enhanced cleaner
       const cleanedResult = cleanNewsletterContent(originalContent);
       logger.info("Cleaned content");
 
-      // Parse the email content using the incremental parser
-      // @ts-ignore - Using internal implementation details
-      const parseResult = new NewsletterParser().parseToCleanHTML(cleanedResult.cleanedContent);
-      logger.info("Parsed content");
-
-      // Get the cleaned HTML content
-      cleanHTML = parseResult.finalOutput || "";
+      cleanHTML = cleanedResult.cleanedContent;
       logger.info("Cleaned HTML content");
 
       // Process the content
       const processed = await processNewsletterContent(cleanHTML, {
         cleanHtml: true,
         extractText: true,
-        extractImages: true
+        extractImages: true,
       });
 
       // Create the newsletter object with processed content
       const now = new Date().toISOString();
       const newsletter: ProcessableNewsletter = {
-        id: '', // Will be set later
+        id: "", // Will be set later
         cleanContent: cleanHTML,
-        textContent: processed.text || '',
-        subject: '', // Will be set from webhook data
-        from: '',  // Will be set from webhook data
+        textContent: processed.text || "",
+        subject: "", // Will be set from webhook data
+        from: "", // Will be set from webhook data
         date: now,
         metadata: {
-          processedAt: now
-        }
+          processedAt: now,
+        },
       };
 
       text = processed.text || "";
 
-      // Update processing version with our custom version
-      processingVersion = `3.0.0-cleaner-${parseResult.metadata?.processingVersion || 'unknown'}`;
+      processingVersion = "3.0.0-cleaner";
       logger.info("Enhanced parser success");
       logger.info("Content lengths", {
         original: originalContent.length,
         clean: cleanHTML.length,
-        compression: parseResult.metadata?.compressionRatio || 0,
       });
 
       cleanContent = cleanHTML;
@@ -178,16 +178,16 @@ export default async function handler(
       cleanContent: string;
       textContent: string;
       processingVersion: string;
-      
+
       // Status fields
       isRead: boolean;
       isArchived: boolean;
       lastAccessedAt?: string | null;
-      
+
       // Additional fields
       url: string;
       tags: string[];
-      
+
       // Metadata
       metadata: {
         source: string;
@@ -197,7 +197,7 @@ export default async function handler(
         isRead?: boolean;
         archived?: boolean;
       };
-      
+
       // Alias for compatibility
       sender: string;
       receivedAt: string;
@@ -205,12 +205,12 @@ export default async function handler(
 
     // Track processing time
     const startTime = Date.now();
-    
+
     // Create the newsletter object with our standardized content model
     const id = Date.now().toString();
-    const textContent = cleanContent.replace(/<[^>]*>?/gm, ''); // Simple HTML to text conversion
+    const textContent = cleanContent.replace(/<[^>]*>?/gm, ""); // Simple HTML to text conversion
     const wordCount = textContent.split(/\s+/).filter(Boolean).length;
-    
+
     // Set end time after all processing is done
     const endTime = Date.now();
 
@@ -226,16 +226,16 @@ export default async function handler(
       cleanContent: cleanContent,
       textContent: textContent,
       processingVersion: processingVersion,
-      
+
       // Status fields
       isRead: false,
       isArchived: false,
       lastAccessedAt: now,
-      
+
       // Additional fields
       url: `/newsletters/${id}`,
       tags: [],
-      
+
       // Metadata
       metadata: {
         source: "webhook",
@@ -243,9 +243,9 @@ export default async function handler(
         compressionRatio: 0, // This would need to be calculated
         processedAt: now,
         isRead: false,
-        archived: false
+        archived: false,
       },
-      
+
       // Aliases for compatibility
       sender: from || "Unknown Sender",
       receivedAt: date || now,
@@ -253,7 +253,11 @@ export default async function handler(
 
     // Classify newsletter into topics
     const textSnippet = (text || textContent).substring(0, 500);
-    const topics = classifyTopics(newsletter.from, newsletter.subject, textSnippet);
+    const topics = classifyTopics(
+      newsletter.from,
+      newsletter.subject,
+      textSnippet,
+    );
     logger.info("Newsletter topics:", { topics });
 
     logger.info("Saving newsletter data to Redis...");
@@ -269,8 +273,11 @@ export default async function handler(
       content: newsletter.cleanContent || newsletter.content,
       cleanContent: newsletter.cleanContent || newsletter.content,
       rawContent: newsletter.rawContent || newsletter.content,
-      textContent: newsletter.textContent || (typeof newsletter.content === 'string' ? 
-        newsletter.content.replace(/<[^>]*>?/gm, '') : ''),
+      textContent:
+        newsletter.textContent ||
+        (typeof newsletter.content === "string"
+          ? newsletter.content.replace(/<[^>]*>?/gm, "")
+          : ""),
       url: newsletter.url || `/newsletters/${newsletter.id}`,
       // Add any additional fields that the frontend might expect
       title: newsletter.subject,
@@ -281,15 +288,15 @@ export default async function handler(
       tags: [],
       topics,
     };
-    
+
     // Log the data we're about to store
-    logger.info('Storing newsletter content:', {
+    logger.info("Storing newsletter content:", {
       id: newsletter.id,
       contentLength: contentData.content?.length,
       cleanContentLength: contentData.cleanContent?.length,
       rawContentLength: contentData.rawContent?.length,
       textContentLength: contentData.textContent?.length,
-      keys: Object.keys(contentData)
+      keys: Object.keys(contentData),
     });
 
     // Store the main content
@@ -323,7 +330,11 @@ export default async function handler(
     if (process.env.ANTHROPIC_API_KEY) {
       import("@/lib/summarizer")
         .then(({ summarizeNewsletter }) =>
-          summarizeNewsletter(newsletter.id, newsletter.subject, text || textContent)
+          summarizeNewsletter(
+            newsletter.id,
+            newsletter.subject,
+            text || textContent,
+          ),
         )
         .catch((err) => logger.warn("Summary generation failed:", err));
     }

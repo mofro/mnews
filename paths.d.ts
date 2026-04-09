@@ -79,12 +79,6 @@ declare module "@/types/newsletter" {
   }
 }
 
-declare module "@/lib/parser" {
-  export class NewsletterParser {
-    static parse(html: string, options?: any): Promise<any>;
-  }
-}
-
 declare module "@/lib/cleaners/contentCleaner" {
   export function cleanNewsletterContent(content: string): {
     cleanedContent: string;

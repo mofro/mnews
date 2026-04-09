@@ -347,7 +347,16 @@ function extractEmailContent(html: string): string {
       else el.removeAttribute("style");
     });
 
-    return body.innerHTML;
+    // 7. Strip invisible characters common in email HTML:
+    //    soft hyphens, zero-width spaces/joiners, BOM, and the ͏ separator
+    //    used by ESPs to pad preheader text.
+    let html7 = body.innerHTML;
+    html7 = html7
+      .replace(/͏[\s\u00A0\u00AD\u00AD]*\u00AD͏[\s\u00A0\u00AD\u00AD]*/g, " ")
+      .replace(/(?:\u00AD|\u200B|\u200C|\u200D|\uFEFF)+/g, "")
+      .replace(/͏+/g, "");
+
+    return html7;
   } catch {
     // If DOM extraction fails for any reason, return the original HTML untouched
     return html;

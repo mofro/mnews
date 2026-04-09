@@ -115,13 +115,6 @@ declare module "@/lib/cleaners/contentCleaner" {
   };
 }
 
-// Parser types
-declare module "@/lib/parser" {
-  export class NewsletterParser {
-    static parse(html: string, options?: any): Promise<any>;
-  }
-}
-
 // Logger types
 declare module "@/utils/logger" {
   export interface Logger {
