@@ -335,6 +335,18 @@ function extractEmailContent(html: string): string {
       if (decoded !== href) a.setAttribute("href", decoded);
     });
 
+    // 6. Strip inline color/background properties so dark mode CSS can apply.
+    //    Layout properties (width, height, padding, margin, etc.) are preserved.
+    const COLOR_PROPS =
+      /\b(color|background(?:-color)?|border-color|outline-color)\s*:[^;]+;?/gi;
+    body.querySelectorAll("[style]").forEach((el) => {
+      const cleaned = (el.getAttribute("style") ?? "")
+        .replace(COLOR_PROPS, "")
+        .trim();
+      if (cleaned) el.setAttribute("style", cleaned);
+      else el.removeAttribute("style");
+    });
+
     return body.innerHTML;
   } catch {
     // If DOM extraction fails for any reason, return the original HTML untouched

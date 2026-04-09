@@ -723,21 +723,22 @@ body {
   border-color: var(--border-color);
 }
 
-/* Ensure good contrast for text in dark mode */
+/* Ensure good contrast for all text elements in dark mode */
 .dark .newsletter-content-html,
 .dark .newsletter-content-html p,
 .dark .newsletter-content-html li,
 .dark .newsletter-content-html div,
-.dark .newsletter-content-html span {
+.dark .newsletter-content-html span,
+.dark .newsletter-content-html em,
+.dark .newsletter-content-html h1,
+.dark .newsletter-content-html h2,
+.dark .newsletter-content-html h3,
+.dark .newsletter-content-html h4,
+.dark .newsletter-content-html h5,
+.dark .newsletter-content-html h6,
+.dark .newsletter-content-html td,
+.dark .newsletter-content-html th {
   color: var(--text-color) !important;
-  opacity: 0.9 !important;
-}
-
-/* Fix for light gray text in dark mode */
-.dark .newsletter-content-html p,
-.dark .newsletter-content-html li,
-.dark .newsletter-content-html div {
-  opacity: 0.9 !important;
 }
 
 .newsletter-content-html h1,
@@ -859,6 +860,10 @@ body {
   padding-bottom: 0.4em;
 }
 
+.dark .newsletter-content-html h2 {
+  border-bottom-color: var(--border-color);
+}
+
 .newsletter-content-html h3 {
   font-size: 1.15em;
 }
@@ -902,6 +907,11 @@ body {
   text-decoration: none;
 }
 
+.dark .newsletter-content-html a:hover {
+  color: #93c5fd;
+  border-bottom-color: #60a5fa;
+}
+
 .newsletter-content-html strong {
   font-weight: 600;
   color: #1a202c;
@@ -917,6 +927,11 @@ body {
   color: #4a5568;
 }
 
+.dark .newsletter-content-html em {
+  color: var(--text-color);
+  opacity: 0.85;
+}
+
 .newsletter-content-html code {
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
   background-color: #f7fafc;
@@ -924,6 +939,11 @@ body {
   border-radius: 3px;
   font-size: 0.9em;
   color: #e53e3e;
+}
+
+.dark .newsletter-content-html code {
+  background-color: #1e2a3a;
+  color: #fc8181;
 }
 
 .newsletter-content-html pre {
@@ -936,6 +956,10 @@ body {
   line-height: 1.6;
 }
 
+.dark .newsletter-content-html pre {
+  background-color: #1e2a3a;
+}
+
 .newsletter-content-html blockquote {
   border-left: 4px solid #e2e8f0;
   margin: 1.5em 0;
@@ -945,11 +969,22 @@ body {
   font-style: italic;
 }
 
+.dark .newsletter-content-html blockquote {
+  color: var(--text-color);
+  background-color: var(--surface-color);
+  border-left-color: var(--border-color);
+  opacity: 0.9;
+}
+
 .newsletter-content-html hr {
   border: 0;
   height: 1px;
   background-color: #e2e8f0;
   margin: 2em 0;
+}
+
+.dark .newsletter-content-html hr {
+  background-color: var(--border-color);
 }
 
 /* Image handling */
