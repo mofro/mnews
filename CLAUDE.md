@@ -115,6 +115,8 @@ If the issue doesn't have this, write it first. This applies to both new issues 
 
 New planned work items get a GitHub Issue. When writing or significantly expanding a work item, create the issue as part of that same work unit — not as a follow-up. Sub-tasks belong in the issue body as a checklist, not as separate issues.
 
+**Hard stop if the issue cannot be created.** If the GitHub MCP is unavailable and no issue exists yet, do not begin implementation. Surface the blocker explicitly: "I can't create the issue right now — GitHub MCP is down. Should I wait, or do you want to create it manually?" Do not work around it by coding first and filing after.
+
 ---
 
 ## Git Workflow
