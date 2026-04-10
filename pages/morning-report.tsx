@@ -5,26 +5,34 @@ import { format } from "date-fns";
 import { useTheme } from "@/context/ThemeContext";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import FullViewArticle from "@/components/article/FullViewArticle";
-import type { DigestNewsletter, CategoryGroup, MorningReportData } from "@/pages/api/morning-report";
+import type {
+  DigestNewsletter,
+  CategoryGroup,
+  MorningReportData,
+} from "@/pages/api/morning-report";
 
 type MorningReportProps = MorningReportData;
 
 const COLOR_MAP: Record<string, string> = {
-  blue:   "border-blue-400 bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-200",
-  green:  "border-green-400 bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200",
-  orange: "border-orange-400 bg-orange-50 dark:bg-orange-950 text-orange-800 dark:text-orange-200",
-  yellow: "border-yellow-400 bg-yellow-50 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200",
-  purple: "border-purple-400 bg-purple-50 dark:bg-purple-950 text-purple-800 dark:text-purple-200",
-  gray:   "border-gray-400 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200",
+  blue: "border-blue-400 bg-blue-50 dark:bg-blue-950 text-blue-800 dark:text-blue-200",
+  green:
+    "border-green-400 bg-green-50 dark:bg-green-950 text-green-800 dark:text-green-200",
+  orange:
+    "border-orange-400 bg-orange-50 dark:bg-orange-950 text-orange-800 dark:text-orange-200",
+  yellow:
+    "border-yellow-400 bg-yellow-50 dark:bg-yellow-950 text-yellow-800 dark:text-yellow-200",
+  purple:
+    "border-purple-400 bg-purple-50 dark:bg-purple-950 text-purple-800 dark:text-purple-200",
+  gray: "border-gray-400 bg-gray-50 dark:bg-gray-800 text-gray-800 dark:text-gray-200",
 };
 
 const DIVIDER_MAP: Record<string, string> = {
-  blue:   "border-blue-400",
-  green:  "border-green-400",
+  blue: "border-blue-400",
+  green: "border-green-400",
   orange: "border-orange-400",
   yellow: "border-yellow-400",
   purple: "border-purple-400",
-  gray:   "border-gray-400",
+  gray: "border-gray-400",
 };
 
 function NewsletterRow({
@@ -48,7 +56,9 @@ function NewsletterRow({
           </p>
           <h3
             className={`text-sm font-semibold leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 ${
-              item.isRead ? "text-gray-500 dark:text-gray-400" : "text-gray-900 dark:text-white"
+              item.isRead
+                ? "text-gray-500 dark:text-gray-400"
+                : "text-gray-900 dark:text-white"
             }`}
           >
             {item.subject}
@@ -60,14 +70,21 @@ function NewsletterRow({
           )}
         </div>
         <div className="flex flex-col items-end gap-1 shrink-0">
-          <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap" suppressHydrationWarning>
+          <span
+            className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap"
+            suppressHydrationWarning
+          >
             {format(new Date(item.date), "h:mm a")}
           </span>
           {item.isRead && (
-            <span className="text-xs text-gray-400 dark:text-gray-500">read</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              read
+            </span>
           )}
           {item.summary && (
-            <span className="text-xs text-emerald-600 dark:text-emerald-400">AI</span>
+            <span className="text-xs text-emerald-600 dark:text-emerald-400">
+              AI
+            </span>
           )}
         </div>
       </div>
@@ -89,11 +106,14 @@ function CategorySection({
   return (
     <section className={`mb-8 border-l-4 pl-4 ${dividerClass}`}>
       <div className="flex items-center gap-2 mb-3">
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${badgeClass}`}>
+        <span
+          className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${badgeClass}`}
+        >
           {group.name}
         </span>
         <span className="text-xs text-gray-400 dark:text-gray-500">
-          {group.newsletters.length} {group.newsletters.length === 1 ? "newsletter" : "newsletters"}
+          {group.newsletters.length}{" "}
+          {group.newsletters.length === 1 ? "newsletter" : "newsletters"}
         </span>
       </div>
       <div>
@@ -105,9 +125,15 @@ function CategorySection({
   );
 }
 
-export default function MorningReport({ date, categories, uncategorized }: MorningReportProps) {
+export default function MorningReport({
+  date,
+  categories,
+  uncategorized,
+}: MorningReportProps) {
   const { theme } = useTheme();
-  const [fullViewItem, setFullViewItem] = useState<DigestNewsletter | null>(null);
+  const [fullViewItem, setFullViewItem] = useState<DigestNewsletter | null>(
+    null,
+  );
 
   // Write the browser's IANA timezone to a cookie so getServerSideProps can
   // compute "today" in the user's local timezone on subsequent requests.
@@ -116,8 +142,13 @@ export default function MorningReport({ date, categories, uncategorized }: Morni
     document.cookie = `tz=${encodeURIComponent(tz)}; path=/; max-age=31536000; SameSite=Lax`;
   }, []);
 
-  const totalCount = categories.reduce((s, c) => s + c.newsletters.length, 0) + uncategorized.length;
-  const formattedDate = format(new Date(date + "T12:00:00"), "EEEE, MMMM d, yyyy");
+  const totalCount =
+    categories.reduce((s, c) => s + c.newsletters.length, 0) +
+    uncategorized.length;
+  const formattedDate = format(
+    new Date(date + "T12:00:00"),
+    "EEEE, MMMM d, yyyy",
+  );
 
   const handleOpen = (item: DigestNewsletter) => setFullViewItem(item);
 
@@ -138,7 +169,9 @@ export default function MorningReport({ date, categories, uncategorized }: Morni
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mt-4">
             Morning Report
           </h1>
-          <p className="text-gray-500 dark:text-gray-400 mt-1">{formattedDate}</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-1">
+            {formattedDate}
+          </p>
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
             {totalCount} newsletter{totalCount !== 1 ? "s" : ""} today
           </p>
@@ -147,17 +180,27 @@ export default function MorningReport({ date, categories, uncategorized }: Morni
         {totalCount === 0 ? (
           <div className="text-center py-16 text-gray-400 dark:text-gray-500">
             <p className="text-lg">No newsletters today.</p>
-            <p className="text-sm mt-2">Check back after your morning emails arrive.</p>
+            <p className="text-sm mt-2">
+              Check back after your morning emails arrive.
+            </p>
           </div>
         ) : (
           <>
             {categories.map((group) => (
-              <CategorySection key={group.name} group={group} onOpen={handleOpen} />
+              <CategorySection
+                key={group.name}
+                group={group}
+                onOpen={handleOpen}
+              />
             ))}
 
             {uncategorized.length > 0 && (
               <CategorySection
-                group={{ name: "Uncategorized", color: "gray", newsletters: uncategorized }}
+                group={{
+                  name: "Uncategorized",
+                  color: "gray",
+                  newsletters: uncategorized,
+                }}
                 onOpen={handleOpen}
               />
             )}
@@ -171,7 +214,7 @@ export default function MorningReport({ date, categories, uncategorized }: Morni
           article={{
             id: fullViewItem.id,
             title: fullViewItem.subject,
-            content: fullViewItem.summary ?? fullViewItem.preview ?? "",
+            content: "",
             publishDate: fullViewItem.date,
             sender: fullViewItem.sender,
             isRead: fullViewItem.isRead,
@@ -189,14 +232,19 @@ export default function MorningReport({ date, categories, uncategorized }: Morni
   );
 }
 
-export const getServerSideProps: GetServerSideProps<MorningReportProps> = async (context) => {
+export const getServerSideProps: GetServerSideProps<
+  MorningReportProps
+> = async (context) => {
   const { date } = context.query;
   const tz = context.req.cookies.tz
     ? decodeURIComponent(context.req.cookies.tz)
     : "UTC";
   // Compute "today" in the user's local timezone. en-CA locale gives YYYY-MM-DD natively.
   const localDate = new Intl.DateTimeFormat("en-CA", {
-    timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+    timeZone: tz,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
   }).format(new Date());
   // Explicit ?date= param wins over the cookie-derived local date
   const dateParam = typeof date === "string" ? date : localDate;
@@ -207,7 +255,12 @@ export const getServerSideProps: GetServerSideProps<MorningReportProps> = async 
       import("@/pages/api/morning-report"),
       import("@/data/topics.json"),
     ]);
-    const data = await getMorningReportData(dateParam, (topicsModule as any).default?.categories ?? (topicsModule as any).categories, tz);
+    const data = await getMorningReportData(
+      dateParam,
+      (topicsModule as any).default?.categories ??
+        (topicsModule as any).categories,
+      tz,
+    );
     return { props: data };
   } catch (error) {
     return {
