@@ -280,18 +280,15 @@ function extractEmailContent(html: string): string {
       }
     });
 
-    // 2b. Remove tracking pixels — <img> with 1×1 dimensions or max-height ≤ 12px
-    body.querySelectorAll("img").forEach((img) => {
+    // 2b. Remove tracking pixels — <img> with 1×1 dimensions or max-height ≤ 12px.
+    //     Use CSSOM .style API (not getAttribute) so !important and property
+    //     normalization by JSDOM's CSS parser don't cause misses.
+    body.querySelectorAll("img").forEach((el) => {
+      const img = el as HTMLElement;
       const w = img.getAttribute("width");
       const h = img.getAttribute("height");
-      const style = img.getAttribute("style") ?? "";
-      const maxH = /max-height\s*:\s*(\d+)px/i.exec(style);
-      if (
-        (w === "1" && h === "1") ||
-        w === "1" ||
-        h === "1" ||
-        (maxH && parseInt(maxH[1]) <= 12)
-      ) {
+      const maxH = parseFloat(img.style.maxHeight); // "12px" → 12, "" → NaN
+      if (w === "1" || h === "1" || (!isNaN(maxH) && maxH <= 12)) {
         img.remove();
       }
     });
@@ -392,14 +389,14 @@ function extractEmailContent(html: string): string {
     //     Gofobo-style ESPs wrap real text in <a style="max-width:19px;max-height:15px">
     //     so the clickable area is invisible while text still renders. Unwrap these
     //     anchors to remove the tracking link while preserving the visible content.
-    body.querySelectorAll("a[style]").forEach((a) => {
-      if (!a.isConnected) return;
-      const style = a.getAttribute("style") ?? "";
-      const maxW = /\bmax-width\s*:\s*(\d+)px/i.exec(style);
-      const maxH = /\bmax-height\s*:\s*(\d+)px/i.exec(style);
+    //     Use CSSOM .style API for reliable value extraction (same reason as 2b).
+    body.querySelectorAll("a[href]").forEach((el) => {
+      if (!el.isConnected) return;
+      const a = el as HTMLElement;
+      const maxW = parseFloat(a.style.maxWidth); // "19px" → 19, "" → NaN
+      const maxH = parseFloat(a.style.maxHeight); // "15px" → 15, "" → NaN
       const isConstrained =
-        (maxW !== null && parseInt(maxW[1]) <= 20) ||
-        (maxH !== null && parseInt(maxH[1]) <= 20);
+        (!isNaN(maxW) && maxW <= 20) || (!isNaN(maxH) && maxH <= 20);
       if (!isConstrained) return;
       // Only unwrap if there's meaningful content inside
       if ((a.textContent ?? "").trim().length < 3 && !a.querySelector("img"))
