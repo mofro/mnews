@@ -159,6 +159,25 @@ Single `main` branch. All work goes directly to main.
 - The user will merge to main from their local machine
 - This is expected behaviour — not an error. Do not attempt to override it.
 
+### Required session-start check
+
+At the **start of every session**, before doing any work:
+
+```bash
+git fetch origin main
+git log --oneline HEAD..origin/main   # commits on main not on branch (behind)
+git log --oneline origin/main..HEAD   # commits on branch not on main (ahead)
+```
+
+If the branch is behind, rebase immediately:
+
+```bash
+git rebase origin/main
+git push --force-with-lease origin <harness-branch>
+```
+
+Do this before writing a single line of code. A stale branch means wasted work and messy PRs.
+
 ### Required pre-push check
 
 Do this before **every** push:
