@@ -280,6 +280,22 @@ function extractEmailContent(html: string): string {
       }
     });
 
+    // 2b. Remove tracking pixels — <img> with 1×1 dimensions or max-height ≤ 12px
+    body.querySelectorAll("img").forEach((img) => {
+      const w = img.getAttribute("width");
+      const h = img.getAttribute("height");
+      const style = img.getAttribute("style") ?? "";
+      const maxH = /max-height\s*:\s*(\d+)px/i.exec(style);
+      if (
+        (w === "1" && h === "1") ||
+        w === "1" ||
+        h === "1" ||
+        (maxH && parseInt(maxH[1]) <= 12)
+      ) {
+        img.remove();
+      }
+    });
+
     // 3. Remove header chrome — containers where ALL links are nav labels
     //    e.g. the "Sign Up | Advertise | View Online" row at the top of TLDR.
     //    Process innermost elements first (reverse) so parent containers see
@@ -328,11 +344,67 @@ function extractEmailContent(html: string): string {
       });
     }
 
+    // 4b. Remove footer blocks — containers whose only content is unsubscribe/
+    //     copyright/address boilerplate. Walk up from the unsubscribe link to the
+    //     nearest div or td ancestor, and remove it if it contains no content
+    //     headings and no long paragraphs (i.e. it's pure footer chrome).
+    const UNSUB_SIGNALS = [
+      "unsubscribe",
+      "opt out",
+      "opt-out",
+      "manage preferences",
+      "manage subscriptions",
+      "email preferences",
+    ];
+    body.querySelectorAll("a").forEach((a) => {
+      if (!a.isConnected) return;
+      const text = (a.textContent ?? "").trim().toLowerCase();
+      if (!UNSUB_SIGNALS.some((s) => text.includes(s))) return;
+      let candidate: Element | null = a;
+      for (let i = 0; i < 6; i++) {
+        const parent: Element | null = candidate
+          ? candidate.parentElement
+          : null;
+        if (!parent || parent === body) break;
+        const tag = parent.tagName.toLowerCase();
+        if (tag === "div" || tag === "td") {
+          const hasHeadings = !!parent.querySelector("h1,h2,h3,h4");
+          const longParas = Array.from(parent.querySelectorAll("p")).filter(
+            (para) => (para.textContent ?? "").trim().length > 200,
+          );
+          if (!hasHeadings && longParas.length === 0) {
+            parent.remove();
+            return;
+          }
+        }
+        candidate = parent;
+      }
+    });
+
     // 5. Decode tracking URLs on all surviving links
     body.querySelectorAll("a[href]").forEach((a) => {
       const href = a.getAttribute("href") ?? "";
       const decoded = decodeTrackingUrl(href);
       if (decoded !== href) a.setAttribute("href", decoded);
+    });
+
+    // 4c. Unwrap constrained tracking anchors.
+    //     Gofobo-style ESPs wrap real text in <a style="max-width:19px;max-height:15px">
+    //     so the clickable area is invisible while text still renders. Unwrap these
+    //     anchors to remove the tracking link while preserving the visible content.
+    body.querySelectorAll("a[style]").forEach((a) => {
+      if (!a.isConnected) return;
+      const style = a.getAttribute("style") ?? "";
+      const maxW = /\bmax-width\s*:\s*(\d+)px/i.exec(style);
+      const maxH = /\bmax-height\s*:\s*(\d+)px/i.exec(style);
+      const isConstrained =
+        (maxW !== null && parseInt(maxW[1]) <= 20) ||
+        (maxH !== null && parseInt(maxH[1]) <= 20);
+      if (!isConstrained) return;
+      // Only unwrap if there's meaningful content inside
+      if ((a.textContent ?? "").trim().length < 3 && !a.querySelector("img"))
+        return;
+      a.replaceWith(...Array.from(a.childNodes));
     });
 
     // 6. Strip inline color/background properties so dark mode CSS can apply.
