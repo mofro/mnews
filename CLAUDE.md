@@ -178,6 +178,17 @@ git push --force-with-lease origin <harness-branch>
 
 Do this before writing a single line of code. A stale branch means wasted work and messy PRs.
 
+### Required pre-PR check
+
+Before creating a PR, always fetch first to ensure the local `origin/main` ref is current:
+
+```bash
+git fetch origin main
+git log --oneline origin/main..HEAD
+```
+
+If this shows 0 commits, the work is already in main (merged via another PR). Do not create a duplicate. Check `git log origin/main` to confirm.
+
 ### Required pre-push check
 
 Do this before **every** push:
