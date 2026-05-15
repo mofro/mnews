@@ -104,3 +104,7 @@ scripts/backup
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+.beads-credential-key
