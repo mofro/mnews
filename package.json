@@ -48,7 +48,9 @@
     "backfill:topics": "tsx scripts/backfill-topics.ts",
     "backfill:topics:run": "tsx scripts/backfill-topics.ts --run",
     "backfill:content": "tsx scripts/backfill-content.ts",
-    "backfill:content:run": "tsx scripts/backfill-content.ts --run"
+    "backfill:content:run": "tsx scripts/backfill-content.ts --run",
+    "dedupe": "tsx scripts/dedupe-newsletters.ts",
+    "dedupe:run": "tsx scripts/dedupe-newsletters.ts --run"
   },
   "jest": {
     "preset": "ts-jest",

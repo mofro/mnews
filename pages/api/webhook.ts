@@ -4,8 +4,14 @@ import { cleanNewsletterContent } from "@/lib/cleaners/contentCleaner";
 import logger from "@/utils/logger";
 import type { Newsletter as ProcessableNewsletter } from "@/types/newsletter";
 import { processNewsletterContent } from "@/utils/content";
+import {
+  webhookFingerprint,
+  FINGERPRINT_KEY_PREFIX,
+} from "@/lib/webhookFingerprint";
 import fs from "fs";
 import path from "path";
+
+const DEDUP_TTL_SECONDS = 3600;
 
 // Verify required environment variables are present
 if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
@@ -107,11 +113,39 @@ export default async function handler(
     return res.status(405).json({ message: "Method not allowed" });
   }
 
+  // Hoisted so the catch can release the fingerprint claim on failure.
+  let claimedFingerprintKey: string | null = null;
+
   try {
     // Extract newsletter data from request (your existing field names)
     const { subject, body, from, date } = req.body;
 
     logger.info("Newsletter received", { subject, from, date });
+
+    // Dedup: reject duplicate webhook deliveries (forwarder retries) before
+    // doing any expensive work. Fingerprint is content-based so retries with
+    // different timestamps still collide. SET ... NX EX is atomic.
+    const fingerprint = webhookFingerprint(
+      from || "",
+      subject || "",
+      body || "",
+    );
+    const fingerprintKey = `${FINGERPRINT_KEY_PREFIX}${fingerprint}`;
+    const claim = await redis.client.set(fingerprintKey, "pending", {
+      nx: true,
+      ex: DEDUP_TTL_SECONDS,
+    });
+    if (claim === null) {
+      const existingId = await redis.client.get(fingerprintKey);
+      logger.info("Duplicate webhook ignored", {
+        fingerprint,
+        existingId,
+        subject,
+        from,
+      });
+      return res.status(200).json({ duplicate: true, existingId, fingerprint });
+    }
+    claimedFingerprintKey = fingerprintKey;
 
     // UPDATED: Handle both original content and cleaned content
     const originalContent = body || "";
@@ -208,6 +242,12 @@ export default async function handler(
 
     // Create the newsletter object with our standardized content model
     const id = Date.now().toString();
+
+    // Update the fingerprint claim to point at the real ID so future duplicate
+    // responses can report a usable existingId. Preserve the original TTL.
+    await redis.client.set(fingerprintKey, id, {
+      ex: DEDUP_TTL_SECONDS,
+    });
     const textContent = cleanContent.replace(/<[^>]*>?/gm, ""); // Simple HTML to text conversion
     const wordCount = textContent.split(/\s+/).filter(Boolean).length;
 
@@ -355,6 +395,14 @@ export default async function handler(
     });
   } catch (error) {
     logger.error("Webhook error:", error);
+    // Release the fingerprint claim so the forwarder's retry can succeed.
+    if (claimedFingerprintKey) {
+      try {
+        await redis.client.del(claimedFingerprintKey);
+      } catch (cleanupErr) {
+        logger.warn("Failed to release fingerprint claim:", cleanupErr);
+      }
+    }
     res.status(500).json({ message: "Internal server error" });
   }
 }
